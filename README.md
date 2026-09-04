@@ -8,10 +8,6 @@ original 48K game with its incompatibility on later 128K Spectrum models
 fixed. It still uses only the 48K address space: there is no bank switching,
 expanded-memory content or separate 128K code path.
 
-**Emulator rule:** always select **ZX Spectrum 48K** and use the supplied
-`assets/zxspectrum48k.rom`. Never select a 128K, +2 or +3 profile for project
-testing merely because the compatibility release is named â€śElite 128Kâ€ť.
-
 All three tape payloads are assembled from the source files in
 `src/`. The **default** TAP is **byte-for-byte identical** to
 `assets/Elite - 128k.tap`. No `INCBIN` or external binary payload is used

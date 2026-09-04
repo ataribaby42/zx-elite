@@ -126,7 +126,7 @@ download from entering Git; builds use the separately installed assembler.
 6. When semantics change, use targeted emulator checks of the affected behaviour.
    Exact bytes prove a reconstruction build, while emulator tests prove
    modified behaviour. Choose their scope using the rules below.
-7. Do not commit or push unless explicitly asked.
+7. Do not create Git commits or push to GitHub. Leave all changes uncommitted locally.
 
 ## Proportionate validation
 
