@@ -1,0 +1,63 @@
+NFix Viper encounter legal status check (ersh)
+Z 8 42038 95 0
+NFix traffic at stations, Vipers emerge if station attacked (tomas)
+Z 8 24680 64 0
+NLenslock code always correct (Viktor Drozd)
+Z 8 49837 0 0
+Y
+
+I just made a fix for the Encounter Indicator Light on the 128k version. The flickering pixel is a little more complicated, but as an option I made a quick fix that removes it altogether.
+
+Nfix encounter indicator light
+M 8 23952 254 255
+M 8 23953 254 255
+M 8 23955 252 254
+M 8 23968 0 192
+M 8 23969 192 240
+M 8 23970 240 248
+M 8 23971 248 252
+M 8 23972 252 254
+M 8 23973 252 254
+M 8 23974 254 255
+Z 8 23975 254 255
+Nremove flickering radar pixel
+Z 8 20681 0 1
+Y
+
+NFix encounter indicator light
+M 8 23952 254 255
+M 8 23953 254 255
+M 8 23955 252 254
+M 8 23968 0 192
+M 8 23969 192 240
+M 8 23970 240 248
+M 8 23971 248 252
+M 8 23972 252 254
+M 8 23973 252 254
+M 8 23974 254 255
+Z 8 23975 254 255
+NRemove flickering radar pixel
+Z 8 20681 0 1
+NAllow escape from pirate controlled system
+M 8 55298 205 33
+M 8 55299 237 99
+M 8 55300 252 112
+M 8 64749 33 0
+M 8 64750 101 0
+M 8 64751 96 0
+M 8 64752 203 0
+M 8 64753 254 0
+M 8 64754 33 0
+M 8 64755 99 0
+M 8 64756 112 0
+Z 8 64757 201 0
+NForce pirate controlled system next jump
+Z 8 55310 0 5
+NEnable pirate controlled systems in Galaxy 1
+Z 8 43047 1 1
+NPirates will never board your ship
+Z 8 55315 254 190
+Y
+
+Nallow missions/pirates in galaxy 1
+Z 8 55237 0 78

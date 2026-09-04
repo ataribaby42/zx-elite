@@ -1,0 +1,492 @@
+THE SPECTRUM GAME DATABASE
+
+ELITE
+
+PUBLISHER
+Firebird
+
+AUTHOR
+Torus
+
+YEAR
+1985
+
+CATEGORY
+Strategy 3D Trading
+
+DESCRIPTION
+Elite is a space trading game, where you fly from planet to
+planet buying and selling goods, and use the cash to upgrade your
+ship.
+
+CONTROLS
+        Space Flight Controls
+
+Anticlockwise roll          N - or joystick
+Clockwise roll              M - or joystick
+Dive                        S - or jotstick
+Climb                       X - or joystick
+Increase speed              SPACE
+Decrease speed              SYMBOL SHIFT
+Front view                  1
+Back view                   2
+Left view                   3
+Right view                  4
+
+        Space Combat Controls
+
+Fire laser                  A - or fire button
+Target missile              T
+Fire missile                F
+Unarm missile               U
+ECM                         E
+Energy bomb                 W
+Escape capsule              Q
+Docking computer on         C
+Docking computer off        C
+
+        Navigation Controls
+
+Hyperspace                  H
+Intergalactic jump          G then H
+Distance to system          D
+Cursor cross home           B
+Cursor cross control        N, M, S, X (left, right, up, down) 
+Galactic chart              I 
+Local cluster chart         O
+
+        Trading Controls
+
+Launch from station         1 - only while docked
+Buy cargo                   2 - only while docked
+Sell cargo                  3 - only while docked
+Equip ship                  4 - only while docked
+Galactic chart              I
+Local cluster chart         O
+Data on system              P
+Market prices               K
+Status page                 L
+Inventory                   ENTER
+Find planet                 R - only while docked
+
+        Game Controls
+
+Torus jump drive            J
+Freeze game                 CAPS SHIFT
+Continue game               SPACE
+Initiate save               SYMBOL SHIFT - only while docked
+
+        Other Controls
+
+Hold a Sinclair port 1/Cursor/Kempston joystick left on the
+initial screen to select control with that joystick port.
+
+Note: these controls can only be used when the game is frozen
+
+Keyboard recentering toggle R
+Keyboard damping toggle     D
+Keyboard/joystick toggle    K
+Reverse joystick            Y - Y-direction only
+Reverse joystick            B - both directions
+Sound effects off           Q
+Sound effects on            S
+Start new game              1
+
+The keyboard recentering toggle R will disable and re-enable the
+recentering in roll and dive/climb control. When recentering is
+enabled, a small amount of climb (or clockwise roll) cancels any
+dive (or antclockwise roll) and vice versa.
+
+The keyboard damping toggle D will disable and re-enable the
+automatic damping of a roll, dive or climb while in keyboard
+control.
+
+The B key will reverse both directions of the joystick enabling
+it to be held either way around. The Y key will reverse the
+Y-direction only so that pushing the joystick forward will result
+in a climb and pulling it back will result in a dive; roll will
+not be affected. The B and Y keys can be used in conjunction.
+
+
+INSTRUCTIONS
+
+Command your Cobra space ship in a fantastic voyage of discovery
+and adventure, a supreme test of your combat, navigational and
+entrepreneurial skills.
+
+Trade between countless planets, using the proceeds to equip your
+ship with heat-seeking missiles, beam lasers and other weapons
+- corporate states can be approached without risk, but unruly
+anarchies may be swarming with space pirates.
+
+Black market trading can be lucrative but could result in
+skirmishes with local police and a price on your head!
+
+However you make your money, by fair means or foul, you must
+blast onwards through space annihilating pirate ships and hostile
+aliens as you strive to earn your reputation as one of the Elite!
+
+YOUR RATING AS A COMBATEER
+To become an elite combateer requires great skill and great
+patience, because expert trading is essential before the
+necessary more powerful armaments and equipment available to the
+Cobra ship can be bought: beam lasers, more missiles, energy
+bombs, a docking computer, galactic hyperdrive, etc.
+
+As you sail through space between the stars, and as you trade,
+you will live with your combat rating. You will begin as
+HARMLESS. If you survive your first skirmish you may be
+reclassified as MOSTLY HARMLESS. But on the slow climb to a
+status level that reflects a growing talent for combat you
+will have to engage many different ships, in many different
+skirmishes, in the System Space of many different worlds. You
+will then be classified as POOR, then AVERAGE, then ABOVE
+AVERAGE, then COMPETENT. Then you will become DANGEROUS, then
+DEADLY. And at last a few will become ELITE.
+
+Your kills are photographed and transmitted by TS ComDirect to
+the nearest GalCop Federal Law Centre. Your rating as a combateer
+will increase in direct proportion.
+
+Fly your Cobra craft wisely and carefully. Remember: other pilots
+may be attempting to increase their own combat rating by
+attacking either innocent traders, or police Vipers (the ships
+of the GalCop Police Force). If you resort to such tactics (or
+if you adopt the fast-credit routine and trade in illegal goods)
+then your combat rating may rise, but your legal status: CLEAN
+-> OFFENDER -> FUGITIVE, will make you Public Enemy Number One
+with the Federation Crime Monitoring Authority and you will not
+be left alone.
+
+SCREEN DISPLAY
+Front shields      Status (Green, all safe; Yellow,            
+Aft shields        possible danger; Red, immediate             
+Fuel level         danger; Flashing, critical.)                
+Cabin temperature  Compass (Centres on planet or       
+Laser temperature  space station; when dot is not      
+Altitude           solid, object is behind you.)       
+Missile status     ECM detector - ECM activity near           
+
+EQUIPMENT
+
+Item                Tech Level      Price/CR
+
+Fuel                 Always           Varies
+Missile              Always             30
+Large Cargo Bay      Always            400
+ECM System              2              600
+Pulse Laser             3              400
+Beam Laser              4             1000
+Fuel Scoops             5              525
+Escape Capsule          6             1000
+Energy Bomb             7              900
+Extra Energy Unit       8             1500
+Docking Computers       9             1500
+Galactic Hyperdrive    10             5000
+Mining Lasers          10              800
+Military Lasers        10             6000
+
+
+HINTS AND TIPS
+* Agricultural worlds need specialist food and raw materials, but
+mostly basic machinery and spare parts. If they are rich, they
+need luxuries and high tech industrial machines. They produce
+food in quantity, raw materials and specialised 'organic' items,
+like some textiles.
+* Industrial worlds need agricultural produce, raw materials (for 
+refining), resource exploitation machinery, and (if rich) high
+tech goods. They produce basic items of need for civilised
+worlds: beds, seals and gaskets, power storage units, basic
+weapons, mass produced fertiliser, mass produced medicines, etc.
+* Trade in illegal goods (Slaves, Narcotics and Firearms) is the
+most profitable, but may harm your Legal Status.
+* Destroying pirate vessels earns a bounty, but attacking
+innocent traders may harm your Legal Status.
+* Once your Cobra is within automatic-docking and protective
+range of the Coriolis space station, the scan console will
+display an S next to the compass.
+* Asteroids (and spacecraft!) can be mined with the appropriate
+lasers, and the debris collected in fuel scoops.
+* Thargoid (alien) battle-cruisers may 'hover' in Witch-Space
+(hyperspace) and attack through-coming craft.
+* Using an Escape Capsule effectively resets your legal status
+to Clean.
+
+
+DOCKING PROCEDURE
+Docking with a Coriolis space station is never easy, unless the
+ship is equipped with an automatic docking computer (in which
+case C will activate it). The Navy Training Manual recommends the
+following approach and dock sequence.
+
+Locate the Coriolis station and approach it. The entrance tunnels
+to all these stations face the mother planet. Fly near to the
+station and then on towards the planet (monitoring altitude
+carefully). By turning a half circle you will now find your ship
+orientated towards the entrance.
+
+Approach the final moments of docking at DEAD SLOW SPEED. Failure
+to dock cleanly can be fatal but may simply result in your
+scraping the sides of the aperture, with consequent loss of
+defensive shield(s) and quite possibly your cargo. Manually
+control the Cobra's roll motion to match the rotation of the
+Coriolis station. The entry port must be nearly as horizontal as
+possible.
+
+If docking is successful, the protective field across the station
+entrance is penetrated, and a break pattern appears on the
+screen. Berthing is handled automatically.
+
+
+CHEATS
+As soon as the game loads, and you're given the option to LOAD
+a new commander, press "Y", then save your position.  Go back to
+the game, and hey presto.  Not much easier than that...
+
+If you are having trouble docking you can try this cheat.  Once
+you have launched, pick new destination, and fly towards the
+planet a bit. Spin around (and you'll still be dead straight with
+the station entrance) and fly towards the station and hit H for
+hyperspace. If you docked before the countdown ended you docked
+at the new station!
+  
+There was also a cheat so that you always launched into Witch
+Space.  Pause the game.  Press 'f' - you'll hear a beep. 
+Un-pause the game, and hyperspace, as normal.  You'll now appear
+in Witchspace, and will continue to do so until you pause and
+press 'f' again.  You *will* use a full journey's worth of fuel
+though, even though your location (on the Short-range chart) is
+halfway between the planets, so make sure you choose a planet
+that's nearer than 3.5 light years, or you'll be stuck! The same
+sequence gets you out again (assuming the Thargoids don't frag
+you before you can jump!)
+
+There is a way to stay in Witchspace forever, or at least until
+you have 35 tonnes of alien items.  If your fuel scoops are
+active when you enter witchspace they stay active and your fuel
+just keeps going up and up.
+
+Elite POKEs:-
+43071-43074    3    Big lasers
+43078          1    Lg cargo bay
+43079          1    ECM
+43082          1    Fuel Scoops
+43083          1    Escape pod
+43084          1    Energy bomb
+43085          1    Energy unit
+43086          1    Docking computer
+43049          200  Lotsa dough
+43122          192  ECM & *cloaking device*
+43087          192  Chance to save refugees 'mission'
+43053-43069    x    Cargo bay 
+43077          4    Missiles
+42428          0    Infinite Energy (useful for cloak)
+42870          0    Infinite missiles
+37482          0    Inf. energy bomb
+42897          0    Inf. escape pods
+54682          0    Inf. Galactic hyperspaces
+
+
+SEQUELS/PREQUELS
+There are several versions of Elite on the Spectrum, most notable
+a 48K and 128K version, although there is very little difference
+between the two.
+
+Elite was followed up with Frontier (written by Elite's original
+author David Braben), although not on the Spectrum.  There was 
+also the *original* ELITE Tuner, which was written by the same 
+bloke who wrote the WHAM Music Box.  I forget his name though. 
+
+Elite Tuner had some superb 2-channel music - Waltz of the Blue 
+Danube. (funnily enough!)
+
+
+SCORES RECEIVED
+It received a Sinclair User Classic award.
+
+
+GENERAL FACTS
+These are the number of kills needed to reach each particular
+status:
+
+           0-8          Harmless
+           9-16         Mostly harmless
+          17-32         Poor
+          33-64         Average
+          65-128        Above average
+         129-767        Competent
+         768-2815       Dangerous
+        2816-6655       Deadly
+        6656+           ELITE
+  
+If you reached 65535 kills, your rating reverted to 0 - Harmless,
+which is a useless but interesting fact, 8-bit register fans.
+
+ELITE is possibly the most well-known computer game ever.  When
+it made it's appearence on the Spectrum, it was thanks to
+Firebird Gold - the full-price range of their software, and
+programmed by a team called TORUS (who also coded the Amstrad
+version, hence why apart from added colour, the two look & play
+the same.)  All the space trading tactics were faithfully
+translated from the BBC original, and there were new missions for
+the format - SuperNova, Cloaking Device & Thargoid Invasion, and
+many of the spacecraft made it to the 'humble' Spectrum.  Many
+of the rumours also made it across - there was, alas, no space
+dredger in the ZX ELITE...
+
+ELITE was also one of the first games to be found not compatible
+with the brand new 128k Spectrum.  A patched version was released
+almost immediatly, although it was rather sad that with all the
+extra memory, nothing new was added to the enhanced machine.
+
+Are the Save games compatible throughout all of the different
+versions? If you saved to tape in the 48k version, could I load
+it back into the 128 one? Yes.  That may have been one of the
+reasons that the 128K version was essentially the same as the 48K
+- so all flags that needed to be set for missions could be
+preserved, etc.
+ 
+Another oddity for ELITE - it used the LensLok protection device.
+Lenslok was a plastic prism, which when viewed through, made a
+jumble on the screen turn into a password.  LensLok never caught
+on, and was only used in a few games, including Tomahawk.  It was
+notoriously difficult to use.
+
+ELITE is still a protected program - ie:  It is not freely
+distributable in any type of snapshot image.
+
+When Elite was first released, it was part of a competition to
+see who the first person was to become elite.  The winner was 
+supposed to get some prize or other. This was to do with all the
+secret  missions and what have you. In fact, this may even have
+been from the original Beeb release, but I think it was for the
+Spectrum.  Anyway, the  publishers got cold feet about it because
+it was alleged that people had hacked in and found it out the 
+'easy' way, so it was cancelled and anyone who entered was fobbed
+off with a badge or something. It caused quite a bit of
+controversy at the time as I recall.
+
+Does the Speccy version include any of the secret missions, such
+as destroying the secret ship, the rogue space-station, etc? 
+Yes.  The first mission, is 'Nova' and requires you (to manouvre
+down this trench...  sorry - wrong game!) rescue the crew of a
+Space Station whose sun is about to explode.  When you arrive in
+the system, the screen is red, not white, you get a 'Fuel Leak!'
+warning (A cunning way of making sure you don't chicken out, and
+witchspace outta there,) and you only have a short time to get
+to the space station.  Your reward is 100g of gems, and to
+trigger the mission you need to be ranked competent or above, and
+have purchased a galactic hyperspace - When you activate your
+space drive, (presumably) the radiation from the Nova bumps you
+into the next Galaxy.
+
+Mission 2 involves a bunch of ships that flicker in and out of
+vision.  They're quite easy to kill though.  Eventually, you'll
+come up against a single ASP II, which when (finally) destroyed
+will release a single cargo canister, as opposed to the 2 alloys
+normally released as debris.  Scoop this cargo, and you'll find
+yourself automagically cloak-capable.  Pressing "Y" will activate
+the cloak - your screen goes blue, and all other ships
+float/drift, power-down, including Thargoids.  The Cloak has a
+pretty hefty drain on the energy units though...
+
+Mission 3 you get to destroy a Space Station!  The Space navy
+equips you with an ECM Jammer, which replaces your standard ECM
+unit, and off you go to have a bish at a Space Station over-run
+by Thargoids.  You can make a fortune on this mission by blasting
+Thargoids, and scooping Tharglets.
+  
+ZX Elite only has the one type of energy unit.  The reason for
+the Military Energy unit was from BBC Elite, where a mission was
+to hunt a new type of ship - The Constrictor - which was equipped
+with the Military Energy unit, and was thusly impervious to
+anything less that Military lasers.  Constrictor mission isn't
+present in ZX Elite, so no Military Energy unit.
+  
+The following are approximate shapes drawn based on the cards 
+supplied with the Archimedes version (Darren Salt):
+
+Adder           Anaconda      Asp                   Boa
+  __________         /\              _______            /\
+ |  ______  |       //\\            /       \          /  \
+ | |______| |       //\\          //         \\        /  \
+ |          |      //__\\       //             \\     / /\ \
+ |__________|     / /  \ \    /_/_             _\_\   / /\ \
+||          ||    //    \\    \ \ ----_____---- / /  / /  \ \
+||   /||\   ||   / /    \ \    \ \     /|\     / /   / /  \ \
+||   \||/   ||  / /      \ \    \\   /  |  \   //   /________\
+||__________||  \_/______\_/     \\/____|____\//    |________|
+
+Cobra Mk I     Cobra Mk 3   Fer-de-Lance        Gecko
+  ______       __                  /\               _____
+ /__==  \     |  \                /  \             /     \
+|        \    |\-_ \             /    \           //     \\
+|         \   | \ --_\          /      \         //  | |  \\
+|          \  |  \   --\       /  /  \  \       / /  | |  \ \
+|        _- | |   \   _- \    /  /|  |\  \     / /  /| |\  \ \
+|      _- ||| |    \_-   |   /  / |  | \  \   /  /  /| |\  \  \
+|       -_||| |    / -_  |  /  /  |  |  \  \ /  /   /| |\   \ \
+|         -_| |   /    - / /  /___|  |___\  \ \_/___________\_/
+|          /  |  /  _--/  /___            ___\
+|         /   | /_-- /    \   ---______---   /
+|___     /    |/-  /       \   __--  --__   /
+ \__==__/     |__/          \==__________==/
+
+Krait                   Mamba                   Moray
+.        .        .         /\                 ________
+|       /|\       |        //\\               /        \
+|      / | \      |       //  \\            / /        \ \
+|    /   |   \    |      / /[]\ \          / /          \ \
+|   /    |    \   |     / /    \ \       /   /          \   \
+| /      |      \ |    /  /    \  \     /___/____________\___\
+|/       |       \|   /  /      \  \     ---____      ____---
+ --__    |    __--   /___/______\___\          ---__---
+     --__|__--
+         -
+
+Orbit Shuttle   Python   .              Sidewinder
+    ____                /|\                  _________
+ _==----==_            / | \                /\        /\
+|    /\    |          /  |  \              /  \      /  \
+|    /\    |         /   |   \            /    \    /    \
+|   /  \   |        /    |    \          /      \  /      \
+|   /  \   |       /     |     \        /________\/________\
+|  /    \  |      /     _|_     \
+|  /    \  |     /  __--   --__  \      Thargon
+| /      \ |    /_==___________==_\       ___
+| /      \ |    \                 /      |   |
+|/        \|     \\             //       |   |
+|/________\|      \ \         / /       | |_| |
+                   \__\     /__/        | |_| |
+                      --\_/--           --___--
+
+Thargoid                    Transpoter         Viper (Police)
+       ________                ___                  /\
+     / \      / \          __--\ /--__             //\\
+   /    \____/    \      ==_____V_____==          //  \\
+ /_    /      \    _\   |       |       |        / /  \ \
+|  --/          \--  |  |       |  /|\  |       / / /\ \ \
+|   |            |   |  | ====  |       |      /  //  \\  \
+|   |            |   |  |  ___  |   .   |     /  //    \\  \
+|__--\          /--__|  |  \|/  |  /_\  |    /   /      \   \
+ \     \ ____ /     /   |       |       |     --/________\--
+   \    /    \    /     |_______|_______|
+     \ /______\ /
+
+Worm
+    _____
+   /|/_\|\
+  | |   | |
+  | |   | |
+ | |     | |
+ | |     | |
+ | |     | |
+|  |     |  |
+| |       | |
+--|_______|--
+
+
+ 
+
+NOTES
+Thats about everything!

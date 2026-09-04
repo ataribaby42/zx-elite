@@ -1,0 +1,29 @@
+NFront military laser          
+Z  2 43071   3   0
+NRear military laser           
+Z  2 43072   3   0
+NLeft military laser           
+Z  2 43074   3   0
+NRight military laser          
+Z  2 43075   3   0
+NLarge cargo bay               
+Z  2 43078   1   0
+NECM system                    
+Z  2 43079   1   0
+NFuel scoops                   
+Z  2 43082   1   0
+NEscape pod                    
+Z  2 43083   1   0
+NEnergy bomb                   
+Z  2 43084   1   0
+NEnergy unit                   
+Z  2 43085   1   0
+NDocking computers             
+Z  2 43086   1   0
+NGalactic hyperspace           
+Z  2 43087   1   0
+NLots of money                 
+Z  2 43049 255   0
+NCloaking device               
+Z  2 43122 192   0
+Y

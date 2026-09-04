@@ -1,0 +1,198 @@
+Elite - Ship Boarded by PIRATES!
+ErshErshFebruary 2016 in Games  Quote Thanks
+Yesterday I sat down behind the debugger and decided to work out what causes the "Ship Boarded by PIRATES!" event that can sometimes, very rarely, happen in the Spectrum version of Elite. I thought there might be something one could do to avoid it, but unfortunately it turns out it's random. However the likelihood of it happening differs depending on what type of government you're in.
+
+0.39% likelihood in Corporate States and Democracies
+
+0.78% likelihood in Confederacies and Communist States
+
+1.17% likelihood in Dictatorships and Multi-Governments
+
+1.56% likelihood in Feudal Worlds and Anarchies
+
+The random number is constantly generated while flying but not when in menus nor while docked. The condition is checked and the event is triggered when you make a hyperspace jump. Once it has been triggered there's no way to avoid it, even if you jump to another system, when you dock it's game over. Also if you don't use the docking computer but fly manually to the station you'll notice that it's not rotating any more, very ominous.
+
+Even if boarding is a small risk, if you're going to grind pirates for three-quarters of an hour, first make sure that the station is safe i.e. first dock then stay in the system while fighting and dock in the same station when you're done.
+
+If you'd like to never be boarded by those pesky pirates, enter this poke:
+
+poke 56907,254
+
+On the other hand; if you'd like to see the red screen of doom, enter this poke and they will board your ship every time:
+
+poke 56902,0
+
+ Quote
+ Quote
+tomastomasFebruary 2016
+Interesting, I never understand this pirates game over, always though its not fair as player has no way to avoid.
+
+Thanks for poke.
+ Quote
+2 Likes Like Quote
+Paradigm ShifterParadigm ShifterFebruary 2016 Thanks
+Can you not press ARRRRR
+Currently released version of SJOE: https://spectrumcomputing.co.uk/index.php?cat=96&id=42215
+ Quote
+Like Quote
+ErshErshFebruary 2016 Thanks
+Yes, it's a bit unfair to be honest. And with such low odds of it happening, they could've made it a positive event instead, like "You won the space-lottery, here have some extra credits" or something.
+
+Pressing ARRRR might work, need to check that! 
+ Quote
+Like Quote
+ZoffyZoffyFebruary 2016 Thanks
+If you use the escape pod is it still Game Over when you dock?
+General Malthadius Zoff
+Magenta icon
+ Quote
+Like Quote
+ErshErshFebruary 2016 edited February 2016 Thanks
+Unfortunately, they still board your ship if you use the escape pod.
+Post edited by Ersh on February 2016
+ Quote
+Like Quote
+MatGubbinsMatGubbinsFebruary 2016 Thanks
+They probably grapple your ship and blast the escape pod if it launches. If you don't use the pod then you will put up a fight and eventually caught / shot dead / added to the slave cargo hold.
+Bomb Munchies on WOS thread
+Download the latest version of Bomb Munchies Ver2210 4th July 2020
+ Quote
+Like Quote
+Paradigm ShifterParadigm ShifterFebruary 2016 Thanks
+Do they have spacesuits for their parrots
+Currently released version of SJOE: https://spectrumcomputing.co.uk/index.php?cat=96&id=42215
+ Quote
+Like Quote
+ErshErshFebruary 2016 Thanks
+Not only do the pirates get a freebie, I've also noticed that the police seems to have some strange behaviour in ZX Elite.
+
+Pretty much the only time I've ever seen the police here is when they attack you during your journey towards a planet. They don't care about you legal status, they'll start shooting at you even if you're 'clean' and if you fight back you'll of course be labelled a 'fugitive'. This may very well be a bug or perhaps this universe only has got corrupt cops on duty.
+
+Also in all other versions (not sure about the CPC one) if you attack a station, police vipers will burst forth, you'll be a fugitive and under heavy attack. In the ZX version you can zap away at the station all you want (hell, fire off a few missiles as well while you're at it) and there'll be no change in legal status and no police to be seen. Perhaps the stations are better built here and they simply don't worry about a lone oddball chipping away at the paint.
+
+ Quote
+Like Quote
+Paradigm ShifterParadigm ShifterFebruary 2016 Thanks
+Are you Commander Leroy or something?
+Currently released version of SJOE: https://spectrumcomputing.co.uk/index.php?cat=96&id=42215
+ Quote
+Like Quote
+SardSardFebruary 2016 Thanks
+The issue of police vipers not coming out of a space station when you open fired on it was really just a bug from the lenslok 48k version and was fixed for the later 128k compatible release. It annoyed me no end at the time.
+ Quote
+Like Quote
+RetrobrothersRetrobrothersFebruary 2016 Thanks
+It's 'features' like this that stopped me from really getting to grips with Elite on my beloved Speccy.
+I'd already been playing it for a year or two on my mates BBC, and to be honest, the Speccy version just wasn't as good.
+
+ Quote
+Like Quote
+ErshErshFebruary 2016 Thanks
+I went back into the debugger to find out if the 'corrupt police' were a bug or not, after half an hour I had it sussed. The cops aren't looking at your legal status but the byte next to it, which happens to be the fractional kill points. Easy enough, here's a bugfix for the cops on the take:
+
+poke 42038,95
+
+I'll probably try to take a look at the 'no police defending the space station' bug in the 48k version next. I kind of want to finish mapping the save data first though, not all that many bytes left. 
+
+ Quote
+Like Quote
+HikaruHikaruFebruary 2016 Thanks
+I wonder if NPC ships can also fight it out among themselves in the original version not just attack you
+https://intenseofficial.blogspot.com/
+ Quote
+ Quote
+tomastomasFebruary 2016 edited February 2016
+It will be good if you tell to what version your poke is 48k or 128k, also I think it will be better to work on more fixed 128k version that is even lenslock free. As Sard said they fixed police at station in 128k.
+
+Also in 128k version there is random traffic out of station (although it's always trader Python).
+
+it can be enabled in 48k version by 24680,64 - it also fix police at station if you shoot Coriolis.
+
+Ersh, nice police fix, that poke 42038,95 is for what version?
+Post edited by tomas on February 2016
+ Quote
+ Quote
+tomastomasFebruary 2016
+Hikaru, that's only in Acorn Archimedes version, all 8 bit versions have whole universe turns only around player.
+ Quote
+Like Quote
+ErshErshFebruary 2016 Thanks
+All pokes are for any 48k version, lenslock or not. I can make 128k pirate boarding pokes and police fix tomorrow (if it's not already fixed). Is there any other bugs that got fixed in the 128k version?
+
+Nice! Didn't know there was a poke for the traffic and station police. That means less work so that's good. 
+
+I've also mapped the save format 100%, I'll clean it up and post it tomorrow.
+
+ Quote
+ Quote
+tomastomasFebruary 2016 edited February 2016
+Excelent news about save game mapping. Can't wait to start making editor.
+
+If you can do pokes for 128k it will be perfect. It's version I am playing.
+
+I think they fixed that docking cheat when you initiate hyperspace and go dock so you will emerge docked in new system.
+Post edited by tomas on February 2016
+ Quote
+Like Quote
+ErshErshFebruary 2016 Thanks
+Pirate's will never board your ship 128k:
+
+poke 55315,254
+
+Pirates board your ship every time 128k:
+
+poke 55310,0
+
+I forgot to mention that the pirates event, like the missions, never happen in the first galaxy. So if you're still in galaxy 1 you also need to enter (48k: poke 53349,1) or (128k: poke 43047,1) if you just want to see the boarding. Remember that you need to hyperspace jump in order to activate it too.
+
+I checked the corrupt police in the 128k version and they had already fixed it so no pokes needed there.
+
+ Quote
+Like Quote
+HikaruHikaruFebruary 2016 Thanks
+tomas wrote: »
+Hikaru, that's only in Acorn Archimedes version, all 8 bit versions have whole universe turns only around player.
+Ehh, I mean they can in this mod, so although I suppose it's unlikely, perhaps this behavior too is in fact just a few POKEs away not unlike the police thing fix etc ITT who knows
+https://intenseofficial.blogspot.com/
+ Quote
+ Quote
+tomastomasFebruary 2016
+No it's not few pokes for sure, its new code for it. This version is extensively changed.
+
+Sorry I though you are asking about vanilla versions.
+ Quote
+ Quote
+tomastomasFebruary 2016
+Thanks for pokes Ersh, very needed. Bah I wish I am not so rusty with Z80 assembly this days so I will try mod Pirates mission so it will reset on next hyperspace. So if player notice station doesn't rotate as you said its a sign if pirates he will just hyperspace out if he have fuel or fuel scoop otherwise he is screwed as before.
+
+BTW how is save mapping ?
+ Quote
+Like Quote
+ErshErshFebruary 2016 Thanks
+I had to find a few free bytes to stick the mod into. In the 128k version there was at the end of a page and below a RET a few 0's with next entire page having the interrupt vector table so I stuck it in between there. The code doesn't access the addresses directly either so I think it's safe. Now you can hyperspace out of a system, if you notice that the station isn't rotating, then safely dock at the next system. I tested that it works, also flew around for awhile to see if anything overwrote the mod but it seems safe.
+
+Be able to escape pirate boarding 128k:
+
+poke 55298,205
+poke 55299,237
+poke 55300,252
+poke 64749,33
+poke 64750,101
+poke 64751,96
+poke 64752,203
+poke 64753,254
+poke 64754,33
+poke 64755,99
+poke 64756,112
+poke 64757,201
+
+Keep in mind that if you enter the 'Pirates board your ship every time' poke, the above mod won't help you.
+
+ Quote
+ Quote
+tomastomasFebruary 2016
+Excellent! I go to test. Thanks a lot for you work on code.
+ Quote
+Like Quote
+ErshErshFebruary 2016 Thanks
+No problem! If anyone else would like to try the above mod, you could first enter the above mod pokes then enter poke 55310,0 ('Pirates board your ship every time'). Make a hyperspace jump to activate the event then enter poke 55310,5 to disable 'Pirates board your ship every time'. This is faster than waiting on the off chance of getting the event during normal gameplay.

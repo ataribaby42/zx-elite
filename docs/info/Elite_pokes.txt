@@ -1,0 +1,38 @@
+You can have craft leaving stations on the 48k version by adding Poke 24680,64. What comes out will depend on the circumstances. To see another craft immediately (or 10  ), shoot the station.
+
+By adding Poke 29686,181 at the start of a game, you won't need to exit multiple times to see the ships, you can just press space to scroll through. Poke 29686,6 when done. 
+
+I went back into the debugger to find out if the 'corrupt police' were a bug or not, after half an hour I had it sussed. The cops aren't looking at your legal status but the byte next to it, which happens to be the fractional kill points. Easy enough, here's a bugfix for the cops on the take: poke 42038,95
+
+Pirate's will never board your ship 128k:
+
+ poke 55315,254
+
+ Pirates board your ship every time 128k:
+
+ poke 55310,0
+
+ I forgot to mention that the pirates event, like the missions, never happen in the first galaxy. So if you're still in galaxy 1 you also need to enter (48k: poke 53349,1) or (128k: poke 43047,1) if you just want to see the boarding. Remember that you need to hyperspace jump in order to activate it too.
+
+ I checked the corrupt police in the 128k version and they had already fixed it so no pokes needed there.
+
+I had to find a few free bytes to stick the mod into. In the 128k version there was at the end of a page and below a RET a few 0's with next entire page having the interrupt vector table so I stuck it in between there. The code doesn't access the addresses directly either so I think it's safe. Now you can hyperspace out of a system, if you notice that the station isn't rotating, then safely dock at the next system. I tested that it works, also flew around for awhile to see if anything overwrote the mod but it seems safe.
+
+ Be able to escape pirate boarding 128k:
+
+ poke 55298,205
+ poke 55299,237
+ poke 55300,252
+ poke 64749,33
+ poke 64750,101
+ poke 64751,96
+ poke 64752,203
+ poke 64753,254
+ poke 64754,33
+ poke 64755,99
+ poke 64756,112
+ poke 64757,201
+
+ Keep in mind that if you enter the 'Pirates board your ship every time' poke, the above mod won't help you.
+
+If anyone else would like to try the above mod, you could first enter the above mod pokes then enter poke 55310,0 ('Pirates board your ship every time'). Make a hyperspace jump to activate the event then enter poke 55310,5 to disable 'Pirates board your ship every time'. This is faster than waiting on the off chance of getting the event during normal gameplay.

@@ -1,0 +1,12 @@
+I did a quick key swap poke:
+CODE: SELECT ALL
+
+Nkeyswap
+M 8 65384 4 1
+M 8 65385 16 32
+M 8 65432 1 4
+Z 8 65433 32 16
+Y
+This will swap the B-key with the symbol-shift-key. Since the B-key was only used to re-center while looking at the map it shouldn't matter if it's symbol-shift now instead and a bit out of the way. (Also since they're swapped, the B-key will now instigate the save menu while docked.)
+
+Haven't got a Plus nor 128k so I can say if it's any better, but on my PC keyboard it felt pretty good having increase/decrease speed closer to each other. Feel free to give it a go!

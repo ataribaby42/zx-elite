@@ -1,0 +1,220 @@
+$0000  Commander Name
+$0001  Commander Name
+$0002  Commander Name
+$0003  Commander Name
+$0004  Commander Name
+$0005  Commander Name
+$0006  Commander Name
+$0007  Commander Name
+$0008  Commander Name
+$0009  Commander Name
+$000A  EOL Marker (should always be $00)
+$000B  Legal Status [$00=CLEAN $30=OFFENDER $60=FUGITIVE]
+$000C  Kill Points Fractional Byte
+$000D  Kill Points LSB
+$000E  Kill Points MSB
+$000F  Jumps LSB (in galaxy >1: 1st mission at $20, 2nd mission at $80, 3rd mission at $FE)
+$0010  Jumps MSB (not used but tracked)
+$0011  Current Galaxy Number
+$0012  Money Upper LSB
+$0013  Money Upper MSB
+$0014  Money Lower LSB
+$0015  Money Lower MSB
+$0016  Price Fluctuation in Current System ($00 = lowest prices, $FF = highest prices)
+$0017  Player's Food Tons
+$0018  Player's Textiles
+$0019  Player's Radioactives
+$001A  Player's Slaves
+$001B  Player's Liquor/Wines
+$001C  Player's Luxuries Tons
+$001D  Player's Narcotics Tons
+$001E  Player's Computers Tons
+$001F  Player's Machinery Tons
+$0020  Player's Alloys Tons
+$0021  Player's Firearms Tons
+$0022  Player's Furs Tons
+$0023  Player's Minerals Kg
+$0024  Player's Gold Kg
+$0025  Player's Platinum Kg
+$0026  Player's Gem-stones g
+$0027  Player's Alien Items Tons
+$0028  Current Cargo Bay Size [$14=ORIGINAL, $23=LARGE_CARGO_BAY] ($FF is possible)
+$0029  Front Laser [$01=PULSE, $02=BEAM, $03=MILITARY, $04=MINING]
+$002A  Rear Laser  [$01=PULSE, $02=BEAM, $03=MILITARY, $04=MINING]
+$002B  Left Laser  [$01=PULSE, $02=BEAM, $03=MILITARY, $04=MINING]
+$002C  Right Laser [$01=PULSE, $02=BEAM, $03=MILITARY, $04=MINING]
+$002D  Mission 1 Event Activated (if not $00)
+$002E  Fuel
+$002F  Number of Missiles
+$0030  Large Cargo Bay
+$0031  ECM
+$0032  NULL [Always $00]
+$0033  NULL [Always $00]
+$0034  Fuel Scoops
+$0035  Escape Pod
+$0036  Energy Bomb
+$0037  Energy Unit
+$0038  Docking Computers
+$0039  Galactic Hyperspace
+$003A  NULL [Always $00]
+$003B  NULL [Always $00]
+$003C  Galaxy Seed 1 LSB
+$003D  Galaxy Seed 1 MSB
+$003E  Galaxy Seed 2 LSB
+$003F  Galaxy Seed 2 MSB
+$0040  Galaxy Seed 3 LSB
+$0041  Galaxy Seed 3 MSB
+$0042  Twisted Galaxy Seed 1 LSB for current planet
+$0043  Twisted Galaxy Seed 1 MSB for current planet. (player's and planet's Y position in galaxy $00-$FF [the game divides this by two])
+$0044  Twisted Galaxy Seed 2 LSB for current planet
+$0045  Twisted Galaxy Seed 2 MSB for current planet. (player's and planet's X position in galaxy $00-$FF)
+$0046  Twisted Galaxy Seed 3 LSB for current planet
+$0047  Twisted Galaxy Seed 3 MSB for current planet
+$0048  Current Planet's Tech Level [$00-$0E]
+$0049  Current Planet's Government Type [$00-$07]
+$004A  Station's Food Tons
+$004B  Station's Textiles
+$004C  Station's Radioactives
+$004D  Station's Slaves
+$004E  Station's Liquor/Wines
+$004F  Station's Luxuries Tons
+$0050  Station's Narcotics Tons
+$0051  Station's Computers Tons
+$0052  Station's Machinery Tons
+$0053  Station's Alloys Tons
+$0054  Station's Firearms Tons
+$0055  Station's Furs Tons
+$0056  Station's Minerals Kg
+$0057  Station's Gold Kg
+$0058  Station's Platinum Kg
+$0059  Station's Gem-stones g
+$005A  Station's Alien Items Tons
+$005B  Mission 3 Events [$01 'People fleeing the planet', $04 'Thargoids attacks']
+$005C  [ECM JAMMER|CLOAKING_DEVICE|0|0|MISSION_3_COMPLETED_FLAG|MISSION_3_TRIGGER_FLAG|MISSION_2_TRIGGER_FLAG|MISSION_1_TRIGGER_FLAG]
+$005D  PLAYER'S SECURITY CODE
+$005E  PLAYER'S SECURITY CODE
+$005F  PLAYER'S SECURITY CODE
+$0060  PLAYER'S SECURITY CODE
+$0061  PLAYER'S SECURITY CODE
+$0062  PLAYER'S SECURITY CODE
+$0063  PLAYER'S SECURITY CODE
+$0064  PLAYER'S SECURITY CODE
+$0065  PLAYER'S SECURITY CODE
+
+Another Elite thread, I know. Felt this deserved its own though.
+
+This took a few days to put together and some variables were a bit harder to find. A few wouldn't change anything by modifying the memory directly so loading from tape over and over was required. A lot were found by stepping through various routines.
+
+If you feel like generating your own galaxies, simply change $003C - $0041 with any 8 bit numbers of your choice. I highly recommend you enter the same numbers into $0042 - $0047 as well, this will place you at planet 1 in your new galaxy with the right coordinates. The planet's tech level and government will be wrong, but once you've made your first hyperspace jump everything will be corrected.
+
+There are a total of 4 'NULL' variables in the data, which aren't addressed directly by the code nor ever changes during gameplay. These are placed among the equipment so perhaps Torus considered adding even more items to the game at some point.
+
+For the equipment; anything but $00 counts as equipped.
+
+If 'Mission 1 Event Activated' is $00 and the 'Mission 1 trigger flag' is set then that means that Mission 1 is completed. Having the Cloaking Device in your possession acts as the Mission 2 completed flag. The 3rd mission has its own flag as seen in the data above.
+
+The last 9 bytes are the 'Player's security code' used for the competition back in the day. It's loaded into memory but never read by the program. When you save, the game calculates the 'security code' based on your progress and overwrites the unread data. Since the competition is long over and changing the 'security code' in the save data doesn't accomplish anything I decided not bothering to decipher it.
+
+
+
+48k 102 bytes, 128k 104 bytes with two extra bytes that I believe are always 0x00, 0x14 and have no real meaning.
+Why this save game incompatibility was introduced I don't know. Other content is same in both. 
+
+
+
+Tomas is correct, the additional last two bytes always seems to be $00, $14 in the 128k version. The only other difference is that the 48k game pads the filename with spaces ($20) to fill the complete 10 bytes, while the 128k game pads the the bytes with the EOL marker ($00).
+
+
+
+Yesterday I sat down behind the debugger and decided to work out what causes the "Ship Boarded by PIRATES!" event that can sometimes, very rarely, happen in the Spectrum version of Elite. I thought there might be something one could do to avoid it, but unfortunately it turns out it's random. However the likelihood of it happening differs depending on what type of government you're in.
+
+0.39% likelihood in Corporate States and Democracies
+
+0.78% likelihood in Confederacies and Communist States
+
+1.17% likelihood in Dictatorships and Multi-Governments
+
+1.56% likelihood in Feudal Worlds and Anarchies
+
+The random number is constantly generated while flying but not when in menus nor while docked. The condition is checked and the event is triggered when you make a hyperspace jump. Once it has been triggered there's no way to avoid it, even if you jump to another system, when you dock it's game over. Also if you don't use the docking computer but fly manually to the station you'll notice that it's not rotating any more, very ominous.
+
+Even if boarding is a small risk, if you're going to grind pirates for three-quarters of an hour, first make sure that the station is safe i.e. first dock then stay in the system while fighting and dock in the same station when you're done.
+
+If you'd like to never be boarded by those pesky pirates, enter this poke:
+
+poke 56907,254
+
+On the other hand; if you'd like to see the red screen of doom, enter this poke and they will board your ship every time:
+
+poke 56902,0
+
+
+
+The issue of police vipers not coming out of a space station when you open fired on it was really just a bug from the lenslok 48k version and was fixed for the later 128k compatible release. It annoyed me no end at the time. 
+
+I went back into the debugger to find out if the 'corrupt police' were a bug or not, after half an hour I had it sussed. The cops aren't looking at your legal status but the byte next to it, which happens to be the fractional kill points. Easy enough, here's a bugfix for the cops on the take:
+
+poke 42038,95
+
+I'll probably try to take a look at the 'no police defending the space station' bug in the 48k version next. I kind of want to finish mapping the save data first though, not all that many bytes left. 
+
+t will be good if you tell to what version your poke is 48k or 128k, also I think it will be better to work on more fixed 128k version that is even lenslock free. As Sard said they fixed police at station in 128k.
+
+Also in 128k version there is random traffic out of station (although it's always trader Python).
+
+it can be enabled in 48k version by 24680,64 - it also fix police at station if you shoot Coriolis.
+
+Ersh, nice police fix, that poke 42038,95 is for what version? 
+
+All pokes are for any 48k version, lenslock or not. I can make 128k pirate boarding pokes and police fix tomorrow (if it's not already fixed). Is there any other bugs that got fixed in the 128k version?
+
+Nice! Didn't know there was a poke for the traffic and station police. That means less work so that's good. 
+
+I've also mapped the save format 100%, I'll clean it up and post it tomorrow.
+
+Pirate's will never board your ship 128k:
+
+poke 55315,254
+
+Pirates board your ship every time 128k:
+
+poke 55310,0
+
+I forgot to mention that the pirates event, like the missions, never happen in the first galaxy. So if you're still in galaxy 1 you also need to enter (48k: poke 53349,1) or (128k: poke 43047,1) if you just want to see the boarding. Remember that you need to hyperspace jump in order to activate it too.
+
+I checked the corrupt police in the 128k version and they had already fixed it so no pokes needed there.
+
+ had to find a few free bytes to stick the mod into. In the 128k version there was at the end of a page and below a RET a few 0's with next entire page having the interrupt vector table so I stuck it in between there. The code doesn't access the addresses directly either so I think it's safe. Now you can hyperspace out of a system, if you notice that the station isn't rotating, then safely dock at the next system. I tested that it works, also flew around for awhile to see if anything overwrote the mod but it seems safe.
+
+Be able to escape pirate boarding 128k:
+
+poke 55298,205
+poke 55299,237
+poke 55300,252
+poke 64749,33
+poke 64750,101
+poke 64751,96
+poke 64752,203
+poke 64753,254
+poke 64754,33
+poke 64755,99
+poke 64756,112
+poke 64757,201
+
+Keep in mind that if you enter the 'Pirates board your ship every time' poke, the above mod won't help you.
+
+No problem! If anyone else would like to try the above mod, you could first enter the above mod pokes then enter poke 55310,0 ('Pirates board your ship every time'). Make a hyperspace jump to activate the event then enter poke 55310,5 to disable 'Pirates board your ship every time'. This is faster than waiting on the off chance of getting the event during normal gameplay.
+
+
+
+
+ewgf wrote: »
+Worst of all, though, was Elite 128K. It was just the 48K version made to work on a 128K Spectrum (the original 48K version was one of the few games that wouldn't work on a 128K machine at all). In fact, Elite 128K was slightly inferior to the 48K version :-o as they removed the futuristic font and also removed the cheat tricks.
+
+They also removed 1 of the ships. The 48k lenslok release had a different version on each side of the cassette. IIRC side A had Kraits and side B had Sidewinders. Obviously these 2 ships didn't appear together but alternately as you changed sides. This was cut from the 128 release as both sides are were the same and therefore missing 1 of the ships.
+They got rid of lenslok though and sorted out the "no viper ships out of the station" bug the original had. So its not all bad news... just 
+
+
+You can have craft leaving stations on the 48k version by adding Poke 24680,64. What comes out will depend on the circumstances. To see another craft immediately (or 10  ), shoot the station.
+
+By adding Poke 29686,181 at the start of a game, you won't need to exit multiple times to see the ships, you can just press space to scroll through. Poke 29686,6 when done.

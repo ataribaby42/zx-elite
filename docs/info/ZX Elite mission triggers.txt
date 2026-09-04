@@ -1,0 +1,5 @@
+Mission 1 (Sun going super nova) is triggered after you've made 32 hyperspace jumps in any galaxy but the first.
+
+Mission 2 (The cloaked Asp) is triggered after you've made 128 jumps in any galaxy but the first.
+
+Mission 3 (Thargoid attack) is triggered after you've made 254 jumps in any galaxy but the first

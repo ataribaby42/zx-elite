@@ -1,0 +1,50 @@
+{
+  "passed": true,
+  "note": "Original Z80 routines with controlled RAM/register setup; no instruction patches.",
+  "scenarios": [
+    {
+      "routine": "0x9a6e",
+      "view": 0,
+      "state_byte": 0,
+      "destination": "0x5a00",
+      "written_attribute": "0x17",
+      "cells": 70
+    },
+    {
+      "routine": "0x9a6e",
+      "view": 0,
+      "state_byte": 1,
+      "destination": "0x5a00",
+      "written_attribute": "0x1f",
+      "cells": 70
+    },
+    {
+      "routine": "0x9a6e",
+      "view": 4,
+      "state_byte": 0,
+      "destination": "0x5b00",
+      "written_attribute": "0x17",
+      "cells": 70
+    },
+    {
+      "routine": "0x9a6e",
+      "view": 4,
+      "state_byte": 1,
+      "destination": "0x5b00",
+      "written_attribute": "0x1f",
+      "cells": 70
+    },
+    {
+      "routine": "0xa4e8",
+      "circle_cells": [
+        "$5A28",
+        "$5A29",
+        "$5A48",
+        "$5A49"
+      ],
+      "circle_attribute": "$04",
+      "additional_cell": "$5AE7",
+      "additional_attribute": "$27"
+    }
+  ]
+}

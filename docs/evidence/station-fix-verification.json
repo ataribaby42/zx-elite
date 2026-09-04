@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "change": "Symbolic persistent station blueprint pointer",
+  "before_sha256": "5c76226043f296005353c17b96925b2db7f89ae9140bf96620ed5ea194f83893",
+  "after_sha256": "361b6a1b1b27f90d4c123d21effd4799ed5f5836da2eb6f834e6102b50d2aaec",
+  "payload_changed_addresses": [
+    24683
+  ],
+  "added_bytes": 0,
+  "model_block_free_bytes": 0,
+  "rear_view_pixel_identical_to_original": true
+}

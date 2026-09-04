@@ -1,0 +1,11 @@
+/build/
+/release/*
+!/release/README.md
+/docs/generated/
+/tools/deps/
+__pycache__/
+*.o
+*.lis
+*.map
+*.sym
+*.def

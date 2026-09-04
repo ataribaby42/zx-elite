@@ -1,0 +1,65 @@
+Nallow missions/pirates in galaxy 1
+Z 8 55237 0 78
+
+Nfix encounter indicator light
+M 8 23952 254 255
+M 8 23953 254 255
+M 8 23955 252 254
+M 8 23968 0 192
+M 8 23969 192 240
+M 8 23970 240 248
+M 8 23971 248 252
+M 8 23972 252 254
+M 8 23973 252 254
+M 8 23974 254 255
+Z 8 23975 254 255
+Nremove flickering radar pixel
+Z 8 20681 0 1
+Y
+
+
+NFix encounter indicator light
+M 8 23952 254 255
+M 8 23953 254 255
+M 8 23955 252 254
+M 8 23968 0 192
+M 8 23969 192 240
+M 8 23970 240 248
+M 8 23971 248 252
+M 8 23972 252 254
+M 8 23973 252 254
+M 8 23974 254 255
+Z 8 23975 254 255
+NRemove flickering radar pixel
+Z 8 20681 0 1
+NAllow escape from pirate controlled system
+M 8 55298 205 33
+M 8 55299 237 99
+M 8 55300 252 112
+M 8 64749 33 0
+M 8 64750 101 0
+M 8 64751 96 0
+M 8 64752 203 0
+M 8 64753 254 0
+M 8 64754 33 0
+M 8 64755 99 0
+M 8 64756 112 0
+Z 8 64757 201 0
+NForce pirate controlled system next jump
+Z 8 55310 0 5
+NEnable pirate controlled systems in Galaxy 1
+Z 8 43047 1 1
+NPirates will never board your ship
+Z 8 55315 254 190
+Y
+
+Nkeyswap
+M 8 65384 4 1
+M 8 65385 16 32
+M 8 65432 1 4
+Z 8 65433 32 16
+Y
+
+This will swap the B-key with the symbol-shift-key. Since the B-key was only used to re-center while looking at the map it shouldn't matter if it's symbol-shift now instead and a bit out of the way. (Also since they're swapped, the B-key will now instigate the save menu while docked.)
+
+Haven't got a Plus nor 128k so I can say if it's any better, but on my PC keyboard it felt pretty good having increase/decrease speed closer to each other. Feel free to give it a go!

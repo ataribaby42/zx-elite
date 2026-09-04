@@ -1,0 +1,48 @@
+Seeing as the Dread Pirates Red pitched up on the stream today, I’ve reread the World Of Spectrum forum post by Ersh regarding them - once you’ve got them, you’re stuck with them :(
+
+They list two POKEs to turn them off:
+48k - POKE 56907, 254
+128K - POKE 55315, 254
+They’ve also made a list of 12x POKEs to enter which is essentially a mod for the 128k version - if you approach a Station and it isn’t rotating (denoting that pirates have overtaken it) then you can jump to another system to escape. Clever stuff!
+
+
+Pirate's will never board your ship 128k:
+
+poke 55315,254
+
+Pirates board your ship every time 128k:
+
+poke 55310,0
+
+I forgot to mention that the pirates event, like the missions, never happen in the first galaxy. So if you're still in galaxy 1 you also need to enter (48k: poke 53349,1) or (128k: poke 43047,1) if you just want to see the boarding. Remember that you need to hyperspace jump in order to activate it too.
+
+I checked the corrupt police in the 128k version and they had already fixed it so no pokes needed there.
+
+I had to find a few free bytes to stick the mod into. In the 128k version there was at the end of a page and below a RET a few 0's with next entire page having the interrupt vector table so I stuck it in between there. The code doesn't access the addresses directly either so I think it's safe. Now you can hyperspace out of a system, if you notice that the station isn't rotating, then safely dock at the next system. I tested that it works, also flew around for awhile to see if anything overwrote the mod but it seems safe.
+
+Be able to escape pirate boarding 128k:
+
+poke 55298,205
+poke 55299,237
+poke 55300,252
+poke 64749,33
+poke 64750,101
+poke 64751,96
+poke 64752,203
+poke 64753,254
+poke 64754,33
+poke 64755,99
+poke 64756,112
+poke 64757,201
+
+Keep in mind that if you enter the 'Pirates board your ship every time' poke, the above mod won't help you.
+
+
+I tried it in Spectaculator just now. Started a fresh game, loaded the POK file and ticked these: Allow escape from pirate controlled system, Force pirate controlled system next jump, Enable pirate controlled systems in Galaxy 1.
+
+Made the jump to Leesti, pirates had taken over the station and it was not rotating, I tried unticking the 'Forced pirates' box in the cheat options, but for some reason it didn't restore the original value in RAM so I manually poked 55310,5 and jumped to Diso. The station was rotating there and the docking went fine. Maybe Fuse has problems restoring the value as well?
+
+I made a proper poke that enables missions/pirates in galaxy 1. This modifies the code and not a variable like the earlier quick hack, so the poke can be applied whenever.
+
+Nallow missions/pirates in galaxy 1
+Z 8 55237 0 78

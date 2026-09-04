@@ -1,0 +1,28 @@
+# Normalize text in Git and use LF for source and maintained documentation.
+* text=auto eol=lf
+
+*.asm text eol=lf
+*.py text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.pok text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+# Windows command scripts use CRLF in the working tree.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Tape images, ROMs and other binary artifacts must retain their exact bytes.
+*.tap binary
+*.tzx binary
+*.rom binary
+*.bin binary
+*.png binary
+*.zip binary
+*.7z binary
+
+# Preserve supplied reference media and research notes verbatim, including EOLs.
+/assets/** -text
+/docs/info/** -text

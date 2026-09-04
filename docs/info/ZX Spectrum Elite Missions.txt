@@ -1,0 +1,92 @@
+So I started playing Elite for the Spectrum, not going for the "Elite" rating or anything but I thought it would be fun to at least do the missions.
+
+The problem is; I've searched the web for the mission triggers and I can't find any useful information at all. I found out somewhere that you need to be rated "Competent" and purchased a "Intergalactic hyperdrive" to trigger the first mission (Supernova). Which I've done, but nothing happens, I've tried jumping from planet to planet but nothing.
+
+Anyone know the exact mission prerequisites, required kill rating, planet, galaxy?
+
+I've played the bbc,c64 and NES (made it to Elite) versions and the zx game feels much different in many ways but I highly enjoy it. 
+
+So I've played some more, killing Thargoids in Witch Space getting my first "Right on Commander" and still no mission activation.
+
+I'm often attacked by the police when I'm pretty close to the planet even though I've done nothing illegal and have a "Clean" legal status. Can't escape them so you'll have to fight back which will get you a "Fugitive" legal status. However there's no problem docking with the computer even so and after one hyperspace jump you're just an "Offender".
+
+Also the Safety Zone indicator flickers on and off sometimes during battle even when you're very far away from the planet. If you attack when it's on you get a negative legal status of course. You can use it to your advantage though, simply press "Dock" when it comes on and you'll instantly dock (if you have a docking computer of course.)
+
+These "bugs" made me think that I had a bad copy of the game or something but I've come across others on the net that have experienced these same problems. 
+
+I think you might have to be in at least the second galaxy for the first mission. Try jumping to the next galaxy then buy another galactic hyperdrive. 
+
+So I jumped to Galaxy 2 and bought a new Galactic Hyperdrive there. Did some trading for a while, then some grinding and got my second "Right on Commander!". That's 512 kill points and only 256 from the "Dangerous" rating. Still no mission though. I've been trying to cover as many planet types as I can during my trading in case it's only activated in certain systems. 
+
+Some news! I got the first mission "Supernova". I was in galaxy 2 trading between 2 planets when all of a sudden it activated. I used a Galactic Hyperdrive to escape and took the refugees to galaxy 3. My rating also improved to "Dangerous" so it seems you're also rewarded 256 kill points for the mission (just like the constrictor mission in other versions). There's no mention of that anywhere on the net though.
+
+I'm wondering if the missions are activated after a certain amount of hyperspace jumps in a galaxy, like in the Amiga version. I'm currently trading between 2 planets in galaxy 3 and counting kills and jumps to see if/when the next mission appears.
+
+
+Does the Speccy version include any of the secret missions, such
+as destroying the secret ship, the rogue space-station, etc? 
+Yes.  The first mission, is 'Nova' and requires you (to manouvre
+down this trench...  sorry - wrong game!) rescue the crew of a
+Space Station whose sun is about to explode.  When you arrive in
+the system, the screen is red, not white, you get a 'Fuel Leak!'
+warning (A cunning way of making sure you don't chicken out, and
+witchspace outta there,) and you only have a short time to get
+to the space station.  Your reward is 100g of gems, and to
+trigger the mission you need to be ranked competent or above, and
+have purchased a galactic hyperspace - When you activate your
+space drive, (presumably) the radiation from the Nova bumps you
+into the next Galaxy.
+
+Mission 2 involves a bunch of ships that flicker in and out of
+vision.  They're quite easy to kill though.  Eventually, you'll
+come up against a single ASP II, which when (finally) destroyed
+will release a single cargo canister, as opposed to the 2 alloys
+normally released as debris.  Scoop this cargo, and you'll find
+yourself automagically cloak-capable.  Pressing "Y" will activate
+the cloak - your screen goes blue, and all other ships
+float/drift, power-down, including Thargoids.  The Cloak has a
+pretty hefty drain on the energy units though...
+
+Mission 3 you get to destroy a Space Station!  The Space navy
+equips you with an ECM Jammer, which replaces your standard ECM
+unit, and off you go to have a bish at a Space Station over-run
+by Thargoids.  You can make a fortune on this mission by blasting
+Thargoids, and scooping Tharglets.
+
+From what I've gathered there's no mission introduction to the Cloaking Device, the crafts just appear when certain conditions are met. If you destroy the cloackable ASP-II and don't scoop up the Container you've missed your chance. It's probably easy to miss if you're not aware of it. 
+
+Got the second mission! Right after I got my 4th "Right on Commander!" I did 2 hyperspace jumps (still in galaxy 3) and there it was... a flickering ASP Mk. II with 2 Kraits as backup. They totally destroyed me, so I had to reload my commander a few times. I finally managed to destroy the ASP but couldn't get the container probably because my cargobay was full. So I sold my cargo and tried again. This time I managed to pick up the container, I promptly used an energy bomb to get rid of the others since I had so little energy left. My docking computer got fried in the heat of battle, so it was a nervous journey to the Station.
+
+Now only one mission remains! 
+
+Since I gained the cloaking device I thought I'd do some grinding in witch space, but it proved harder than I thought. I can get 2 Thargoids down easily but then my energy is too low because both the cloak and the laser drain it so quickly. So I tried using missiles and that worked great, if they're close, also they don't use ECM when you're cloaked. If I'm lucky I can get three out of four with missiles then take the last one out with the laser. It's still pretty hard, but at 4 points and 50cr a pop I think it's worth it.
+
+However, when returning to the station from a witch space skirmish I was greeted with a red screen saying something along the line of "Your ship is boarded by pirates" and wham! instant Game Over. I've read about this, I have no idea why it happens. I wondered if it's some nasty trick they pull if you do a certain amount of jumps with an empty cargobay, in order to dissuade grinding. So I got 30 tons of goods and tried again, this time I could dock. I will play some more and hopefully it won't happen again.
+
+I have been playing for quite some time and have gotten 8 "Right on Commanders!" and still no third mission. So I decided to investigate the matter once and for all, so I transferred my save to my PC and fired up a debugger. Took me quite some time to find everything but here's the gist of it.
+
+In order to get a mission you must have left Galaxy 1. The game only allows missions to trigger if $d065 (galaxy no) is above 0 (Galaxy 1). So you can get the missions in all other Galaxies.
+
+Next the game checks how many hyperspace jumps ($d063) you've made . If you've jumped more than 32 times the first mission triggers. When you've completed that mission, which is required in order to get the next one, the next mission is triggered at 128 jumps. Once that's done the third mission is triggered at 254 jumps. Although I've seen rumours of more missions, the code only contains the three.
+
+The $d0b0 variable contains the mission trigger flags (first three bits) as well as the Cloaking Device and ECM Jammer flags.
+
+Every time you make a hyperspace jump there's the Galaxy 1 check routine at $ddf7, a bit further down at $de2c is the routine that sets the mission triggers if the conditions are right.
+
+So it's all about how many jumps you've made and your Competence Rating ($d061-62) has nothing to do with it at all. Who knew?
+
+Anyway, I've still got around 58 jumps to the third mission so I'm off to do some trading! 
+
+
+Yeah, the Elite games usually have the Kill Points as a trigger for the missions, the Amiga version (and ZX) being the only exceptions I know of.
+
+Also, two additional notes;
+
+Hyperspace jumps aren't counted at all in Galaxy 1, only when you've left the galaxy will they begin to accumulate.
+
+All missions reward you with 256 kill points on completion, so you'll reach the "Dangerous" Rating after you've completed all of them even if you've only killed a few pirates along the way.
+
+Haven't had time to play today, but I shouldn't be far away from the last mission now. I'll try to get to it tomorrow! 
+
+ beat the final mission today! I'm only less than 2 ROC's from "Deadly" but completing the missions was my goal so I think I'll call it quits here. Highly enjoyable port and by far the most different of all the 8bit adaptations. I even think it ranks as my second favourite version (just behind the NES game).
+

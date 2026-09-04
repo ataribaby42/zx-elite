@@ -1,0 +1,7 @@
+NFix Viper encounter legal status check (ersh)
+Z 8 42038 95 0
+NFix traffic at stations, Vipers emerge if station attacked (tomas)
+Z 8 24680 64 0
+NLenslock code always correct (Viktor Drozd)
+Z 8 49837 0 0
+Y
