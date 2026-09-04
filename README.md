@@ -1,4 +1,4 @@
-# ZX Spectrum Elite â€” source reconstruction
+# ZX Spectrum Elite 128k source reconstruction
 
 This project reconstructs the supplied **original ZX Spectrum Elite
 128K-compatible release** as an independent, standalone project.
