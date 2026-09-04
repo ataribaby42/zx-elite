@@ -121,14 +121,19 @@ analysis to fail.
 | `+14` | 2 | Edge-table offset relative to this header |
 | `+16` | 2 | Face-table offset relative to this header; zero for the alloy plate |
 | `+18` | 1 | Behaviour flags |
-| `+19` | 1 | Partially decoded property byte |
+| `+19` | 1 | Normal-scaling control, read at `$E93A`; see SHIP-COMPARISON.md |
 | `+20` | 1 | Gun vertex |
-| `+21` | 1 | Partially decoded property byte |
-| `+22` | 1 | Normal-vector scaling exponent |
+| `+21` | 1 | Low byte of the word read at `$DB53..$DB56`, halved and passed to `$A8EE` |
+| `+22` | 1 | High byte of that word; not the normal-scaling exponent |
 
 Vertices use six bytes each; edges and face normals use four bytes each. Their
 packed bit fields still need field-by-field naming, but their boundaries and
 their relationship to each header are verified.
+
+See [Cross-platform model comparison](SHIP-COMPARISON.md) for every vertex
+and the differences from the C64 and BBC sources. Its code evidence corrects
+the legacy analyzer's misleading `normal_scale` name for header byte +22;
+the normal-scaling field is +19.
 
 ## Asteroid mining and the missing Boulder
 

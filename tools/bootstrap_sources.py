@@ -381,13 +381,13 @@ def image(data):
                 emit_graphics(dict(region, file='font-48.asm'), patch_memory, labels,
                               patch_payload, prologue(5, patch_payload, PATCH_SOURCE, PATCH_SHA256))
                 patch_memory[region['start']:region['end']] = fixed_font(bytes(memory[region['start']:region['end']]))
-                provenance = ['; Fixes the corrupted compass in the Elite 128K instrument panel.',
+                provenance = ['; Fixes the corrupted Status Indicator in the Elite 128K instrument panel.',
                               '; Hybrid font: original font.asm with codes $21..$26 from font-48.asm.',
                               '; Both sources: TAP data block 5, load $6048; font source $C000.',
                               '; PATCH128.TAP SHA256: '+PATCH_SHA256] + prologue(5, data)
                 emit_graphics(dict(region, file='font-128fix.asm'), patch_memory, labels, data, provenance)
                 patch_memory[region['start']:region['end']] = fixed_font(bytes(memory[region['start']:region['end']]), ecm_s=True)
-                provenance = ['; Fixes the corrupted compass in the Elite 128K instrument panel and uses the smaller ECM and S indicators from the 48K version.', '; Hybrid font: original font.asm with codes $21..$26, $3B..$3E and $5B..$5E from font-48.asm.', '; Both sources: TAP data block 5, load $6048; font source $C000.', '; PATCH128.TAP SHA256: fac185ce4248e1dccc99f93a7cb7d2791e220543c24016a3a77a1dfff4cbec47'] + prologue(5, data)
+                provenance = ['; Fixes the corrupted Status Indicator in the Elite 128K instrument panel and uses the smaller ECM and S indicators from the 48K version.', '; Hybrid font: original font.asm with codes $21..$26, $3B..$3E and $5B..$5E from font-48.asm.', '; Both sources: TAP data block 5, load $6048; font source $C000.', '; PATCH128.TAP SHA256: fac185ce4248e1dccc99f93a7cb7d2791e220543c24016a3a77a1dfff4cbec47'] + prologue(5, data)
                 emit_graphics(dict(region, file='font-128fix_ecm_s.asm'), patch_memory, labels, data, provenance)
         elif region['name'] == 'ShipBlueprintsAndDispatchTables':
             _, blueprint_image, blueprint_records = analyze_ship_blueprints()

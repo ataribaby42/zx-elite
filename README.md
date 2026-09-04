@@ -56,8 +56,8 @@ Font choices:
 |---|---|
 | `128` | Original font from the 128K-compatible release. |
 | `48` | Prettier font from the 48K version. |
-| `128fix` | Fixes the corrupted compass in the Elite 128K instrument panel. Uses the original font with codes `$21..$26` copied from the 48K font. |
-| `128fix_ecm_s` | Fixes the corrupted compass in the Elite 128K instrument panel and uses the smaller ECM and S indicators from the 48K version. Replaces codes `$21..$26`, `$3B..$3E` and `$5B..$5E`. |
+| `128fix` | Fixes the corrupted Status Indicator in the Elite 128K instrument panel. Uses the original font with codes `$21..$26` copied from the 48K font. |
+| `128fix_ecm_s` | Fixes the corrupted Status Indicator in the Elite 128K instrument panel and uses the smaller ECM and S indicators from the 48K version. Replaces codes `$21..$26`, `$3B..$3E` and `$5B..$5E`. |
 
 All four fonts contain 91 glyphs (728 bytes) and use the same startup copy and
 character renderer. Normal builds assemble the selected font source without

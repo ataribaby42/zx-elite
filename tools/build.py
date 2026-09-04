@@ -134,7 +134,7 @@ def main():
     p.add_argument('--verify-only',action='store_true')
     p.add_argument('--ship',choices=['krait','adder'],default='krait',help='blueprint in slot 17 (default: krait)')
     p.add_argument('--laser',choices=['original','single'],default='original',help='original beams or one centred beam with endpoint wiggle (default: original)')
-    p.add_argument('--font',choices=['128','48','128fix','128fix_ecm_s'],default='128',help='original font, prettier font from the 48K version (48), or fix the corrupted compass in the Elite 128K instrument panel (128fix); 128fix_ecm_s also uses the smaller ECM and S indicators from the 48K version (default: 128)')
+    p.add_argument('--font',choices=['128','48','128fix','128fix_ecm_s'],default='128',help='original font, prettier font from the 48K version (48), or fix the corrupted Status Indicator in the Elite 128K instrument panel (128fix); 128fix_ecm_s also uses the smaller ECM and S indicators from the 48K version (default: 128)')
     p.add_argument('--scannerpixelfix',choices=['no','yes'],default='no',help='preserve the scanner pixel overlapped by the ECM indicator (default: no)')
     p.add_argument('--stationrandomlaunchfix',choices=['no','yes'],default='no',help='allow both Cobra and Python station traders without changing police launches (default: no)')
     p.add_argument('--verify',choices=['yes','no'],default='yes',help='exact original-byte comparison (default: yes); structural checks always run')

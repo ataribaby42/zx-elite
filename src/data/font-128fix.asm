@@ -1,4 +1,4 @@
-; Fixes the corrupted compass in the Elite 128K instrument panel.
+; Fixes the corrupted Status Indicator in the Elite 128K instrument panel.
 ; Hybrid font: original font.asm with codes $21..$26 from font-48.asm.
 ; Both sources: TAP data block 5, load $6048; font source $C000.
 ; PATCH128.TAP SHA256: fac185ce4248e1dccc99f93a7cb7d2791e220543c24016a3a77a1dfff4cbec47

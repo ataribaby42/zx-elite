@@ -407,9 +407,9 @@ the symbolic text targets. `--force` deliberately replaces generated source
 annotations/model edits; it is not part of normal builds. Rebuild the default
 Krait variant before collecting reference-only runtime analysis or code seeds.
 
-### Compass font fix (`font=128fix`)
+### Status Indicator font fix (`font=128fix`)
 
-This option fixes the corrupted compass in the Elite 128K instrument panel.
+This option fixes the corrupted Status Indicator in the Elite 128K instrument panel.
 
 Run `make.bat font=128fix verify=no`, then `verify.bat verify=no`.
 The equivalent Python option is `--font 128fix`. This selects
@@ -421,9 +421,9 @@ preserves this variant. The default remains `font=128` and byte-identical.
 `tools/check_build_options.py` now covers 128 combinations, including all four
 fonts; `tools/check_graphics.py` checks the hybrid bytes and executes all glyphs.
 
-### Compass and smaller ECM/S font (`font=128fix_ecm_s`)
+### Status Indicator and smaller ECM/S font (`font=128fix_ecm_s`)
 
-Fixes the corrupted compass in the Elite 128K instrument panel and uses the smaller ECM and S indicators from the 48K version.
+Fixes the corrupted Status Indicator in the Elite 128K instrument panel and uses the smaller ECM and S indicators from the 48K version.
 
 Run `make.bat font=128fix_ecm_s verify=no`, then `verify.bat verify=no`.
 The equivalent Python option is `--font 128fix_ecm_s`. This selects

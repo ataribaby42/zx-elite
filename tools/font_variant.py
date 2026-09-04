@@ -33,7 +33,7 @@ def patch_font():
 
 
 def fixed_font(original, ecm_s=False):
-    """Replace the compass glyphs, optionally also the smaller ECM/S glyphs."""
+    """Replace the Status Indicator glyphs, optionally also the smaller ECM/S glyphs."""
     alternate = patch_font()[0]
     if len(original) != len(alternate):
         raise ValueError('Font sizes differ')
