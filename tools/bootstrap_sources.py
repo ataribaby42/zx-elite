@@ -180,7 +180,13 @@ def emit_verified_data(region, memory, labels, payload):
     pc = start
     while pc < end:
         if pc in labels:
+            if pc in ANNOTATIONS:
+                comments = ANNOTATIONS[pc][1]
+                lines += ['', '; VERIFIED: ' + comments[0]]
+                lines += ['; ' + line for line in comments[1:]]
             lines += [labels[pc] + ':']
+            if pc in ANNOTATIONS:
+                lines += [f'L_{pc:04X}: ; legacy analysis alias; same address, no emitted bytes']
         if name == 'InitialRuntimeState' and labels.get(pc) == 'StationBlueprintPointer':
             # Original slot-zero pointer must match table entry zero. Emit a
             # symbol so the optional Adder layout relocates this instance too.
@@ -484,6 +490,17 @@ def image(data):
         if pc == 0xF470:
             lines += ['    assert SelectParentLaunchType-GameImage = ParentLaunchSelectionStart-$6048',
                       '    assert LaunchSelectedShip-GameImage = ParentLaunchSelectionLimit-$6048']
+        if pc == 0xD0F8:
+            # The preceding L_BA99 consumes only the space. Execution resumes
+            # at LD B,$12, not at the linear decoder's JR NZ / LD (DE),A.
+            if bytes(memory[pc:pc+3]) != bytes.fromhex('20 06 12'):
+                raise ValueError('Legal-status inline space/token setup changed')
+            lines += ['    defb $20                                   ; Inline space consumed by L_BA99',
+                      '    LD B,$12                                   ; $D0F9: 06 12; Clean text-token index']
+            ranges += [dict(start=pc,end=pc+1,kind='data',name='LegalStatusSeparator'),
+                       dict(start=pc+1,end=pc+3,kind='code')]
+            pc += 3
+            continue
         if pc == 0xD137:
             # L_BA99 consumes one inline character, then returns to the CALL.
             # Linear decoding mistakes the four bytes for LD DE,nn / POP DE.

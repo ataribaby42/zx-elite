@@ -9,7 +9,13 @@
 
 ActiveCommanderRecord:
     defb $4A,$41,$4D,$45,$53,$4F,$4E,$20,$20,$20,$00                                      ; $A816 JAMESON   .
-L_A821:
+
+; VERIFIED: Unsigned legal score in ActiveCommanderRecord at offset 11.
+; Status display: 0 Clean, 1..49 Offender, 50..255 Fugitive.
+; Viper and Fer-de-Lance AI becomes hostile at 40, before the Fugitive boundary.
+; Evidence: SelectLegalStatusToken, UpdateShipHostilityAndSteering and tools/check_bounty_hunters.py.
+PlayerLegalScore:
+L_A821: ; legacy analysis alias; same address, no emitted bytes
     defb $00                                                                              ; $A821 .
 L_A822:
     defb $00                                                                              ; $A822 .

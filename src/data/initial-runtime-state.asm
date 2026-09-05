@@ -62,7 +62,13 @@ L_6159:
 L_6162:
     defb $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00                  ; $6162 ................
     defb $00,$00,$00,$00,$00,$00,$00,$00,$00                                              ; $6172 .........
-L_617B:
+
+; VERIFIED: Energy field of object slot seven, used by the player missile during flight.
+; This slot is outside the six encounter slots; the title display also reuses it.
+; Nonzero energy makes UpdateSharedHostility set each updated ship hostile.
+; Evidence: slot selection at $F402..$F42F and tools/check_bounty_hunters.py.
+PlayerMissileEnergy:
+L_617B: ; legacy analysis alias; same address, no emitted bytes
     defb $00,$00,$00,$00,$00                                                              ; $617B .....
 
 InitialRuntimeStateEnd:

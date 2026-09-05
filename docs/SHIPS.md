@@ -66,6 +66,9 @@ gameplay records rather than additional shapes. The Rock hermit points to the
 Asteroid vertices, edges and faces. The two Cobra Mk III records share one set
 of geometry, as do the two Python records.
 
+See [Fer-de-Lance encounters and legal hostility](BOUNTY-HUNTERS.md) for the
+bounty-hunter spawn path, the legal-score threshold and retaliation exceptions.
+
 ## Persistent station instance
 
 The station is stored in object slot zero at `InitialRuntimeState` (`$6048`).

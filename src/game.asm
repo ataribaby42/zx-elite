@@ -1220,7 +1220,7 @@ L_77D5:
     LD HL,L_6069                               ; $77FD: 21 69 60
     RES 2,(HL)                                 ; $7800: CB 96
     XOR A                                      ; $7802: AF
-    LD (L_DA14),A                              ; $7803: 32 14 DA
+    LD (SharedHostilityAlert),A                ; $7803: 32 14 DA
     LD L,$0F                                   ; $7806: 2E 0F
     JR L_780C                                  ; $7808: 18 02
 L_780A:
@@ -1824,7 +1824,7 @@ L_7C14:
     LD IX,InitialRuntimeState                  ; $7C14: DD 21 48 60
     RES 2,(IX+$21)                             ; $7C18: DD CB 21 96
     XOR A                                      ; $7C1C: AF
-    LD (L_DA14),A                              ; $7C1D: 32 14 DA
+    LD (SharedHostilityAlert),A                ; $7C1D: 32 14 DA
     LD DE,$0027                                ; $7C20: 11 27 00
     LD B,$07                                   ; $7C23: 06 07
 L_7C25:
@@ -6555,7 +6555,7 @@ L_A788:
     LD HL,$0010                                ; $A79D: 21 10 00
     LD (L_FF0C),HL                             ; $A7A0: 22 0C FF
     XOR A                                      ; $A7A3: AF
-    LD (L_A821),A                              ; $A7A4: 32 21 A8
+    LD (PlayerLegalScore),A                    ; $A7A4: 32 21 A8
     LD (L_A84B),A                              ; $A7A7: 32 4B A8
     LD HL,L_A82C                               ; $A7AA: 21 2C A8
     LD B,$11                                   ; $A7AD: 06 11
@@ -6692,7 +6692,7 @@ L_A8DF:
     SLA B                                      ; $A8DF: CB 20
 L_A8E1:
     SLA B                                      ; $A8E1: CB 20
-    LD HL,L_A821                               ; $A8E3: 21 21 A8
+    LD HL,PlayerLegalScore                     ; $A8E3: 21 21 A8
     LD A,(HL)                                  ; $A8E6: 7E
     ADD A,B                                    ; $A8E7: 80
     JR NC,L_A8EC                               ; $A8E8: 30 02
@@ -9878,10 +9878,24 @@ L_D0B9:
     RLCA                                       ; $D0EF: 07
     LD A,$71                                   ; $D0F0: 3E 71
     CALL L_AFE3                                ; $D0F2: CD E3 AF
+
+; VERIFIED: Status-screen block: print the inline space through L_BA99, then load B=$12.
+; The bytes $20,$06,$12 are a text byte followed by LD B,$12, not JR NZ / LD (DE),A.
+; Fall through to SelectLegalStatusToken and the remaining status-screen output.
+; Evidence: original block-5 bytes and all 256 legal scores in tools/check_bounty_hunters.py.
+PrintLegalStatus:
+L_D0F5: ; legacy analysis alias; same address, no emitted bytes
     CALL L_BA99                                ; $D0F5: CD 99 BA
-    JR NZ,L_D100                               ; $D0F8: 20 06
-    LD (DE),A                                  ; $D0FA: 12
-    LD A,(L_A821)                              ; $D0FB: 3A 21 A8
+    defb $20                                   ; Inline space consumed by L_BA99
+    LD B,$12                                   ; $D0F9: 06 12; Clean text-token index
+
+; VERIFIED: B is the Clean text-token index ($12), set immediately before this entry.
+; Read PlayerLegalScore: keep B for zero, add one for 1..49, two for 50..255.
+; Continue into text output at L_D107; this is a status-screen block, not a standalone subroutine.
+; Evidence: all 256 scores in tools/check_bounty_hunters.py.
+SelectLegalStatusToken:
+L_D0FB: ; legacy analysis alias; same address, no emitted bytes
+    LD A,(PlayerLegalScore)                    ; $D0FB: 3A 21 A8
     AND A                                      ; $D0FE: A7
 L_D0FF:
 defc L_D100 = L_D0FF + 1 ; byte inside instruction at $D0FF
@@ -10622,7 +10636,7 @@ L_D62B:
     CALL L_D64F                                ; $D640: CD 4F D6
     CALL L_D64F                                ; $D643: CD 4F D6
     XOR A                                      ; $D646: AF
-    LD (L_A821),A                              ; $D647: 32 21 A8
+    LD (PlayerLegalScore),A                    ; $D647: 32 21 A8
     CALL L_ACB3                                ; $D64A: CD B3 AC
     JR L_D6B3                                  ; $D64D: 18 64
 L_D64F:
@@ -10652,7 +10666,7 @@ L_D65A:
     ADD A,A                                    ; $D673: 87
     ADD A,B                                    ; $D674: 80
     LD (L_9237),A                              ; $D675: 32 37 92
-    LD HL,L_A821                               ; $D678: 21 21 A8
+    LD HL,PlayerLegalScore                     ; $D678: 21 21 A8
     SRL (HL)                                   ; $D67B: CB 3E
     LD A,(L_FC14)                              ; $D67D: 3A 14 FC
     BIT 6,A                                    ; $D680: CB 77
@@ -11241,7 +11255,13 @@ L_DA11:
     defb $00                                                                              ; $DA11 .
 L_DA12:
     defb $00,$00                                                                          ; $DA12 ..
-L_DA14:
+
+; VERIFIED: Shared alert raised by an already hostile ship with behaviour bits $20 or $40.
+; Trader records and Viper carry those bits; UpdateSharedHostility propagates the alert.
+; Separate from PlayerLegalScore; a Clean player can therefore provoke other ships.
+; Evidence: $DAD8..$DAF6 and tools/check_bounty_hunters.py.
+SharedHostilityAlert:
+L_DA14: ; legacy analysis alias; same address, no emitted bytes
     defb $00                                                                              ; $DA14 .
 L_DA15:
     defb $00                                                                              ; $DA15 .
@@ -11350,26 +11370,33 @@ L_DAB2:
 L_DAC1:
     LD A,(L_DA10)                              ; $DAC1: 3A 10 DA
     AND A                                      ; $DAC4: A7
-    JR Z,L_DAD8                                ; $DAC5: 28 11
+    JR Z,UpdateSharedHostility                 ; $DAC5: 28 11
     BIT 2,(IX+$26)                             ; $DAC7: DD CB 26 56
-    JR NZ,L_DAD8                               ; $DACB: 20 0B
+    JR NZ,UpdateSharedHostility                ; $DACB: 20 0B
     LD A,(IY+$06)                              ; $DACD: FD 7E 06
     CP $27                                     ; $DAD0: FE 27
-    JR Z,L_DAD8                                ; $DAD2: 28 04
+    JR Z,UpdateSharedHostility                 ; $DAD2: 28 04
     SET 4,(IX+$20)                             ; $DAD4: DD CB 20 E6
-L_DAD8:
+
+; VERIFIED: Per-instance update block; IX points at the current ship.
+; If it is hostile and has behaviour bits $20/$40, raise SharedHostilityAlert.
+; Set its hostility bit 2 when that alert or PlayerMissileEnergy is nonzero.
+; There is no legal-score test here. Fall through into the remaining object update.
+; Evidence: Clean-player alert and missile fixtures in tools/check_bounty_hunters.py.
+UpdateSharedHostility:
+L_DAD8: ; legacy analysis alias; same address, no emitted bytes
     BIT 2,(IX+$21)                             ; $DAD8: DD CB 21 56
     JR Z,L_DAEA                                ; $DADC: 28 0C
     LD A,(IX+$21)                              ; $DADE: DD 7E 21
     AND $60                                    ; $DAE1: E6 60
     JR Z,L_DAEA                                ; $DAE3: 28 05
     LD A,$01                                   ; $DAE5: 3E 01
-    LD (L_DA14),A                              ; $DAE7: 32 14 DA
+    LD (SharedHostilityAlert),A                ; $DAE7: 32 14 DA
 L_DAEA:
-    LD A,(L_617B)                              ; $DAEA: 3A 7B 61
+    LD A,(PlayerMissileEnergy)                 ; $DAEA: 3A 7B 61
     AND A                                      ; $DAED: A7
     JR NZ,L_DAF6                               ; $DAEE: 20 06
-    LD A,(L_DA14)                              ; $DAF0: 3A 14 DA
+    LD A,(SharedHostilityAlert)                ; $DAF0: 3A 14 DA
     AND A                                      ; $DAF3: A7
     JR Z,L_DAFA                                ; $DAF4: 28 04
 L_DAF6:
@@ -11422,9 +11449,9 @@ L_DB43:
     LD A,(IX+$21)                              ; $DB60: DD 7E 21
     AND $60                                    ; $DB63: E6 60
     JR Z,L_DBBE                                ; $DB65: 28 57
-    LD A,(L_A821)                              ; $DB67: 3A 21 A8
+    LD A,(PlayerLegalScore)                    ; $DB67: 3A 21 A8
     OR $40                                     ; $DB6A: F6 40
-    LD (L_A821),A                              ; $DB6C: 32 21 A8
+    LD (PlayerLegalScore),A                    ; $DB6C: 32 21 A8
     JR L_DBBE                                  ; $DB6F: 18 4D
 L_DB71:
     LD A,B                                     ; $DB71: 78
@@ -11470,7 +11497,7 @@ L_DBBE:
     LD A,(L_DA0F)                              ; $DBCC: 3A 0F DA
     AND A                                      ; $DBCF: A7
     RET NZ                                     ; $DBD0: C0
-    LD (L_DA14),A                              ; $DBD1: 32 14 DA
+    LD (SharedHostilityAlert),A                ; $DBD1: 32 14 DA
     RET                                        ; $DBD4: C9
 L_DBD5:
     PUSH IX                                    ; $DBD5: DD E5
@@ -13703,10 +13730,16 @@ L_EC39:
     LD DE,$0027                                ; $EC4B: 11 27 00
 L_EC4E:
     DEC A                                      ; $EC4E: 3D
-    JR Z,L_EC55                                ; $EC4F: 28 04
+    JR Z,ApplyPlayerLaserHit                   ; $EC4F: 28 04
     ADD IX,DE                                  ; $EC51: DD 19
     JR L_EC4E                                  ; $EC53: 18 F9
-L_EC55:
+
+; VERIFIED: IX is the laser-hit instance; C is the pending damage amount.
+; Set hostility bit 2 unconditionally, even for a Clean player, before damage checks.
+; Continue the hit handling and beam drawing; this is not a standalone subroutine.
+; Evidence: a nonlethal Fer-de-Lance hit in tools/check_bounty_hunters.py.
+ApplyPlayerLaserHit:
+L_EC55: ; legacy analysis alias; same address, no emitted bytes
     SET 2,(IX+$21)                             ; $EC55: DD CB 21 D6
     LD HL,L_707D                               ; $EC59: 21 7D 70
     SET 3,(HL)                                 ; $EC5C: CB DE
@@ -14791,7 +14824,7 @@ L_F2CA: ; legacy analysis alias; same address, no emitted bytes
     SRL C                                      ; $F2CF: CB 39
     SRL C                                      ; $F2D1: CB 39
     AND $0F                                    ; $F2D3: E6 0F
-    JP Z,L_F61D                                ; $F2D5: CA 1D F6
+    JP Z,SpawnRandomEncounter                  ; $F2D5: CA 1D F6
     DEC A                                      ; $F2D8: 3D
     JP Z,L_F3CE                                ; $F2D9: CA CE F3
     DEC A                                      ; $F2DC: 3D
@@ -14815,6 +14848,8 @@ L_F2CA: ; legacy analysis alias; same address, no emitted bytes
 ; VERIFIED: A supplies the ship ID in its low six bits; IX points to an already selected instance.
 ; Resolve the blueprint table, return its pointer in IY, and store it at IX+$23/$24.
 ; Copy instance defaults, then set energy, behaviour, payload count and half maximum speed.
+; Blueprint byte +$12 AND $6F becomes instance +$21: bit 1 is legal-sensitive, bit 2 hostile.
+; Fer-de-Lance starts with $02; Viper with $42. Neither starts hostile from its blueprint.
 ; Initial coordinates use the RNG. Parent launches overwrite the first 27 bytes afterwards.
 ; ship=adder uses compact two-byte pointers and replaces only blueprint slot 17.
 InitialiseShipFromBlueprint:
@@ -15252,7 +15287,13 @@ L_F616:
     LDI                                        ; $F617: ED A0
     JP PE,L_F616                               ; $F619: EA 16 F6
     RET                                        ; $F61C: C9
-L_F61D:
+
+; VERIFIED: Event-zero encounter entry, reached from DispatchShipEvent.
+; The later mixed single-ship path can create Fer-de-Lance regardless of PlayerLegalScore.
+; Earlier cargo, government and special-state gates remain separate from ship hostility.
+; Evidence: full event-zero executions in tools/check_bounty_hunters.py; docs/BOUNTY-HUNTERS.md.
+SpawnRandomEncounter:
+L_F61D: ; legacy analysis alias; same address, no emitted bytes
     LD A,(L_A830)                              ; $F61D: 3A 30 A8
     LD C,A                                     ; $F620: 4F
     LD A,(L_A833)                              ; $F621: 3A 33 A8
@@ -15281,7 +15322,7 @@ L_F61D:
     CALL FindFreeShipSlot                      ; $F64D: CD 99 F3
     RET NZ                                     ; $F650: C0
     LD A,$0D                                   ; $F651: 3E 0D
-    JR L_F6C8                                  ; $F653: 18 73
+    JR InitialiseEncounterShip                 ; $F653: 18 73
 L_F655:
     defb $DD,$CB,$26,$F6,$DD,$CB,$20,$D6,$C3,$0E,$F7                                      ; $F655 ..&... ....
 L_F660:
@@ -15324,8 +15365,23 @@ L_F6A3:
     LD C,A                                     ; $F6A3: 4F
     BIT 3,B                                    ; $F6A4: CB 58
     JP Z,L_F6E2                                ; $F6A6: CA E2 F6
+
+; VERIFIED: Allocate one encounter slot, then fall through to SelectMixedEncounterShipType.
+; Return NZ if all six allocatable slots are occupied. No legal-score gate.
+; Evidence: full/free-slot cases in tools/check_bounty_hunters.py.
+SpawnMixedSingleShipEncounter:
+L_F6A9: ; legacy analysis alias; same address, no emitted bytes
     CALL FindFreeShipSlot                      ; $F6A9: CD 99 F3
     RET NZ                                     ; $F6AC: C0
+
+; VERIFIED: IX already identifies a free slot. Select using NextRandomByte AND $3F:
+; 0 Thargoid (15); 1..11 Fer-de-Lance (14); 12..29 Asp (13);
+; 30..45 pirate Cobra (12); 46..63 pirate Python (11).
+; Continue into blueprint initialization; Fer-de-Lance alone starts calm in this group.
+; These are selector outcomes, not per-frame probabilities; preceding RNG/gates still apply.
+; Evidence: all 256 RNG byte values in tools/check_bounty_hunters.py.
+SelectMixedEncounterShipType:
+L_F6AD: ; legacy analysis alias; same address, no emitted bytes
     CALL NextRandomByte                        ; $F6AD: CD 24 ED
     AND $3F                                    ; $F6B0: E6 3F
     LD B,$0F                                   ; $F6B2: 06 0F
@@ -15344,7 +15400,13 @@ L_F6C6:
     LD A,B                                     ; $F6C6: 78
 L_F6C7:
     PUSH AF                                    ; $F6C7: F5
-L_F6C8:
+
+; VERIFIED: A is the selected blueprint ID, IX the allocated slot; a saved AF word is on the stack.
+; Initialize the instance, restore AF and optionally set bit 0 in instance +$25.
+; That optional flag does not change hostility in +$21 or inspect PlayerLegalScore.
+; Evidence: identical Fer-de-Lance spawn state across legal scores in tools/check_bounty_hunters.py.
+InitialiseEncounterShip:
+L_F6C8: ; legacy analysis alias; same address, no emitted bytes
     CALL InitialiseShipFromBlueprint           ; $F6C8: CD FB F2
     POP AF                                     ; $F6CB: F1
     CP $0F                                     ; $F6CC: FE 0F
@@ -15543,7 +15605,7 @@ L_F800:
     INC A                                      ; $F802: 3C
 L_F803:
     POP IX                                     ; $F803: DD E1
-    JP Z,L_F8A2                                ; $F805: CA A2 F8
+    JP Z,UpdateShipHostilityAndSteering        ; $F805: CA A2 F8
     RES 6,(IX+$20)                             ; $F808: DD CB 20 B6
     SET 1,(IX+$26)                             ; $F80C: DD CB 26 CE
     SRL (IX+$1B)                               ; $F810: DD CB 1B 3E
@@ -15561,7 +15623,7 @@ L_F829:
     LD A,(EcmTimer)                            ; $F829: 3A 16 DA
     AND A                                      ; $F82C: A7
     JR NZ,TryLaunchStationTraffic              ; $F82D: 20 17
-    LD HL,L_617B                               ; $F82F: 21 7B 61
+    LD HL,PlayerMissileEnergy                  ; $F82F: 21 7B 61
     LD A,(HL)                                  ; $F832: 7E
     AND A                                      ; $F833: A7
     JR Z,TryLaunchStationTraffic               ; $F834: 28 10
@@ -15580,7 +15642,7 @@ L_F841:
 TryLaunchStationTraffic:
 L_F846: ; legacy analysis alias; same address, no emitted bytes
     BIT 2,(IX+$26)                             ; $F846: DD CB 26 56
-    JR Z,L_F8A2                                ; $F84A: 28 56
+    JR Z,UpdateShipHostilityAndSteering        ; $F84A: 28 56
     LD A,(EncounterShipCount)                  ; $F84C: 3A 1B DA
     CP $04                                     ; $F84F: FE 04
     RET NC                                     ; $F851: D0
@@ -15635,22 +15697,29 @@ L_F882:
     AND A                                      ; $F89E: A7
     SBC HL,DE                                  ; $F89F: ED 52
     RET                                        ; $F8A1: C9
-L_F8A2:
+
+; VERIFIED: For instance +$21 bit 1, set hostility bit 2 when PlayerLegalScore >= 40 ($28).
+; Only Viper and Fer-de-Lance blueprints initially carry bit 1.
+; Scores 1..39 already display Offender but do not trigger this legal-hostility check.
+; The check never clears existing hostility. Continue into distance/steering decisions.
+; Evidence: all 19 blueprints x 256 legal scores in tools/check_bounty_hunters.py.
+UpdateShipHostilityAndSteering:
+L_F8A2: ; legacy analysis alias; same address, no emitted bytes
     BIT 1,(IX+$21)                             ; $F8A2: DD CB 21 4E
     JR Z,L_F8B3                                ; $F8A6: 28 0B
-    LD A,(L_A821)                              ; $F8A8: 3A 21 A8
+    LD A,(PlayerLegalScore)                    ; $F8A8: 3A 21 A8
     CP $28                                     ; $F8AB: FE 28
     JR C,L_F8B3                                ; $F8AD: 38 04
     SET 2,(IX+$21)                             ; $F8AF: DD CB 21 D6
 L_F8B3:
     LD DE,$0200                                ; $F8B3: 11 00 02
     CALL L_F882                                ; $F8B6: CD 82 F8
-    JR C,L_F8EF                                ; $F8B9: 38 34
+    JR C,SteerShipAwayFromPlayer               ; $F8B9: 38 34
     BIT 5,(IX+$26)                             ; $F8BB: DD CB 26 6E
     JR Z,L_F8C8                                ; $F8BF: 28 07
     LD D,$0A                                   ; $F8C1: 16 0A
     CALL L_F882                                ; $F8C3: CD 82 F8
-    JR C,L_F8EF                                ; $F8C6: 38 27
+    JR C,SteerShipAwayFromPlayer               ; $F8C6: 38 27
 L_F8C8:
     BIT 2,(IX+$21)                             ; $F8C8: DD CB 21 56
     RET Z                                      ; $F8CC: C8
@@ -15661,15 +15730,21 @@ L_F8C8:
     AND A                                      ; $F8D7: A7
     JR Z,L_F8E2                                ; $F8D8: 28 08
     BIT 3,(IX+$21)                             ; $F8DA: DD CB 21 5E
-    JR Z,L_F90B                                ; $F8DE: 28 2B
-    JR L_F8EF                                  ; $F8E0: 18 0D
+    JR Z,SteerShipTowardsPlayer                ; $F8DE: 28 2B
+    JR SteerShipAwayFromPlayer                 ; $F8E0: 18 0D
 L_F8E2:
     LD A,(IX+$25)                              ; $F8E2: DD 7E 25
     AND $7F                                    ; $F8E5: E6 7F
     CP $08                                     ; $F8E7: FE 08
-    JR NC,L_F90B                               ; $F8E9: 30 20
+    JR NC,SteerShipTowardsPlayer               ; $F8E9: 30 20
     SET 7,(IX+$25)                             ; $F8EB: DD CB 25 FE
-L_F8EF:
+
+; VERIFIED: Build a scaled vector from the ship position relative to the player, preserving its signs.
+; Set instance +$26 bit 5 and continue to the shared steering calculation at L_F9FA.
+; This distance/avoidance path can be selected for a hostile ship as well.
+; Evidence: coordinate readers at $F9DB..$F9F9; docs/BOUNTY-HUNTERS.md.
+SteerShipAwayFromPlayer:
+L_F8EF: ; legacy analysis alias; same address, no emitted bytes
     PUSH IX                                    ; $F8EF: DD E5
     CALL L_F9E2                                ; $F8F1: CD E2 F9
     LD (L_F72B),HL                             ; $F8F4: 22 2B F7
@@ -15680,7 +15755,13 @@ L_F8EF:
     POP IX                                     ; $F903: DD E1
     SET 5,(IX+$26)                             ; $F905: DD CB 26 EE
     JR L_F925                                  ; $F909: 18 1A
-L_F90B:
+
+; VERIFIED: Build a scaled vector towards the player by reversing the player-relative position signs.
+; Clear instance +$26 bit 5 and continue to shared steering at L_F9FA.
+; Also used by a player-targeting missile; this entry is not specific to bounty hunters.
+; Evidence: coordinate readers at $F9DB..$F9F9 and Fer-de-Lance AI traces in tools/check_bounty_hunters.py.
+SteerShipTowardsPlayer:
+L_F90B: ; legacy analysis alias; same address, no emitted bytes
     PUSH IX                                    ; $F90B: DD E5
     CALL L_F9DB                                ; $F90D: CD DB F9
     LD (L_F72B),HL                             ; $F910: 22 2B F7
@@ -15702,7 +15783,7 @@ L_F928:
 L_F937:
     LD A,(IX+$25)                              ; $F937: DD 7E 25
     AND A                                      ; $F93A: A7
-    JR Z,L_F90B                                ; $F93B: 28 CE
+    JR Z,SteerShipTowardsPlayer                ; $F93B: 28 CE
     PUSH IY                                    ; $F93D: FD E5
     LD IY,$6021                                ; $F93F: FD 21 21 60
     LD DE,$0027                                ; $F943: 11 27 00
@@ -15882,14 +15963,21 @@ L_FA81:
     LD B,$02                                   ; $FA96: 06 02
 L_FA98:
     CP B                                       ; $FA98: B8
-    JR C,L_FAA5                                ; $FA99: 38 0A
+    JR C,TryFireAiLaser                        ; $FA99: 38 0A
     LD B,$01                                   ; $FA9B: 06 01
     CP $10                                     ; $FA9D: FE 10
     JR NC,L_FAA2                               ; $FA9F: 30 01
     INC B                                      ; $FAA1: 04
 L_FAA2:
     LD (IX+$1C),B                              ; $FAA2: DD 70 1C
-L_FAA5:
+
+; VERIFIED: Firing block within the steering routine; require instance +$21 hostility bit 2.
+; Facing, RNG, instance flags, range and alignment gates still apply after that check.
+; The hit paths add seven to the corresponding player damage accumulator.
+; Inputs include the preceding steering results in D/H and the blueprint in IY.
+; Evidence: controlled calm/hostile firing cases in tools/check_bounty_hunters.py.
+TryFireAiLaser:
+L_FAA5: ; legacy analysis alias; same address, no emitted bytes
     BIT 2,(IX+$21)                             ; $FAA5: DD CB 21 56
     RET Z                                      ; $FAA9: C8
     LD A,(IX+$08)                              ; $FAAA: DD 7E 08
@@ -16433,6 +16521,7 @@ assert ContinueStartup-Startup = AdderStartupResumeJump-AdderStartup
 ENDIF
 assert InitialRuntimeState-GameImage = $6048-$6048
 assert StationBlueprintPointer-GameImage = $606B-$6048
+assert PlayerMissileEnergy-GameImage = $617B-$6048
 assert ShipBlueprintsAndDispatchTables-GameImage = $6180-$6048
 assert Entry-GameImage = $7000-$6048
 assert CurrentScreenId-GameImage = $7041-$6048
@@ -16458,6 +16547,7 @@ ENDIF
 assert TextColumn-GameImage = $A80D-$6048
 assert TextRow-GameImage = $A80E-$6048
 assert ActiveCommanderRecord-GameImage = $A816-$6048
+assert PlayerLegalScore-GameImage = $A821-$6048
 assert CurrentGalaxy-GameImage = $A827-$6048
 assert CommanderTemplateBuffer-GameImage = $A910-$6048
 assert GetCharacterBitmap-GameImage = $BB69-$6048
@@ -16468,12 +16558,17 @@ assert SquareLookupTables-GameImage = $BE00-$6048
 assert FontBitmap-GameImage = $C000-$6048
 assert CockpitAttributes-GameImage = $C700-$6048
 assert CockpitBitmap-GameImage = $C800-$6048
+assert PrintLegalStatus-GameImage = $D0F5-$6048
+assert SelectLegalStatusToken-GameImage = $D0FB-$6048
 assert (L_D7C4-GameImage)+1 = $D7C5-$6048
 assert PirateEscapePatchSite-GameImage = $D802-$6048
 assert (L_D80D-GameImage)+1 = $D80E-$6048
 assert (L_D812-GameImage)+1 = $D813-$6048
+assert SharedHostilityAlert-GameImage = $DA14-$6048
 assert EcmTimer-GameImage = $DA16-$6048
 assert EncounterShipCount-GameImage = $DA1B-$6048
+assert UpdateSharedHostility-GameImage = $DAD8-$6048
+assert ApplyPlayerLaserHit-GameImage = $EC55-$6048
 assert DrawLaser-GameImage = $ECD4-$6048
 assert LaserPatchSite-GameImage = $ECF2-$6048
 assert LaserOriginalContinuation-GameImage = $ECFE-$6048
@@ -16487,11 +16582,19 @@ assert FindFreeShipSlot-GameImage = $F399-$6048
 assert SelectParentLaunchType-GameImage = $F44A-$6048
 assert LaunchSelectedShip-GameImage = $F470-$6048
 assert AdjustChildLaunchOrientation-GameImage = $F48A-$6048
+assert SpawnRandomEncounter-GameImage = $F61D-$6048
+assert SpawnMixedSingleShipEncounter-GameImage = $F6A9-$6048
+assert SelectMixedEncounterShipType-GameImage = $F6AD-$6048
+assert InitialiseEncounterShip-GameImage = $F6C8-$6048
 assert SelectEncounterTraderType-GameImage = $F6FD-$6048
 assert TryLaunchAiPayload-GameImage = $F780-$6048
 assert TryLaunchStationTraffic-GameImage = $F846-$6048
 assert TryLaunchStationTrader-GameImage = $F871-$6048
 assert DispatchShipEventPreservingParent-GameImage = $F876-$6048
+assert UpdateShipHostilityAndSteering-GameImage = $F8A2-$6048
+assert SteerShipAwayFromPlayer-GameImage = $F8EF-$6048
+assert SteerShipTowardsPlayer-GameImage = $F90B-$6048
+assert TryFireAiLaser-GameImage = $FAA5-$6048
 assert UnusedAfterReturnCandidate-GameImage = $FCED-$6048
 assert KeySwapMaskB1-GameImage = $FF68-$6048
 assert KeySwapMaskB2-GameImage = $FF69-$6048
