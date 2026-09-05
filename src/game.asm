@@ -9886,7 +9886,7 @@ L_D0B9:
 PrintLegalStatus:
 L_D0F5: ; legacy analysis alias; same address, no emitted bytes
     CALL L_BA99                                ; $D0F5: CD 99 BA
-    defb $20                                   ; Inline space consumed by L_BA99
+    defb $20                                   ; Space character; L_BA99 prints it and advances its return address past this byte.
     LD B,$12                                   ; $D0F9: 06 12; Clean text-token index
 
 ; VERIFIED: B is the Clean text-token index ($12), set immediately before this entry.

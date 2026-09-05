@@ -495,7 +495,7 @@ def image(data):
             # at LD B,$12, not at the linear decoder's JR NZ / LD (DE),A.
             if bytes(memory[pc:pc+3]) != bytes.fromhex('20 06 12'):
                 raise ValueError('Legal-status inline space/token setup changed')
-            lines += ['    defb $20                                   ; Inline space consumed by L_BA99',
+            lines += ['    defb $20                                   ; Space character; L_BA99 prints it and advances its return address past this byte.',
                       '    LD B,$12                                   ; $D0F9: 06 12; Clean text-token index']
             ranges += [dict(start=pc,end=pc+1,kind='data',name='LegalStatusSeparator'),
                        dict(start=pc+1,end=pc+3,kind='code')]
