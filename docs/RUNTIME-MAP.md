@@ -71,6 +71,11 @@ The access runs use SkoolKit's slower Python Z80 simulator with a
 list-compatible memory recorder. Opcode fetches explain most reads in
 candidate-code ranges. Reads from unclassified ranges identify likely
 tables, text, models or mutable workspace for further analysis.
+Each report also lists `memory_read_before_write_map`: addresses read while
+they still hold their loaded value, so only there can the tape byte matter.
+In the view buffer `$C000..$CFFF` these are exactly the 3,032 bytes of the
+font, cockpit colours and cockpit bitmap. All other buffer bytes, including
+`ViewBufferResidueAfterLoader`, are written before any read.
 
 | Scenario | Image reads | Unclassified reads | Image writes | Unclassified writes | Writes in candidate code |
 |---|---:|---:|---:|---:|---:|

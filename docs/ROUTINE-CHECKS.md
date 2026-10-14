@@ -171,11 +171,12 @@ deletes the previous report first. The whole tool runs in about 15 seconds.
 | `security-number` | `AccessMenuSave`, `RotateParityIntoD` | 3,000 | The two save "security numbers" (HL, DE) follow the Python model of kill count, galaxy, CommanderFlags bits 3/6 and CashHigh for any carry on entry.  Entered at the LD HL,(CombatScoreLow) of AccessMenuSave, stopped at the first CALL PrintDecimalHL after it. |
 | `galaxy-seed-compare` | `CompareWithGalaxySeeds` | 2,000 | Carry clear exactly when the six bytes at HL equal GalaxySeeds. |
 
-### `dormant`: Dormant bytes (9 cases)
+### `dormant`: Dormant bytes (14 cases)
 
 | Check | Routines | Cases | Claim supported |
 |---|---|---:|---|
 | `download-loader-relocation` | `L_C350`, `L_C3EE` | 9 | The dormant loader at L_C350 starts with DE = BC + $9E and nine "LD HL,n / ADD HL,BC / LD (HL),E / INC HL / LD (HL),D" relocations; with BC = L_C350 (USR convention) they are exactly the operands of the nine CALLs to L_C3EE, and there are no other such CALLs. |
+| `unused-interrupt-routines` | `UnusedEnableInterrupts`, `UnusedSelectInterruptMode1`, `ViewBufferResidueAfterLoader`, `ClearViewBuffer` | 5 | Both routines follow a RET and have no word or JR/DJNZ reference; called with interrupts off in IM 2, `EI`, `RET` sets IFF and `IM 1`, `RET` selects IM 1, with other registers and memory unchanged. Both comparison 48K memory images hold EnableInterruptMode2 and UnusedSelectInterruptMode1 unchanged, no word $FF53, no CALL EnableInterruptMode2 (IM 2 is selected inline) and no RET, EI, RET. ClearViewBuffer replaces the residue bytes $F3,$AF with 0. |
 
 ### `missions`: Missions, pirates and encounters (2,082 cases)
 
@@ -281,6 +282,7 @@ and comments it added (see `docs/COMPARISON-SKOOLKIT.md`).
 | Check | Routines | Cases | Claim supported |
 |---|---|---:|---|
 | `r8-motion-helpers` | `ScaleComponentBySpeed`, `AddToCoordinate`, `SquareRootHL`, `ApplyPlayerMotion` | 6,014 | ScaleComponentBySpeed and AddToCoordinate equal their bit-level models (the high-byte test compares all of A with D); SquareRootHL returns A = 0; ApplyPlayerMotion without rotation moves z by 2\*(speed+1) towards negative, flips the sign when crossing zero and turns a negative overflow into +$7FFFxx, returning HL = z high/mid. |
+| `roll-reversal-drift` | `ApplyPlayerMotion`, `AddScaledCoordinate` | 2 | Original quirk: a roll is two shear steps in a fixed order (x -= y\*a, then y += x\*a with the new x, a = 2\*roll/256), so a roll to the right is not undone by a roll to the left. M and N held alternately for 32 updates each (roll ramps to 15 and -15) for 20 cycles move the planet 4.98 times further from the view axis at unchanged depth; the same order in exact arithmetic gives 6.2, a true rotation 1.0. The same number of updates in one direction gives 0.83. |
 
 ### `missions` (second pass)
 
@@ -310,7 +312,7 @@ and comments it added (see `docs/COMPARISON-SKOOLKIT.md`).
 | `r8-projected-object-size` | `DrawObjectInView`, `ProjectedObjectSize` | 120 | ProjectedObjectSize = DivideRatioByte(blueprint +1 size, depth) = min(255, 256\*size/depth) for every view once the depth exceeds the size (otherwise unchanged); an object with +$20 bit 4 has it copied to +$1F with ProjectedX in +$1C and +$20 bit 5 set (L_E1D4). |
 | `p9-explosion-record` | `DrawObjectInView`, `RecordExplosionPosition` | 11 | A visible object with +$20 bit 4 is not drawn: +$1C/+$1D = ProjectedX/Y, +$1F = projected size (L_DA0B), +$1E = $0C + CircleFlags side bits (bit 0 right of centre, bit 1 above, rear/right views mirrored) and +$20 bit 5 is set; behind or off the view nothing is recorded. |
 | `p9-avoidance-in-sights` | `DrawObjectInView`, `CancelAvoidanceInSights` | 9 | A counted (+$20 bit 6) hostile (+$21 bit 2) ship near the view centre (ProjectedX+ProjectedY < $20) whose local z axis has \|component\| >= $40 along the view axis (z in front/rear views, x in left/right views) loses the avoidance flag +$26 bit 5; otherwise it stays. |
-| `p1-projection-offset-paths` | `ProjectBodyPosition`, `ProjectCoordinate` | 4,004 | Offsets below 256 (\|c\| <= depth, bit 2/3 set) are within 2 of min(255, 256\*\|c\|/depth); the 256..511 path (bit clear) matches a bit-level model of L_76D6/L_7746 exactly, including the not-visible case, and is approximate: within 3 of 256\*\|c\|/depth-256 for 99% of coordinates with as many significant bits as the depth (x $1774EC / z $176C2A borrows: 173), -1..+127 too large with more bits (x $180000 / z $0F0000: 206).  Depth 1 (1/256) gives 128. |
+| `p1-projection-offset-paths` | `ProjectBodyPosition`, `ProjectCoordinate` | 4,005 | Offsets below 256 (\|c\| <= depth, bit 2/3 set) are within 2 of min(255, 256\*\|c\|/depth); the 256..511 path (bit clear) matches a bit-level model of L_76D6/L_7746 exactly, including the not-visible case, and is approximate: within 3 of 256\*\|c\|/depth-256 for 99% of coordinates with as many significant bits as the depth (x $1774EC / z $176C2A borrows: 173), -1..+127 too large with more bits (x $180000 / z $0F0000: 206).  Near a body this hides a disc that should fill columns 136..247 (x $80E5 / z $7E00: 131 instead of 6).  Depth 1 (1/256) gives 128. |
 
 ### `scanner` (second pass)
 
@@ -342,6 +344,7 @@ and comments it added (see `docs/COMPARISON-SKOOLKIT.md`).
 | `p6-input-string` | `InputString`, `EraseInputCharacter` | 4 | InputString keeps '0'..'9' and '@'..'Z', ignores other codes and a delete on an empty buffer, deletes the last character, ends on Enter and also on a further character once the maximum length is reached (that character is dropped); the result is zero-terminated. |
 | `p7-justify-padding` | `InsertSpaceInTextBuffer`, `FindPreviousSpace` | 4 | In the justified printer each InsertSpaceInTextBuffer call adds one space at an existing word gap: the calls equal the extra spaces inside the printed lines, every printed line is 30 characters wide and the words keep their order.  PutCharacter and NewLine are stubbed. |
 | `justified-full-stop-loss` | `PrintCharacter`, `EndJustifiedText` | 1 | Original quirk: a character that arrives as the 31st character of a justified line is stored after the 30 printed characters and lost; here the final full stop disappears. |
+| `description-full-stop-loss` | `DeriveSelectedSystemData`, `GenerateSystemName`, `L_BA49` | 1 | The same quirk in real game text: the "DATA ON" description of SOCELAGE (galaxy 1, system 45) is generated with a final full stop, but its second line is exactly 30 characters wide, so the full stop never reaches the screen. A scan of all 2,048 descriptions found 72 such cases, always the final full stop. |
 
 ## Differences from the former ad-hoc tests
 

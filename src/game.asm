@@ -558,11 +558,17 @@ L_7158:
     LD (KeyFlagsFlight),A                      ; $7165: 32 0F FC
     RET                                        ; $7168: C9
 
-; INFERRED: Two bytes that decode as EI / RET directly after the RET of HandleChartCursorKeys.  No static,
-; pointer or runtime reference was found; kept unclassified.
-L_7169:
-; UNCLASSIFIED: $7169..$716A (2 bytes); no proved code or data role yet.
-    defb $FB,$C9                                                                          ; $7169 ..
+; VERIFIED: Unused routine: EI, RET.  It follows the unconditional RET of HandleChartCursorKeys
+; and precedes Startup, so only a call or jump could enter it, and there is none: no
+; word $7169 in the image, no relative jump to it, and the seven 48K access traces
+; neither execute nor read it.  Called, it enables interrupts and returns with every other register and
+; all memory unchanged.  The comparison 48K memory images contain no RET, EI, RET
+; sequence, so it is not a leftover of their layout.
+; Evidence: tools/check_routines.py dormant/unused-interrupt-routines; execution, read and
+; write maps of tools/run_runtime_scenarios.py --accesses.
+UnusedEnableInterrupts:
+    EI                                         ; $7169: FB
+    RET                                        ; $716A: C9
 
 ; Direct target of the entry JP at $7000.
 ; VERIFIED: One-time start-up (default ship variant): copy the font (FontBitmapSize = 728 bytes,
@@ -1633,9 +1639,11 @@ L_7734:
 ; depth (x $1774EC, z $176C2A: 173 instead of 0).  With more significant bits than the
 ; depth (most ratios between 1 and 2) the divisor D is the depth's high byte with bit 7
 ; forced on instead of a normalised depth, and the offset is up to 127 too large
-; (x $180000, z $0F0000: 206 instead of 153).
+; (x $180000, z $0F0000: 206 instead of 153).  Close to the sun or planet this can
+; hide a large disc just beyond an edge of the view: x $80E5, z $7E00 gives 131 instead of 6, so
+; DrawCircle draws nothing where the disc should fill columns 136..247.
 ; Evidence: tools/check_routines.py pipeline/p1-projection-offset-paths (bit-level model
-; of this path, random cases of both kinds).
+; of this path, random cases of both kinds, the hidden disc).
 L_7746:
     SLA B                                      ; $7746: CB 20
     RL E                                       ; $7748: CB 13
@@ -14034,11 +14042,15 @@ L_C3FE:
     OUT ($FE),A                                ; $C409: D3 FE
     RET                                        ; $C40B: C9
 
-; INFERRED: Two bytes $F3,$AF (DI / XOR A if decoded) after the receiver's RET, then zeros.
-; No reference and no runtime execution; probably the truncated start of further dormant
-; code.  Left unclassified.
-L_C40C:
-; UNCLASSIFIED: $C40C..$C40D (2 bytes); no proved code or data role yet.
+; VERIFIED: Two residue bytes $F3,$AF in the reference image (DI, XOR A if decoded) after the
+; receiver's RET.  Runtime: part of the view bitmap buffer like the surrounding zeros.
+; No static reference.  In all seven 48K access traces their first access is the
+; ClearViewBuffer write (PUSH HL at L_7485), so the stored values are never used.  Of
+; $C000..$CFFF only the FontBitmap, CockpitAttributes and CockpitBitmap source bytes
+; are read before a write.
+; Evidence: memory_read_before_write_map of tools/run_runtime_scenarios.py --accesses;
+; tools/check_routines.py dormant/unused-interrupt-routines (ClearViewBuffer zeroes them).
+ViewBufferResidueAfterLoader:
     defb $F3,$AF                                                                          ; $C40C ..
 
 ; VERIFIED: Zero fill in the reference image (498 bytes) up to the optional Adder startup area.
@@ -17011,8 +17023,14 @@ RotateOrientationComponent:
 ; (PlayerRoll, x-y) with AddScaledCoordinate, then move z by 2*(PlayerSpeed+1): positive z decreases,
 ; negative z grows.  Returns HL = z sign/high and mid bytes.  Also used for SunPosition/PlanetPosition
 ; (MoveSunAndPlanet).  Crossing zero flips the sign; a negative magnitude overflowing $FFFF becomes
-; +$7FFF.. (sign cleared).  Evidence: tools/check_routines.py maths/r8-motion-helpers (z step,
-; zero crossing, overflow, returned HL).
+; +$7FFF.. (sign cleared).
+; NOTE: each rotation is two shear steps in a fixed order (z, then y from the new z; x,
+; then y from the new x).  One step is close to a rotation, but a roll or pitch in one
+; direction is not undone by the same rate in the other.  Rolling alternately left and right
+; pushes positions away from the view axis at unchanged depth (planet 4.98 times further
+; after 20 cycles of 32 updates each way); one direction alone does not.
+; Evidence: tools/check_routines.py maths/r8-motion-helpers (z step, zero crossing,
+; overflow, returned HL), maths/roll-reversal-drift.
 ApplyPlayerMotion:
     LD A,(PlayerPitch)                         ; $DED1: 3A 43 70
     XOR $80                                    ; $DED4: EE 80  C = -pitch
@@ -22812,13 +22830,18 @@ EnableInterruptMode2:
     IM 2                                       ; $FF50: ED 5E
     RET                                        ; $FF52: C9
 
-; INFERRED: Bytes ED 56 C9 decode as IM 1 / RET, the counterpart of EnableInterruptMode2.  No static
-; reference (no $FF53 operand in the image), never executed in the 48K traces, and the
-; image contains no other IM 1: the game never returns to the ROM interrupt mode.
-; Left unclassified: dormant code or leftover.
-L_FF53:
-; UNCLASSIFIED: $FF53..$FF55 (3 bytes); no proved code or data role yet.
-    defb $ED,$56,$C9                                                                      ; $FF53 .V.
+; VERIFIED: Unused routine: IM 1, RET, the counterpart of EnableInterruptMode2 just before it.
+; No caller: no word $FF53 in the image, no relative jump to it, and the seven 48K access
+; traces neither execute nor read it.  The image contains no other IM 1, so the game
+; never returns to the ROM interrupt mode.  Called, it selects interrupt mode 1 and
+; returns with all registers and memory unchanged.  The comparison 48K memory images hold
+; the same bytes $FF4C..$FF55 (EnableInterruptMode2 and this routine), again without a
+; word $FF53; their start-up selects IM 2 with inline code instead of a CALL.
+; Evidence: tools/check_routines.py dormant/unused-interrupt-routines; execution, read and
+; write maps of tools/run_runtime_scenarios.py --accesses.
+UnusedSelectInterruptMode1:
+    IM 1                                       ; $FF53: ED 56
+    RET                                        ; $FF55: C9
 
 ; VERIFIED: SP of the interrupted program, saved and restored by InterruptHandler.
 InterruptSavedStack:
@@ -23113,6 +23136,7 @@ defc L_70FB = DockWithStation
 defc L_7102 = StartDockingSequence
 defc L_7108 = MakeSunRelativeToStation
 defc L_713B = HandleChartCursorKeys
+defc L_7169 = UnusedEnableInterrupts
 defc L_716B = Startup
 defc L_7181 = StartupAfterGraphicsCopy
 defc L_7189 = ContinueStartup
@@ -23733,6 +23757,7 @@ defc L_C000 = FontBitmap
 defc L_C2D8 = ViewBufferZerosAfterFont
 defc L_C350 = DormantPortLoader
 defc L_C3EE = DormantPortReceiveByte
+defc L_C40C = ViewBufferResidueAfterLoader
 defc L_C40E = ViewBufferZerosAfterLoader
 defc L_C640 = ViewBufferZerosBeforeCockpit
 defc L_C700 = CockpitAttributes
@@ -24026,6 +24051,7 @@ defc L_FF0A = PitchControl
 defc L_FF0C = SpeedControl
 defc L_FF25 = InterruptHandler
 defc L_FF4C = EnableInterruptMode2
+defc L_FF53 = UnusedSelectInterruptMode1
 defc L_FF56 = InterruptSavedStack
 defc L_FF58 = KeyActionTable
 defc L_FF68 = KeySymbolShiftActionByte

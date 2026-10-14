@@ -38,13 +38,14 @@ or, where marked, follows from the instructions alone.
 | Address | Routine | Finding |
 |---|---|---|
 | `$7C39` | `HyperspaceKeyLatch` | `CheckHyperspaceKeys` sets the latch before it tests anything else, so even a refused H or G press sets it. Until the next hyperspace arrival or game over, neither station contact nor the docking computer can dock the ship. Confirmed by `missions/p2-hyperspace-key-latch` and by a 48K emulator run. |
-| `$BCFC` | `BufferJustifiedCharacter` | A non-space character arriving as the 31st character of a justified line is stored after the 30 printed characters and lost, for example a line-ending full stop (`text/justified-full-stop-loss`). |
+| `$BCFC` | `BufferJustifiedCharacter` | A non-space character arriving as the 31st character of a justified line is stored after the 30 printed characters and lost. In real text this hits the final full stop of 72 of the 2,048 planet descriptions, those whose last line is exactly 30 characters wide. For example, SOCELAGE ends with "noted for Its Exotic Goat Meat" and no full stop (`text/justified-full-stop-loss`, `text/description-full-stop-loss`). |
 | `$BDC6` | `FindPreviousSpace` | A justified line without any space would loop forever (follows from the instructions). |
 | `$B5B4` | `BuyEquipmentItem` | Buying fuel while the nova mission is active takes the price and gives no fuel (`economy/p6-equipment-purchase`). |
 | `$B333` | `InputQuantity` | A non-digit key after the first digit leaves the prompt with the one-digit trade already applied (`text/p6-input-quantity`). |
 | `$B11D` | `InputString` | Typing into a full buffer ends the input as Enter would (`text/p6-input-string`). |
 | `$D411` | `ReportTapeLoadingError` | A tape error while docked restores the commander from the snapshot taken at the last load, save or game start. The game then continues docked with that older commander. A BREAK keeps the bytes already loaded (`commander/p7-tape-load-paths`). |
-| `$76DC` | `ProjectCoordinate` | For an off-screen sun or planet whose coordinate is between one and two times the depth, the projected offset can be up to 127 too large (`pipeline/p1-projection-offset-paths`). |
+| `$76DC` | `ProjectCoordinate` | For an off-screen sun or planet whose coordinate is between one and two times the depth, the projected offset can be up to 127 too large (`pipeline/p1-projection-offset-paths`). This is visible only close to a body (depth below $10000, disc radius 160 pixels or more), when its centre lies just beyond an edge of the view. There the visible part of the disc can shrink or vanish. At x $80E5, z $7E00 the disc should fill columns 136..247, but nothing is drawn. |
+| `$DED1` | `ApplyPlayerMotion` | Roll and pitch rotate each position with two shear steps in a fixed order (x, then y from the new x). A roll in one direction is therefore not undone by a roll in the other. Rolling alternately left and right moves the sun, planet, station and ships away from the view axis, by roughly 8 to 10% per left-right cycle at full roll rate. Their depth, and so their drawn size, is unchanged until the player turns towards them. With M and N held for 32 updates each, 20 cycles move the planet 4.98 times further from the axis. The same order in exact arithmetic gives 6.2, a true rotation 1.0, and one direction alone 0.83 (`maths/roll-reversal-drift`). Pitch has the same structure (follows from the instructions). |
 | `$EB65` | `ReleaseTargetLocks` | The test reads the removed object instead of the slot being scanned. Missiles locked on a removed ship keep their lock, and a ship whose `+$25` equals a removed missile's counter explodes (`contact/p9-release-target-locks`). |
 | `$EC55` | `ApplyPlayerLaserHit` | Each hit lowers the AI courage counter in `+$25` by 14. On a fleeing ship a low value wraps upwards instead of stopping at the floor, which lifts it back above the flee threshold (`combat/r10-laser-hit-outcomes`). |
 | `$8C29` | `DrawScannerContacts` | A contact with dx = 4 is drawn one pixel row off. The upward-stick guard covers only column 15, so in other columns a stick can reach screen row 127 inside the view (`scanner/p3-scanner-geometry`). |
@@ -92,12 +93,22 @@ Other research notes:
 - `$84C5..$8544` holds patch values and destination pointers for self-modifying code. `DrawScreenCircle` uses them to switch the circle renderer between the `$C000` view buffer and the screen. The destinations are now emitted as `defw` labels, so they follow the patched code if it moves.
 - `$E88B` is a complete but unused 16x16 multiply (`UnusedMultiplyWordHigh`).
 
-Only seven bytes remain unclassified. Each is an unreferenced fragment with
-an `INFERRED` comment explaining what it would decode to:
+No byte remains unclassified. The last seven were resolved as follows
+(`dormant/unused-interrupt-routines` and the 48K access traces):
 
-- `$7169..$716A`: `EI`/`RET`;
-- `$C40C..$C40D`: the two bytes after the dormant receiver;
-- `$FF53..$FF55`: `IM 1`/`RET`.
+- `$7169..$716A` is `UnusedEnableInterrupts` (`EI`, `RET`). It is code that is
+  never called: it sits between two `RET`-terminated routines, and no word,
+  relative jump or traced access reaches it. The comparison 48K images have no
+  `RET`, `EI`, `RET` sequence.
+- `$FF53..$FF55` is `UnusedSelectInterruptMode1` (`IM 1`, `RET`), the
+  never-called counterpart of `EnableInterruptMode2`. The comparison 48K
+  images contain both routines byte for byte at the same addresses. They
+  reference neither, because their start-up selects IM 2 with inline code.
+- `$C40C..$C40D` is `ViewBufferResidueAfterLoader`: two residue bytes (`DI`,
+  `XOR A` if decoded) after the dormant receiver. They lie in the view buffer.
+  In every access trace `ClearViewBuffer` writes them before any read, so
+  their stored values are never used. Of `$C000..$CFFF`, only the 3,032 font,
+  cockpit-colour and cockpit-bitmap source bytes are read before being written.
 
 The `RET` byte at `$B93F` between two text handlers is now typed data: a
 check proves that no path reaches it (`text/p6-unreachable-byte`).

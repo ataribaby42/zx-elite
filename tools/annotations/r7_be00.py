@@ -51,6 +51,7 @@ TEXTCALLS = {
 
 DATA = {
     0xC2D8: (0xC350, 'zeros', 120),
+    0xC40C: (0xC40E, 'bytes', 2),
     0xC40E: (0xC600, 'zeros', 498),
     0xC640: (0xC700, 'zeros', 192),
     0xD0B8: (0xD0B9, 'bytes', 1),
@@ -86,10 +87,15 @@ RunAccessMenu)."""),
     0xC3EE: ('DormantPortReceiveByte', 'verified', """
 Dormant byte receiver of DormantPortLoader: handshake through port $1F (bit 0),
 E = byte from port $9F, then border stripes from C.  Returns E."""),
-    0xC40C: (None, 'inferred', """
-Two bytes $F3,$AF (DI / XOR A if decoded) after the receiver's RET, then zeros.
-No reference and no runtime execution; probably the truncated start of further dormant
-code.  Left unclassified."""),
+    0xC40C: ('ViewBufferResidueAfterLoader', 'verified', """
+Two residue bytes $F3,$AF in the reference image (DI, XOR A if decoded) after the
+receiver's RET.  Runtime: part of the view bitmap buffer like the surrounding zeros.
+No static reference.  In all seven 48K access traces their first access is the
+ClearViewBuffer write (PUSH HL at L_7485), so the stored values are never used.  Of
+$C000..$CFFF only the FontBitmap, CockpitAttributes and CockpitBitmap source bytes
+are read before a write.
+Evidence: memory_read_before_write_map of tools/run_runtime_scenarios.py --accesses;
+tools/check_routines.py dormant/unused-interrupt-routines (ClearViewBuffer zeroes them)."""),
     0xC40E: ('ViewBufferZerosAfterLoader', 'verified', """
 Zero fill in the reference image (498 bytes) up to the optional Adder startup area.
 Runtime: part of the view bitmap buffer like L_C2D8 (cleared by L_7485, drawn into,

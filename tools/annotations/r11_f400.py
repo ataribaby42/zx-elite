@@ -416,11 +416,16 @@ switch to the private stack below InterruptStackTop ($FFBF, above the game image
 push HL, DE, BC, AF, IX, IY, then ScanKeyboard, UpdateFlightControls and L_9082
 (sound effect step, gated by ControlOptions bit 7).  Restore, EI, RET.
 Alternate registers are not saved.  Runtime: stack use $FFAB..$FFBE only."""),
-    0xFF53: (None, 'inferred', """
-Bytes ED 56 C9 decode as IM 1 / RET, the counterpart of EnableInterruptMode2.  No static
-reference (no $FF53 operand in the image), never executed in the 48K traces, and the
-image contains no other IM 1: the game never returns to the ROM interrupt mode.
-Left unclassified: dormant code or leftover."""),
+    0xFF53: ('UnusedSelectInterruptMode1', 'verified', """
+Unused routine: IM 1, RET, the counterpart of EnableInterruptMode2 just before it.
+No caller: no word $FF53 in the image, no relative jump to it, and the seven 48K access
+traces neither execute nor read it.  The image contains no other IM 1, so the game
+never returns to the ROM interrupt mode.  Called, it selects interrupt mode 1 and
+returns with all registers and memory unchanged.  The comparison 48K memory images hold
+the same bytes $FF4C..$FF55 (EnableInterruptMode2 and this routine), again without a
+word $FF53; their start-up selects IM 2 with inline code instead of a CALL.
+Evidence: tools/check_routines.py dormant/unused-interrupt-routines; execution, read and
+write maps of tools/run_runtime_scenarios.py --accesses."""),
     0xFF56: ('InterruptSavedStack', 'verified', """
 SP of the interrupted program, saved and restored by InterruptHandler."""),
     0xFF58: ('KeyActionTable', 'verified', """
@@ -1177,6 +1182,8 @@ DATA = {
 SEEDS = {
     0xF655: 'return address pushed at $F648 and reached by the RET of InitialiseEncounterShip; '
             'executed in the R11 special-encounter test',
+    0xFF53: 'complete unreferenced routine IM 1, RET after the RET of EnableInterruptMode2; '
+            'simulated by tools/check_routines.py dormant/unused-interrupt-routines',
 }
 
 CONSTANTS = {

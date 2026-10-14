@@ -213,24 +213,25 @@ tables and the laser entry points. It also uses instruction addresses proved
 by 48K runtime traces and seeds recorded in the annotation database. Of the
 40,801 bytes of the game image:
 
-- **27,378 bytes are code** (14,095 instructions), plus **61 inline argument
+- **27,383 bytes are code** (14,099 instructions), plus **61 inline argument
   bytes** read through the return address of text routines;
-- **10,467 bytes are verified data** in named ASM includes, and **2,824 bytes**
+- **10,467 bytes are verified data** in named ASM includes, and **2,826 bytes**
   are typed data inside `game.asm` (variables, tables, pointer tables, text,
   zero fills and workspaces);
 - 64 bytes are the zero-filled area reserved for the optional Adder start-up;
-- **7 bytes remain unclassified**: three unreferenced fragments, each with an
-  explanatory comment.
+- **no byte remains unclassified**. The last seven were resolved as two
+  unused routines and two residue bytes in the view buffer (see
+  [findings](docs/FINDINGS.md)).
 
-There are 1,160 annotated headers, 925 of them with verified descriptive names
-and 15 marked INFERRED, plus 5,745 line comments. 48 section banners
+There are 1,160 annotated headers, 928 of them with verified descriptive names
+and 12 marked INFERRED, plus 5,745 line comments. 48 section banners
 group the code into subsystems. Self-modifying code sites and their patchers
 are documented. The patch tables of the circle renderer are emitted as
 pointer data, so they relocate with the code. See
 [findings](docs/FINDINGS.md) for original-game defects and corrections to the
 research notes uncovered by this work. A second pass used an
 [independent disassembly](docs/COMPARISON-SKOOLKIT.md) as a pointer to gaps
-and filled them from this project's own evidence. 124 simulator checks
+and filled them from this project's own evidence. 127 simulator checks
 ([list](docs/ROUTINE-CHECKS.md)) back the verified meanings.
 
 The font is 91 glyphs x 8 rows = 728 bytes, not 768 or 2,048 bytes. The
@@ -239,10 +240,11 @@ retained [font image and graphics documentation](docs/GRAPHICS.md) show the
 The cockpit bitmap occupies 2,048 bytes, with 256 separate colour attributes.
 Their initial storage is reused at runtime; it must not be treated as ROM.
 
-Unclassified regions can contain graphics, tables, text, padding **or further
-code** reached by indirect dispatch. Instruction discovery is not a proof
-that every candidate has the intended semantics. Neutral labels retain
-original addresses; comments distinguish verified facts from research hints.
+A classification is not a full explanation: typed data can still hide
+further structure, and dormant code can have an unknown purpose. Instruction
+discovery is not a proof that every candidate has the intended semantics.
+Neutral labels retain original addresses; comments distinguish verified facts
+from research hints.
 
 Direct in-image branch and call targets use labels. Every 16-bit immediate
 whose value lies in the image range was reviewed. Numbers such as bit

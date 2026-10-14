@@ -263,9 +263,15 @@ the lowest set bit n of (L_FC0F AND $0F) OR (L_FC12 AND $70) and run screen hand
 Called by MainLoop when docked and by the non-view flight frame (L_72D2).
 Evidence: HandleScreenKeys maps screen keys to screens 7..12 = handlers 3..8; the JP table
 ScreenFunctionTable; tools/check_routines.py controls/p1-chart-cursor-keys."""),
-    0x7169: (None, 'inferred', """
-Two bytes that decode as EI / RET directly after the RET of L_713B.  No static,
-pointer or runtime reference was found; kept unclassified."""),
+    0x7169: ('UnusedEnableInterrupts', 'verified', """
+Unused routine: EI, RET.  It follows the unconditional RET of L_713B
+and precedes Startup, so only a call or jump could enter it, and there is none: no
+word $7169 in the image, no relative jump to it, and the seven 48K access traces
+neither execute nor read it.  Called, it enables interrupts and returns with every other register and
+all memory unchanged.  The comparison 48K memory images contain no RET, EI, RET
+sequence, so it is not a leftover of their layout.
+Evidence: tools/check_routines.py dormant/unused-interrupt-routines; execution, read and
+write maps of tools/run_runtime_scenarios.py --accesses."""),
     0x716B: (None, 'verified', """
 One-time start-up (default ship variant): copy the font (FontBitmapSize = 728 bytes,
 glyphs $20..$7A) to FontRuntime and the initial cockpit colours to the mutable buffer
@@ -485,9 +491,11 @@ With as many significant bits as the depth the offset is within 3 of
 depth (x $1774EC, z $176C2A: 173 instead of 0).  With more significant bits than the
 depth (most ratios between 1 and 2) the divisor D is the depth's high byte with bit 7
 forced on instead of a normalised depth, and the offset is up to 127 too large
-(x $180000, z $0F0000: 206 instead of 153).
+(x $180000, z $0F0000: 206 instead of 153).  Close to the sun or planet this can
+hide a large disc just beyond an edge of the view: x $80E5, z $7E00 gives 131 instead of 6, so
+DrawCircle draws nothing where the disc should fill columns 136..247.
 Evidence: tools/check_routines.py pipeline/p1-projection-offset-paths (bit-level model
-of this path, random cases of both kinds)."""),
+of this path, random cases of both kinds, the hidden disc)."""),
     0x7766: ('ProjectionNotVisible', 'verified', 'Return A=0 (body not visible).'),
     0x7777: ('DivideFractionAB', 'verified', """
 D = A*256/B (requires A < B); E is cleared.  Falls into DivideFractionAEB.
@@ -1380,6 +1388,8 @@ SEEDS = {
             'runtime write to L_A80B from $7A72',
     0x780F: 'unreferenced fragment ending exactly at the verified instruction L_7813',
     0x7818: 'unreferenced fragment: JR NZ to verified L_7806, RET, then ArmExpandingSun',
+    0x7169: 'complete unreferenced routine EI, RET between two RET-terminated routines; '
+            'simulated by tools/check_routines.py dormant/unused-interrupt-routines',
 }
 
 CONSTANTS = {

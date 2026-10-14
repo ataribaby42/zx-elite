@@ -36,16 +36,14 @@ Byte classification of the game image `$6048..$FFA8` (40,801 bytes):
 
 | External / this project | Bytes |
 |---|---:|
-| code / code | 27,179 |
-| data / data | 13,354 |
+| code / code | 27,184 |
+| data / data | 13,356 |
 | data / inline argument | 57 |
 | code / inline argument | 4 |
 | data / code | 199 |
 | code / data | 1 |
-| code / unclassified | 5 |
-| data / unclassified | 2 |
 
-The two disassemblies agree on 99.3% of the bytes. Each remaining difference
+The two disassemblies agree on 99.4% of the bytes. Each remaining difference
 has a reason:
 
 | Address | External | Here | Resolution |
@@ -54,11 +52,9 @@ has a reason:
 | `$B3EC`, `$B697`, `$B72F`, `$B8D1` | instructions | inline arguments | These bytes follow `CALL SetTextColumnInline` or `CALL PrintInlineToken`. Those routines pop the return address, read the byte and return after it. The traces execute `$B8D2`, not `$B8D3`, which confirms the boundary. The external decoding at `$B72F` and `$B8D1` shifts the following instruction boundaries (`$B731/$B732`, `$B8D3/$B8D4`). The other 57 argument bytes are data on both sides. |
 | `$C350..$C40B` | data | code | `DormantPortLoader`: its prologue relocates exactly the operands of its nine `CALL` instructions, which proves the block is code. It is never executed and is documented as dormant. |
 | `$91C9..$91D1` | data | code | Three `JP` instructions to `UseEnergyBomb`, `$9280` and `$9287`. There is no reference to them; the header marks the role as INFERRED. As code, their targets are symbolic. |
-| `$7169..$716A`, `$FF53..$FF55` | code | unclassified | Unreferenced fragments that decode as `EI`/`RET` and `IM 1`/`RET`. They are never executed, so this project keeps them unclassified, with comments giving the decoding. |
 | `$B93F` | code | data | A `RET` byte between two text handlers. A check proves that no path reaches it (`text/p6-unreachable-byte`), so it is typed as a data byte. |
-| `$C40C..$C40D` | data | unclassified | Two bytes after the dormant receiver, without a role. |
 
-The source here contains 14,095 instruction starts, against 13,982 in the
+The source here contains 14,099 instruction starts, against 13,982 in the
 external `.skool`. The extra instructions are mainly the dormant loader.
 
 ## Labels
@@ -67,7 +63,7 @@ external `.skool`. The extra instructions are mainly the dormant loader.
 |---|---:|
 | Descriptive label in both | 344 |
 | Only in the external disassembly | 23 |
-| Only here | 655 |
+| Only here | 658 |
 
 The shared addresses describe the same concepts in different words. Examples:
 

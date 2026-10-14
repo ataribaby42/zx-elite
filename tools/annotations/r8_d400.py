@@ -499,8 +499,14 @@ Rotate the 24-bit position at IX+0..8 by the player's pitch (L_7043, y-z) and ro
 (L_7042, x-y) with AddScaledCoordinate, then move z by 2*(L_7044+1): positive z decreases,
 negative z grows.  Returns HL = z sign/high and mid bytes.  Also used for L_7065/L_706E
 (L_778F).  Crossing zero flips the sign; a negative magnitude overflowing $FFFF becomes
-+$7FFF.. (sign cleared).  Evidence: tools/check_routines.py maths/r8-motion-helpers (z step,
-zero crossing, overflow, returned HL)."""),
++$7FFF.. (sign cleared).
+NOTE: each rotation is two shear steps in a fixed order (z, then y from the new z; x,
+then y from the new x).  One step is close to a rotation, but a roll or pitch in one
+direction is not undone by the same rate in the other.  Rolling alternately left and right
+pushes positions away from the view axis at unchanged depth (planet 4.98 times further
+after 20 cycles of 32 updates each way); one direction alone does not.
+Evidence: tools/check_routines.py maths/r8-motion-helpers (z step, zero crossing,
+overflow, returned HL), maths/roll-reversal-drift."""),
     0xDF46: ('AddScaledCoordinate', 'verified', """
 Coordinate at IX+HL += coordinate at IX+DE * |C| / 256, sign = sign(C) XOR source sign
 (24-bit sign-magnitude, approximate products).  IX/IY preserved.

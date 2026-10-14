@@ -38,10 +38,15 @@ class TrackedMemory(list):
         self.tracking = False
         self.read_addresses = set()
         self.write_addresses = set()
+        # Read while still holding its loaded value: the initial byte can matter.
+        self.read_before_write = set()
 
     def __getitem__(self, key):
         if self.tracking and isinstance(key, int):
-            self.read_addresses.add(key & 0xFFFF)
+            address = key & 0xFFFF
+            self.read_addresses.add(address)
+            if address not in self.write_addresses:
+                self.read_before_write.add(address)
         return super().__getitem__(key)
 
     def __setitem__(self, key, value):
@@ -231,6 +236,7 @@ def main():
     if args.memory_accesses:
         report['memory_read_map']=sorted(simulator.memory.read_addresses)
         report['memory_write_map']=sorted(simulator.memory.write_addresses)
+        report['memory_read_before_write_map']=sorted(simulator.memory.read_before_write)
     (out/f'{args.name}.json').write_text(json.dumps(report,indent=2)+'\n')
     print('Machine: '+MACHINE)
     print(f"Executed {trace.operations:,} actual Z80 instructions; {report['game_executed_addresses']} distinct PCs in the game image.")

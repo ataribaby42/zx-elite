@@ -2507,6 +2507,58 @@ def check_download_loader_relocation(ctx):
     return len(offsets)
 
 
+@check('dormant', 'unused-interrupt-routines',
+       ['UnusedEnableInterrupts', 'UnusedSelectInterruptMode1', 'ViewBufferResidueAfterLoader', 'ClearViewBuffer'],
+       'integration',
+       'UnusedEnableInterrupts (EI, RET) and UnusedSelectInterruptMode1 (IM 1, RET) each follow a RET and '
+       'have no reference: no word in the image equals their address and no JR/DJNZ byte pair reaches '
+       'them.  Called with interrupts off in IM 2, the first sets IFF and the second selects IM 1; the '
+       'other registers and all memory stay unchanged.  Both comparison 48K memory images hold the bytes '
+       'from EnableInterruptMode2 to the RET of UnusedSelectInterruptMode1 unchanged, no word $FF53, no '
+       'CALL EnableInterruptMode2 (their start-up selects IM 2 inline) and no RET, EI, RET.  '
+       'ClearViewBuffer replaces the residue bytes $F3,$AF of ViewBufferResidueAfterLoader with 0.')
+def check_unused_interrupt_routines(ctx):
+    from skoolkit.simutils import IFF, IM
+    from tape import parse
+    image, start, end = ctx.pristine, ctx['GameImage'], ctx['GameImageEnd']
+    kept = (A, F, B, C, D, E, H, L, IXh, IXl, IYh, IYl)
+    cases = 0
+    for name, code, state in (('UnusedEnableInterrupts', [0xFB, 0xC9], (1, 2)),
+                              ('UnusedSelectInterruptMode1', [0xED, 0x56, 0xC9], (0, 1))):
+        address = ctx[name]
+        expect(list(image[address - 1:address + len(code)]) == [0xC9] + code, name, 'bytes')
+        words = [a for a in range(start, end - 1) if image[a] | image[a + 1] << 8 == address]
+        relative = [a for a in range(start, end - 1) if image[a] in (0x10, 0x18, 0x20, 0x28, 0x30, 0x38)
+                    and a + 2 + ((image[a + 1] ^ 0x80) - 0x80) == address]
+        expect(not words and not relative, name, words, relative)
+        m = ctx.machine()
+        m.r[IFF], m.r[IM] = 0, 2
+        m.set(a=0x12, f=0x34, bc=0x5678, de=0x9ABC, hl=0xDEF0, ix=0x1357, iy=0x2468)
+        registers, memory = [m.r[i] for i in kept], list(m.memory)
+        m.call(name)
+        stack = range(ctx.test_stack - 2, ctx.test_stack)
+        expect([m.r[i] for i in kept] == registers and (m.r[IFF], m.r[IM]) == state, name, 'effect')
+        expect(all(m.memory[a] == memory[a] for a in range(0x4000, 0x10000) if a not in stack), name, 'memory')
+        cases += 1
+    here, unused = ctx['EnableInterruptMode2'], ctx['UnusedSelectInterruptMode1']
+    select_im2 = bytes(image[here:here + 6])                       # LD A,$FD / LD I,A / IM 2
+    for name in ('Elite+48K+fixed+A+-+Krait.tap', 'Elite+48K+fixed+B+-+Adder.tap'):
+        old = bytes(0x4000) + parse((ROOT / 'assets' / name).read_bytes())[2].payload
+        expect(old[here:unused + 3] == bytes(image[here:unused + 3]), name, 'interrupt helpers')
+        expect(bytes([unused & 255, unused >> 8]) not in old[0x4000:], name, 'word $FF53')
+        expect(bytes([0xCD, here & 255, here >> 8]) not in old, name, 'CALL EnableInterruptMode2')
+        inline = [a for a in range(0x4000, len(old) - 6) if old[a:a + 6] == select_im2 and a != here]
+        expect(len(inline) == 1 and old[inline[0] + 6] == 0xC3, name, 'inline IM 2', inline)
+        expect(b'\xC9\xFB\xC9' not in old, name, 'RET, EI, RET')
+        cases += 1
+    residue = ctx['ViewBufferResidueAfterLoader']
+    m = ctx.machine()
+    expect(list(m.memory[residue:residue + 2]) == [0xF3, 0xAF], 'residue bytes')
+    m.call('ClearViewBuffer')
+    expect(list(m.memory[residue:residue + 2]) == [0, 0], 'residue cleared')
+    return cases + 1
+
+
 # ===========================================================================
 # missions: hyperspace arrival tail, energy bomb exemption, special encounter
 
@@ -4850,7 +4902,9 @@ def p1_coordinate_overflow_model(coordinate, depth):
        '256..511 path (bit clear) matches a bit-level model of L_76D6/L_7746 exactly, including '
        'the not-visible case, and is approximate: within 3 of 256*|c|/depth-256 for 99% of '
        'coordinates with as many significant bits as the depth (x $1774EC / z $176C2A borrows: 173), '
-       '-1..+127 too large with more bits (x $180000 / z $0F0000: 206).  Depth 1 (1/256) gives 128.')
+       '-1..+127 too large with more bits (x $180000 / z $0F0000: 206).  Near a body this hides '
+       'a disc that should fill columns 136..247 (x $80E5 / z $7E00: 131 instead of 6).  '
+       'Depth 1 (1/256) gives 128.')
 def check_p1_projection_offset_paths(ctx):
     m = ctx.machine()
     rng = random.Random(72)
@@ -4891,10 +4945,23 @@ def check_p1_projection_offset_paths(ctx):
     expect(min(errors[False]) >= -1 and max(errors[False]) <= 127, 'longer-coordinate error range')
     golden = [project(0x180000, 0, 0x0F0000)[1], project(0x1774EC, 0, 0x176C2A)[1]]
     expect(golden == [206, 173], golden)
+    # Near a body the error can hide a large disc: depth word $7E (radius 255), x = 1.023 * depth.
+    # The exact centre is 262 px right of column 128 (offset byte 6, bit 2 clear), and the renderer
+    # would fill columns 136..247; the computed 256 + 131 makes DrawCircle return at once.
+    near = project(0x80E5, 0, 0x7E00)
+    expect(near == (1, 131, 0, 0x0B) and m.byte('CircleRadius') == 255, near)
+    lit_columns = []
+    for dx in (131, round(0x80E5 * 256 / 0x7E00) - 256):
+        m.reset()
+        m.clear(ctx['ViewBitmapBuffer'], VIEW_SIZE)
+        set_circle(m, 0, dx, 0x0B, 255)
+        m.call('DrawFilledCircle', stack=ctx.upper_stack)
+        lit_columns.append(len({x for x, _ in bitmap_pixels(m.memory, ctx['ViewBitmapBuffer'], VIEW_ROWS)}))
+    expect(lit_columns == [0, 112], lit_columns)
     # Depth 1 (1/256): 23 shifts never move the depth's top bit out; D is the shifted depth.
     edge = [project(value, value, 1)[1:3] for value in (0, 1)]
     expect(edge == [(128, 128), (128, 128)], edge)
-    return 4004, dict(worst_fraction_error=worst_fraction, not_visible=hidden,
+    return 4005, dict(worst_fraction_error=worst_fraction, not_visible=hidden,
                       same_length_cases=sum(errors[True].values()), same_length_within_3=same_close,
                       longer_coordinate_cases=sum(errors[False].values()),
                       longer_coordinate_error_range=[min(errors[False]), max(errors[False])])
@@ -5285,6 +5352,102 @@ def check_justified_full_stop_loss(ctx):
     expect(lines[2] == 'Jjjjjjjjjj K Ll Mmm Nnnn Ooooo', lines)
     expect('.' not in ''.join(out), 'the full stop is printed after all', lines)
     return 1
+
+
+@check('text', 'description-full-stop-loss', ['DeriveSelectedSystemData', 'GenerateSystemName',
+                                               'L_BA49'], 'integration',
+       'The same quirk in real game text: the "DATA ON" description of SOCELAGE (galaxy 1, '
+       'system 45) is generated with a final full stop, but its second line is exactly 30 '
+       'characters wide, so the full stop never reaches the screen.  A scan of all 2048 '
+       'descriptions found 72 such cases, always the final full stop.')
+def check_description_full_stop_loss(ctx):
+    """Stubs as in text/justified-word-wrap: PutCharacter and NewLine only record output."""
+    m = ctx.machine()
+    load_jameson(m)
+    m.call('LoadGalaxySeedsToGenerator', **ZERO_REGISTERS)
+    for _ in range(46):                                  # systems 0..45
+        m.call('DeriveSelectedSystemData', **ZERO_REGISTERS)
+        m.call('GenerateSystemName', **ZERO_REGISTERS)
+    name = m.text('GeneratedSystemName')
+    expect(name == 'SOCELAGE', name)
+    m.poke('SelectedSystemName', *(name.encode() + bytes(9 - len(name))))
+    fed, out = [], []
+    hooks = {'PrintCharacter': lambda mm: fed.append(chr(mm.reg('a')))
+             if mm.byte('TextRedirectFlag') == 1 else None}
+    stubs = {'PutCharacter': lambda mm: out.append(chr(mm.reg('a'))),
+             'NewLine': lambda mm: out.append('\n')}
+    m.call('L_BA49', hooks=hooks, stubs=stubs, limit=3_000_000, halt=True, **ZERO_REGISTERS)
+    lines = ''.join(out).split('\n')
+    expect(''.join(fed).endswith('GOAT MEAT.'), ''.join(fed))
+    expect(lines[:2] == ['This  planet  is    reasonably', 'noted for Its Exotic Goat Meat'], lines)
+    expect('.' not in ''.join(out), lines)
+    return 1
+
+
+def alternating_roll_bytes(hold, cycles):
+    """PlayerRoll bytes while M and N are held alternately for `hold` updates each, following
+    UpdateFlightControls without the damping and recentring options: steps of $FF on the
+    sign-magnitude accumulator, high byte 0..15."""
+    negative, magnitude, rolls = False, 0, []
+    for _ in range(cycles):
+        for left in (False, True):
+            for _ in range(hold):
+                if magnitude == 0:
+                    negative, magnitude = left, 0xFF
+                elif negative == left:
+                    magnitude += 0xFF if magnitude + 0xFF < 0x1000 else 0
+                else:
+                    magnitude -= 0xFF
+                    if magnitude < 0:
+                        negative, magnitude = False, 0
+                rolls.append(magnitude >> 8 | (0x80 if negative else 0))
+    return rolls
+
+
+@check('maths', 'roll-reversal-drift', ['ApplyPlayerMotion', 'AddScaledCoordinate'], 'integration',
+       'Original quirk: ApplyPlayerMotion rolls a position with two shear steps in a fixed order '
+       '(x -= y*a, then y += x*a with the new x, a = 2*roll/256).  A roll to the right is not '
+       'undone by a roll to the left.  M and N held alternately for 32 updates each (roll ramps '
+       'to 15 and to -15) for 20 cycles move the planet 4.98 times further from the view axis '
+       'at unchanged depth; the same order in exact arithmetic gives 6.2 and a true rotation '
+       '1.0.  The same number of updates in one direction does not push it outward.')
+def check_roll_reversal_drift(ctx):
+    planet, start = ctx['PlanetPosition'], (0x030000, 0x010000, 0x080000)
+
+    def run(rolls):
+        m = ctx.machine()
+        for axis, value in enumerate(start):
+            put24(m.memory, planet + 3 * axis, value)
+        m.poke('PlayerPitch', 0)
+        m.poke('PlayerSpeed', 0)
+        for roll in rolls:
+            m.poke('PlayerRoll', roll)
+            m.call('ApplyPlayerMotion', ix=planet, **ZERO_REGISTERS)
+        x, y, z = (get24(m.memory, planet + 3 * axis) for axis in range(3))
+        expect(z == start[2] - 2 * len(rolls), 'depth moves only by the speed step', z)
+        return math.hypot(x, y) / math.hypot(*start[:2])
+
+    def model(rolls, rotation):
+        x, y = start[:2]
+        for roll in rolls:
+            a = (roll & 0x7F) * (-2 if roll & 0x80 else 2) / 256
+            if rotation:
+                x, y = x * math.cos(a) - y * math.sin(a), x * math.sin(a) + y * math.cos(a)
+            else:
+                x -= y * a
+                y += x * a
+        return math.hypot(x, y) / math.hypot(*start[:2])
+
+    rolls = alternating_roll_bytes(32, 20)
+    expect(rolls[:16] == list(range(16)) and rolls[63] == 0x8F
+           and set(rolls) == set(range(16)) | set(range(0x80, 0x90)), 'roll ramp', rolls[:64])
+    game, shear, rotation = run(rolls), model(rolls, False), model(rolls, True)
+    one_way = run([0x0F] * len(rolls))
+    expect(round(game, 2) == 4.98 and round(shear, 1) == 6.2 and abs(rotation - 1) < 1e-9,
+           game, shear, rotation)
+    expect(one_way < 1, 'one direction does not push outward', one_way)
+    return 2, dict(alternating_game=round(game, 3), alternating_exact_shear=round(shear, 3),
+                   alternating_true_rotation=round(rotation, 3), one_direction_game=round(one_way, 3))
 # --- END INTEGRATION CHECKS ---
 
 # --- BEGIN P3 CHECKS ---
