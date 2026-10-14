@@ -5,7 +5,7 @@
 
 ; KNOWN DATA: $BE00..$BFFF, 512 bytes.
 ; VERIFIED DATA: 256 low bytes then 256 high bytes of n*n for n=0..255.
-; Field-level names remain for later analysis where the exact format is not yet proved.
+; Field names are given only where code or runtime evidence proves them.
 
 SquareLookupTables:
     defb $00,$01,$04,$09,$10,$19,$24,$31,$40,$51,$64,$79,$90,$A9,$C4,$E1                  ; $BE00 ......$1@Qdy....

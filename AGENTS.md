@@ -165,6 +165,14 @@ the completion-report template.
   `tools/verified_annotations.py` when regenerating `src/game.asm`. See
   `docs/CODE-NAMES.md` for the named paths. Original `L_xxxx` names remain
   aliases for existing analysis tools, not numeric substitutes for new code.
+- Record disassembly results (names, comments, data types, constants,
+  operand expressions, seeds) in the annotation database `tools/annotations/`,
+  never only in the generated `src/game.asm`. Follow `docs/DISASSEMBLY.md`:
+  descriptive names only with `verified` status, `INFERRED:` for hypotheses,
+  ASCII English, evidence in the header. After changes run
+  `python tools/bootstrap_sources.py --force`, `make.bat`, `verify.bat` and the
+  relevant checks (`tools/check_core_routines.py`, `tools/check_routines.py`).
+  The generator appends `defc L_xxxx = Name` aliases for every renamed label.
 - Never copy C64/BBC routine layouts, addresses, ship formats or mission state
   into this version. They are distinct ports. General Elite concepts may guide
   investigation, but ZX bytes and runtime behaviour decide the result.
@@ -229,7 +237,9 @@ Runtime gameplay tracing also confirms these non-code regions:
   tables. `docs/SHIPS.md` is the maintained map and
   `tools/analyze_ship_blueprints.py` validates it against the 128K-compatible
   tape plus the supplied 48K Krait/Adder comparison tapes;
-- `$92B5..$9965` and `$9A9D..$9E73`: encoded text and its token dictionary;
+- `$92B7..$9964` and `$9A9D..$9E73`: the message table and its token
+  dictionary (`$92B5..$92B6` is a saved stack pointer and `$9965` the
+  `TorusJumpDustFlag`, not text);
 - `$A816..$A87D`: the mutable 104-byte buffer used directly by ROM tape
   load/save. Its first 102 bytes are persistent commander data; the final two
   tape bytes carry no necessary persistent information, although their RAM
@@ -245,9 +255,12 @@ the map. Actual program counters from these 48K runs are persistent source
 seeds in `src/runtime-code-seeds.json`.
 
 Do not classify `$C2D8..$C6FF` as a plain graphics buffer. It is reused at
-runtime, but the initial image also contains dormant code around
-`$C350..$C40C`, likely tape/save support. Keep mixed or unexercised regions
-unclassified until control flow or format evidence separates them.
+runtime as part of the `$C000..$CFFF` view buffer, but the initial image also
+contains dormant code at `$C350..$C40B`: a self-relocating loader for an
+external parallel interface (`DormantPortLoader`), not the game's tape code.
+Its prologue relocates its own CALL operands, so its operands must stay
+symbolic. Keep mixed or unexercised regions unclassified until control flow
+or format evidence separates them; see `docs/FINDINGS.md`.
 
 Preserve the verified ship-variant distinction: the 128K-compatible release
 and 48K side A use Krait in blueprint slot 17, while 48K side B replaces that
@@ -306,7 +319,8 @@ original table as unused, or as the cockpit's only colour mechanism.
 Comment only what the evidence supports, starting with:
 
 - bootstrap and 128K compatibility fix;
-- input tables and the documented B/Symbol Shift swap addresses;
+- input tables and the documented B/Symbol Shift swap addresses (the
+  entry at `$FF68/$FF69` belongs to SYMBOL SHIFT, `$FF98/$FF99` to B);
 - encounter/safety indicator and scanner-pixel fixes;
 - legal status and station Viper behaviour;
 - mission/pirate triggers around documented `$D0xx`, `$D7xx`, `$DDxx` and

@@ -11,9 +11,9 @@ AdderStartup:
     LD BC,CockpitAttributesSize
     LDIR
 AdderStartupAfterGraphicsCopy:
-    CALL L_FF4C
+    CALL EnableInterruptMode2
     EI
-    LD (L_74B2),SP
+    LD (StartupStackPointer),SP
 AdderStartupResumeJump:
     JP ContinueStartup
 AdderStartupEnd:

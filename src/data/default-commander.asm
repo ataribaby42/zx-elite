@@ -5,17 +5,89 @@
 
 ; KNOWN DATA: $A910..$A975, 102 bytes.
 ; VERIFIED DATA: initial 102-byte JAMESON template; copied to ActiveCommanderRecord for a new game and reused as a mutable tape-workflow copy.
-; Field-level names remain for later analysis where the exact format is not yet proved.
+; Field names are given only where code or runtime evidence proves them.
 
 CommanderTemplateBuffer:
-    defb $4A,$41,$4D,$45,$53,$4F,$4E,$00,$00,$00,$00,$00,$00,$00,$00,$00                  ; $A910 JAMESON.........
-    defb $00,$00,$00,$00,$E8,$03,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00                  ; $A920 ................
-    defb $00,$00,$00,$00,$00,$00,$00,$00,$14,$01,$00,$00,$00,$00,$46,$03                  ; $A930 ..............F.
-    defb $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$4A,$5A,$48,$02                  ; $A940 ............JZH.
-    defb $53,$B7,$38,$AD,$9C,$14,$1D,$15,$05,$03,$11,$12,$1A,$0E,$27,$08                  ; $A950 S.8...........'.
-    defb $00,$00,$0A,$19,$00,$00,$3D,$0E,$11,$0C,$00,$00,$00                              ; $A960 ......=......
+    defb $4A,$41,$4D,$45,$53,$4F,$4E,$00,$00,$00                                          ; $A910 JAMESON...  +$00 name, 10 characters (this release pads with $00)
+    defb $00                                                                              ; $A91A .  +$0A name terminator
+    defb $00                                                                              ; $A91B .  +$0B legal score (PlayerLegalScore)
+    defb $00                                                                              ; $A91C .  +$0C combat score, fraction byte
+    defb $00                                                                              ; $A91D .  +$0D combat score, low byte
+    defb $00                                                                              ; $A91E .  +$0E combat score, high byte
+    defb $00                                                                              ; $A91F .  +$0F jump counter, word
+    defb $00                                                                              ; $A920 .
+    defb $00                                                                              ; $A921 .  +$11 galaxy number, zero-based
+    defb $00,$00                                                                          ; $A922 ..  +$12 cash high word (units of 1000.0 Cr)
+    defb $E8,$03                                                                          ; $A924 ..  +$14 cash low word (0..9999 tenths of a credit)
+    defb $00                                                                              ; $A926 .  +$16 market fluctuation byte
+    defb $00                                                                              ; $A927 .  +$17 cargo 0: FOOD
+    defb $00                                                                              ; $A928 .  +$18 cargo 1: TEXTILES
+    defb $00                                                                              ; $A929 .  +$19 cargo 2: RADIOACTIVES
+    defb $00                                                                              ; $A92A .  +$1A cargo 3: SLAVES
+    defb $00                                                                              ; $A92B .  +$1B cargo 4: LIQUOR/WINES
+    defb $00                                                                              ; $A92C .  +$1C cargo 5: LUXURIES
+    defb $00                                                                              ; $A92D .  +$1D cargo 6: NARCOTICS
+    defb $00                                                                              ; $A92E .  +$1E cargo 7: COMPUTERS
+    defb $00                                                                              ; $A92F .  +$1F cargo 8: MACHINERY
+    defb $00                                                                              ; $A930 .  +$20 cargo 9: ALLOYS
+    defb $00                                                                              ; $A931 .  +$21 cargo 10: FIREARMS
+    defb $00                                                                              ; $A932 .  +$22 cargo 11: FURS
+    defb $00                                                                              ; $A933 .  +$23 cargo 12: MINERALS
+    defb $00                                                                              ; $A934 .  +$24 cargo 13: GOLD
+    defb $00                                                                              ; $A935 .  +$25 cargo 14: PLATINUM
+    defb $00                                                                              ; $A936 .  +$26 cargo 15: GEM-STONES
+    defb $00                                                                              ; $A937 .  +$27 cargo 16: ALIEN ITEMS
+    defb $14                                                                              ; $A938 .  +$28 free cargo space, tons
+    defb $01                                                                              ; $A939 .  +$29 front laser (0 none, 1 pulse, 2 beam, 3 military, 4 mining)
+    defb $00                                                                              ; $A93A .  +$2A rear laser
+    defb $00                                                                              ; $A93B .  +$2B left laser
+    defb $00                                                                              ; $A93C .  +$2C right laser
+    defb $00                                                                              ; $A93D .  +$2D nova mission active (NovaMissionActive)
+    defb $46                                                                              ; $A93E F  +$2E fuel, tenths of a light year
+    defb $03                                                                              ; $A93F .  +$2F missiles
+    defb $00                                                                              ; $A940 .  +$30 large cargo bay
+    defb $00                                                                              ; $A941 .  +$31 E.C.M. system
+    defb $00,$00                                                                          ; $A942 ..  +$32 two bytes without any code reference
+    defb $00                                                                              ; $A944 .  +$34 fuel scoops
+    defb $00                                                                              ; $A945 .  +$35 escape pod
+    defb $00                                                                              ; $A946 .  +$36 energy bomb
+    defb $00                                                                              ; $A947 .  +$37 energy unit
+    defb $00                                                                              ; $A948 .  +$38 docking computers
+    defb $00                                                                              ; $A949 .  +$39 galactic hyperdrive
+    defb $00,$00                                                                          ; $A94A ..  +$3A two bytes without any code reference
+    defb $4A,$5A,$48,$02                                                                  ; $A94C JZH.  +$3C galaxy seeds s0, s1, s2 (words)
+    defb $53,$B7                                                                          ; $A950 S.
+    defb $38                                                                              ; $A952 8  +$42 current system seeds s0, s1, s2 (words)
+    defb $AD                                                                              ; $A953 .  +$43 current system Y (s0 high)
+    defb $9C                                                                              ; $A954 .  +$44 current system s1 low
+    defb $14                                                                              ; $A955 .  +$45 current system X (s1 high)
+    defb $1D,$15                                                                          ; $A956 ..  +$46 current system s2
+    defb $05                                                                              ; $A958 .  +$48 current system tech level
+    defb $03                                                                              ; $A959 .  +$49 current system government
+    defb $11                                                                              ; $A95A .  +$4A station stock 0: FOOD
+    defb $12                                                                              ; $A95B .  +$4B station stock 1: TEXTILES
+    defb $1A                                                                              ; $A95C .  +$4C station stock 2: RADIOACTIVES
+    defb $0E                                                                              ; $A95D .  +$4D station stock 3: SLAVES
+    defb $27                                                                              ; $A95E '  +$4E station stock 4: LIQUOR/WINES
+    defb $08                                                                              ; $A95F .  +$4F station stock 5: LUXURIES
+    defb $00                                                                              ; $A960 .  +$50 station stock 6: NARCOTICS
+    defb $00                                                                              ; $A961 .  +$51 station stock 7: COMPUTERS
+    defb $0A                                                                              ; $A962 .  +$52 station stock 8: MACHINERY
+    defb $19                                                                              ; $A963 .  +$53 station stock 9: ALLOYS
+    defb $00                                                                              ; $A964 .  +$54 station stock 10: FIREARMS
+    defb $00                                                                              ; $A965 .  +$55 station stock 11: FURS
+    defb $3D                                                                              ; $A966 =  +$56 station stock 12: MINERALS
+    defb $0E                                                                              ; $A967 .  +$57 station stock 13: GOLD
+    defb $11                                                                              ; $A968 .  +$58 station stock 14: PLATINUM
+    defb $0C                                                                              ; $A969 .  +$59 station stock 15: GEM-STONES
+    defb $00                                                                              ; $A96A .  +$5A station stock 16: ALIEN ITEMS
+    defb $00                                                                              ; $A96B .  +$5B invasion mission state (InvasionMissionState)
+    defb $00                                                                              ; $A96C .  +$5C flags: missions 0..3, 5 refugees, 6 cloak, 7 ECM jammer
+
+; VERIFIED: Template +$5D: nine bytes copied to SunPosition..SunZHigh by InitialiseCommander.
 L_A96D:
-    defb $27,$08,$01,$2A,$4D,$8F,$F2,$88,$05                                              ; $A96D '..*M....
+    defb $27,$08,$01                                                                      ; $A96D '..  +$5D 9-byte copy of SunPosition..SunZHigh
+    defb $2A,$4D,$8F,$F2,$88,$05                                                          ; $A970 *M....
 
 CommanderTemplateBufferEnd:
 defc CommanderTemplateBufferSize = CommanderTemplateBufferEnd - CommanderTemplateBuffer

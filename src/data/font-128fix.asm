@@ -17,17 +17,12 @@
 
 ; Character code $20 (32); source $C000.
 FontBitmap:
-    defb $00,$00,$00,$00,$00 ; $C000
-L_C005:
-    defb $00,$00,$00 ; $C005
+    defb $00,$00,$00,$00,$00,$00,$00,$00 ; $C000
 
 ; Character code $21 (33); source $C008.
-    defb $7F,$40,$40,$20 ; $C008
-L_C00C:
-    defb $20,$10,$0C,$03 ; $C00C
+    defb $7F,$40,$40,$20,$20,$10,$0C,$03 ; $C008
 
 ; Character code $22 (34); source $C010.
-L_C010:
     defb $FE,$02,$02,$04,$04,$08,$30,$C0 ; $C010
 
 ; Character code $23 (35); source $C018.
@@ -112,17 +107,13 @@ L_C010:
     defb $30,$30,$30,$30,$3F,$3F,$00,$FF ; $C0E8
 
 ; Character code $3E (62); source $C0F0.
-L_C0F0:
     defb $00,$00,$00,$00,$FC,$FC,$00,$FF ; $C0F0
 
 ; Character code $3F (63); source $C0F8.
     defb $00,$3C,$42,$04,$08,$00,$08,$00 ; $C0F8
 
 ; Character code $40 (64); source $C100.
-L_C100:
-    defb $00,$00,$00,$00,$00,$00 ; $C100
-L_C106:
-    defb $00,$FF ; $C106
+    defb $00,$00,$00,$00,$00,$00,$00,$FF ; $C100
 
 ; Character code $41 (65); source $C108.
     defb $00,$3C,$42,$42,$7E,$42,$42,$00 ; $C108
@@ -218,9 +209,7 @@ L_C106:
     defb $01,$01,$01,$01,$01,$01,$01,$01 ; $C1F8
 
 ; Character code $60 (96); source $C200.
-    defb $00,$1C ; $C200
-L_C202:
-    defb $22,$78,$20,$20,$7E,$00 ; $C202
+    defb $00,$1C,$22,$78,$20,$20,$7E,$00 ; $C200
 
 ; Character code $61 (97); source $C208.
     defb $00,$00,$38,$04,$3C,$44,$3C,$00 ; $C208

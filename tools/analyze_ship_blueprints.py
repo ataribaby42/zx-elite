@@ -25,8 +25,8 @@ BLUEPRINT_DATA_END = 0x6FA3
 REGION_END = 0x7000
 EXTERNAL_DATA_LABELS = {
     0x640A: "L_640A",
-    0x6FA3: "L_6FA3",
-    0x6FBF: "L_6FBF",
+    0x6FA3: "TokenControlTable",
+    0x6FBF: "MessageControlTable",
 }
 
 
@@ -60,8 +60,75 @@ IDENTITIES = (
 )
 
 
+# Header layout: (offset, size, JSON key, reading instructions in the reference image).
+HEADER_FIELDS = (
+    (0x00, 1, "cargo_flags", "$ECB3 low nibble, $F7D4 whole byte, $EAB5 high nibble"),
+    (0x01, 1, "radius", "$E02D near limit and projected size, $EA58 proximity box, $DB38"),
+    (0x02, 1, "laser_fire_chance", "$FAB3, halved while CombatScoreHigh = 0"),
+    (0x03, 1, "vertices", "$E2F5"),
+    (0x04, 1, "edges", "$E72F"),
+    (0x05, 1, "faces", "$E940; zero marks face 0 visible"),
+    (0x06, 1, "maximum_speed", "$F33B half at creation, $DD7E speed limit, $DACD Thargoid test"),
+    (0x07, 1, "energy", "$F320 creation, $F733/$F76E regeneration, $ECBE/$ECC5 debris"),
+    (0x08, 2, "bounty_tenths_cr", "$DB4A/$DB4D -> AwardBounty"),
+    (0x0A, 1, "launch_flags", "$F32F bits 0..2 payload count, $F794 high nibble subtype"),
+    (0x0B, 1, "dot_distance", "$E112"),
+    (0x0C, 2, "vertices_address", "$E2FA/$E2FD offset from the header"),
+    (0x0E, 2, "edges_address", "$E729/$E72C offset from the header"),
+    (0x10, 2, "faces_address", "$E92F/$E932 offset from the header"),
+    (0x12, 1, "behaviour_flags", "$F326 -> instance +$21/+$20 bit 7, $F7DF value 4"),
+    (0x13, 1, "normal_scale_shift", "$E93A -> NormalScaleShift"),
+    (0x14, 1, "gun_vertex", "$E1A5"),
+    (0x15, 2, "combat_score_award", "$DB53/$DB56, halved -> AddCombatScore"),
+)
+
+# Commodity names in CargoHold order (tokens $D0..$E0, printed by ScoopCargoItem).
+COMMODITY_NAMES = (
+    "Food", "Textiles", "Radioactives", "Slaves", "Liquor/Wines", "Luxuries", "Narcotics",
+    "Computers", "Machinery", "Alloys", "Firearms", "Furs", "Minerals", "Gold", "Platinum",
+    "Gem-stones", "Alien items",
+)
+# Header +$0A high nibble: the child chosen by SelectParentLaunchType (0 = missile event).
+LAUNCH_SUBTYPES = {0: "missile", 1: "Viper", 2: "Cobra/Python trader", 3: "Thargon",
+                   4: "Thargoid", 5: "Sidewinder or slot-17 ship"}
+# Header +$12 bits, as used through instance +$21 (bit 7 goes to instance +$20 bit 7).
+BEHAVIOUR_BITS = ((0x01, "speed limit x4"), (0x02, "legal-sensitive"), (0x04, "hostile"),
+                  (0x08, "steers away near station"), (0x20, "protected"), (0x40, "protected"),
+                  (0x80, "escape capsule"))
+
+
 def word(data: bytes, offset: int) -> int:
     return data[offset] | data[offset + 1] << 8
+
+
+def scooped_commodity(cargo_flags: int):
+    """Commodity index given by a scooped object: high nibble + 1, or None (random 0..7)."""
+    return (cargo_flags >> 4) + 1 if cargo_flags >> 4 else None
+
+
+def cargo_comment(cargo_flags: int) -> str:
+    commodity = scooped_commodity(cargo_flags)
+    scoop = COMMODITY_NAMES[commodity] if commodity is not None else "random Food..Computers"
+    kill = "one canister" if cargo_flags & 0x0F else "no canister"
+    return f"+0 cargo: scooped as {scoop}; {kill} when killed"
+
+
+def launch_comment(flags: int) -> str:
+    count, subtype = flags & 0x07, flags >> 4
+    if not count:
+        return "+$0A launches: none"
+    return f"+$0A launches: {count} x {LAUNCH_SUBTYPES.get(subtype, 'nothing')}"
+
+
+def behaviour_comment(flags: int) -> str:
+    names = []
+    for bit, name in BEHAVIOUR_BITS:
+        if flags & bit and name not in names:
+            names.append(name)
+    text = ", ".join(names) if names else "passive"
+    if flags == 0x04:
+        text += " (value 4: Thargon test)"
+    return f"+$12 behaviour: {text}"
 
 
 def slice_at(image: bytes, base: int, address: int, size: int) -> bytes:
@@ -116,29 +183,32 @@ def parse_table(
                 "name": identity.name,
                 "role": identity.role or None,
                 "label": identity.label,
-                "dispatch_group": None if compact else entry[3],
+                # Table byte 3; no code reads it (nor the $C3 byte 0).
+                "unused_table_group": None if compact else entry[3],
                 "address": address,
                 "header": header,
-                "canister_or_commodity_flags": header[0],
-                "maximum_canisters": header[0] & 0x0F,
-                "target_size": header[1],
-                "agility": header[2],
+                "cargo_flags": header[0],
+                "drops_canister_when_killed": bool(header[0] & 0x0F),
+                "scooped_commodity": scooped_commodity(header[0]),
+                "radius": header[1],
+                "laser_fire_chance": header[2],
                 "vertices": header[3],
                 "edges": header[4],
                 "faces": header[5],
                 "maximum_speed": header[6],
                 "energy": header[7],
                 "bounty_tenths_cr": word(header, 8),
-                "byte_10": header[10],
-                "visibility_distance": header[11],
+                "launch_flags": header[10],
+                "payload_count": header[10] & 0x07,
+                "launch_subtype": header[10] >> 4,
+                "dot_distance": header[11],
                 "vertices_address": vertices,
                 "edges_address": edges,
                 "faces_address": faces,
-                "behavior_flags": header[18],
-                "byte_19": header[19],
+                "behaviour_flags": header[18],
+                "normal_scale_shift": header[19],
                 "gun_vertex": header[20],
-                "byte_21": header[21],
-                "normal_scale": header[22],
+                "combat_score_award": word(header, 21),
                 "geometry_end": geometry_end,
             }
         )
@@ -229,6 +299,10 @@ def analysis() -> tuple[dict, bytes, list[dict]]:
             "blueprint_data_end_exclusive": f"${BLUEPRINT_DATA_END:04X}",
             "auxiliary_data_end_exclusive": f"${REGION_END:04X}",
         },
+        "header_fields": [
+            {"offset": f"+${offset:02X}", "size": size, "key": key, "readers": readers}
+            for offset, size, key, readers in HEADER_FIELDS
+        ],
         "blueprints": [serializable_record(record) for record in records],
         "shared_geometry": [
             {"record": "Rock hermit", "geometry_owner": "Asteroid"},
@@ -280,9 +354,21 @@ def render_asm(image: bytes, records: list[dict]) -> str:
         f"; Zero-based TAP data block 5; payload SHA256: {sha(image)}",
         "; Generated by tools/analyze_ship_blueprints.py; tools/bootstrap_sources.py uses the same renderer.",
         "",
-        "; VERIFIED DATA: 19 four-byte dispatch entries, structured ship blueprint",
+        "; VERIFIED DATA: 19 four-byte blueprint table entries, structured ship blueprint",
         "; headers and geometry, followed by text/control-token handler pointers.",
-        "; Each vertex is 6 bytes; each edge and face is 4 bytes.",
+        "; Table entry: $C3, pointer to the header, group byte.  InitialiseShipFromBlueprint reads",
+        "; only the pointer; no code reads the $C3 or group bytes (ship=adder drops both).",
+        "; Header, 23 bytes (readers in docs/SHIPS.md): +0 cargo flags, +1 radius, +2 AI laser fire",
+        "; chance, +3/+4/+5 vertex/edge/face counts, +6 maximum speed, +7 energy, +8 bounty word,",
+        "; +$0A launch flags, +$0B dot distance, +$0C/+$0E/+$10 vertex/edge/face table offsets from",
+        "; the header, +$12 behaviour flags, +$13 normal scale shift, +$14 gun vertex,",
+        "; +$15 combat-score award word (halved and added to the score: kill count + word/512).",
+        "; Vertex, 6 bytes: |x|, |y|, |z|; +3 bits 7/6/5 = signs of x/y/z, bits 0..4 visibility",
+        "; threshold; +4 and +5 = four face numbers, one per nibble.",
+        "; Edge, 4 bytes: visibility threshold, first vertex, second vertex, two face nibbles.",
+        "; Face, 4 bytes: normal |x|, |y|, |z|; +3 bits 7/6/5 signs, bits 0..4 visibility threshold.",
+        "; A part is used while the detail level (depth class) is below its threshold; $1F means",
+        "; always.  Face number 15 is always visible; a vertex or edge needs one visible face.",
         "",
         "ShipBlueprintsAndDispatchTables:",
         "ShipBlueprintTable:",
@@ -290,10 +376,13 @@ def render_asm(image: bytes, records: list[dict]) -> str:
     for record in records:
         role = f" ({record['role']})" if record["role"] else ""
         lines += [
-            'IF !SHIP_ADDER', "    defb $C3", 'ENDIF',
+            'IF !SHIP_ADDER', "    defb $C3 ; not read (JP opcode byte)", 'ENDIF',
             ("IF SHIP_ADDER\n    defw ShipAdderBlueprint\nELSE\n    defw ShipKraitBlueprint\nENDIF"
              if record['id'] == 17 else f"    defw Ship{record['label']}Blueprint"),
-            'IF !SHIP_ADDER', f"    defb ${record['dispatch_group']:02X} ; ID {record['id']}: {record['name']}{role}", 'ENDIF',
+            'IF !SHIP_ADDER',
+            f"    defb ${record['unused_table_group']:02X} ; ID {record['id']}: {record['name']}{role};"
+            " group byte, not read",
+            'ENDIF',
         ]
     lines += [
         "ShipBlueprintTableEnd:",
@@ -323,30 +412,31 @@ def render_asm(image: bytes, records: list[dict]) -> str:
         lines += [
             f"; Blueprint ID {record['id']}: {identity}; original address ${address:04X}.",
             f"Ship{record['label']}Blueprint:",
-            f"    defb ${record['canister_or_commodity_flags']:02X} ; canister/commodity flags; low nibble is maximum canisters",
-            f"    defb {record['target_size']} ; target size",
-            f"    defb ${record['agility']:02X} ; agility / rotation limit",
-            f"    defb {record['vertices']} ; vertices",
-            f"    defb {record['edges']} ; edges",
-            f"    defb {record['faces']} ; faces",
-            f"    defb {record['maximum_speed']} ; maximum speed",
-            f"    defb {record['energy']} ; energy",
-            f"    defw {record['bounty_tenths_cr']} ; bounty in tenths of a credit",
-            f"    defb ${record['byte_10']:02X} ; partially decoded property byte",
-            f"    defb {record['visibility_distance']} ; visibility distance",
-            f"    defw Ship{owner['label']}Vertices-Ship{record['label']}Blueprint",
-            f"    defw Ship{owner['label']}Edges-Ship{record['label']}Blueprint",
+            f"    defb ${record['cargo_flags']:02X} ; {cargo_comment(record['cargo_flags'])}",
+            f"    defb {record['radius']} ; +1 radius: near limit, target size, collision box",
+            f"    defb ${record['laser_fire_chance']:02X} ; +2 AI laser fire chance in 256, halved below 256 kills",
+            f"    defb {record['vertices']} ; +3 vertices",
+            f"    defb {record['edges']} ; +4 edges",
+            f"    defb {record['faces']} ; +5 faces",
+            f"    defb {record['maximum_speed']} ; +6 maximum speed; a new ship starts at half",
+            f"    defb {record['energy']} ; +7 energy: initial value and regeneration limit",
+            f"    defw {record['bounty_tenths_cr']} ; +8 bounty in tenths of a credit",
+            f"    defb ${record['launch_flags']:02X} ; {launch_comment(record['launch_flags'])}",
+            f"    defb {record['dot_distance']} ; +$0B dot distance: wireframe while the depth high byte is lower",
+            f"    defw Ship{owner['label']}Vertices-Ship{record['label']}Blueprint ; +$0C",
+            f"    defw Ship{owner['label']}Edges-Ship{record['label']}Blueprint ; +$0E",
         ]
         if record["faces_address"]:
-            lines.append(f"    defw Ship{owner['label']}Faces-Ship{record['label']}Blueprint")
+            lines.append(f"    defw Ship{owner['label']}Faces-Ship{record['label']}Blueprint ; +$10")
         else:
-            lines.append("    defw 0 ; no face normals")
+            lines.append("    defw 0 ; +$10 no face normals")
+        award = record['combat_score_award']
         lines += [
-            f"    defb ${record['behavior_flags']:02X} ; behaviour flags",
-            f"    defb ${record['byte_19']:02X} ; partially decoded property byte",
-            f"    defb {record['gun_vertex']} ; gun vertex",
-            f"    defb ${record['byte_21']:02X} ; partially decoded property byte",
-            f"    defb {record['normal_scale']} ; normal scaling exponent",
+            f"    defb ${record['behaviour_flags']:02X} ; {behaviour_comment(record['behaviour_flags'])}",
+            f"    defb ${record['normal_scale_shift']:02X} ; +$13 normal scale shift n: normals x 2/2^n",
+            f"    defb {record['gun_vertex']} ; +$14 gun vertex: start of the AI laser beam",
+            f"    defb ${award & 255:02X} ; +$15 combat-score award {award}: kill count +{award >> 1}/256",
+            f"    defb {award >> 8} ; +$16 high byte of the award",
             f"assert $-Ship{record['label']}Blueprint = {HEADER_SIZE}",
         ]
 
@@ -390,8 +480,8 @@ def render_asm(image: bytes, records: list[dict]) -> str:
         f"assert ShipBlueprintsAndDispatchTablesSize = {REGION_END - TABLE_ADDRESS}",
         'IF !SHIP_ADDER',
         "assert L_640A-ShipBlueprintsAndDispatchTables = $640A-$6180",
-        "assert L_6FA3-ShipBlueprintsAndDispatchTables = $6FA3-$6180",
-        "assert L_6FBF-ShipBlueprintsAndDispatchTables = $6FBF-$6180",
+        "assert TokenControlTable-ShipBlueprintsAndDispatchTables = $6FA3-$6180",
+        "assert MessageControlTable-ShipBlueprintsAndDispatchTables = $6FBF-$6180",
         'ENDIF',
         "",
     ]
@@ -404,16 +494,23 @@ def text_dispatch_targets(image):
     return [word(data, i) for i in range(0, len(data)-1, 2)]
 
 
-def write_variant_sources(image):
-    """Extract reviewable ASM once; normal builds never extract reference binaries."""
+def write_variant_sources(image, names=None):
+    """Extract reviewable ASM once; normal builds never extract reference binaries.
+
+    names maps handler addresses to their current source labels; without it
+    the neutral L_xxxx names are used (resolved through the alias table)."""
+    names = names or {}
     directory = ROOT/'src/data'
     prologue = [
-        '; Original text/control-token handler pointers, read by $B89A/$B89F.',
+        '; Original text control-code handler pointers, read by DispatchMessageControl ($B89A)',
+        '; and DispatchTokenControl ($B89F).  Entry n handles control code n.',
         f'; assets/Elite - 128k.tap, block 5, load $6048, SHA256 {REFERENCE_SHA256}',
     ]
     targets = text_dispatch_targets(image)
-    for part, label, values in [('first','L_6FA3',targets[:14]), ('second','L_6FBF',targets[14:])]:
-        lines = prologue + [label+':'] + [f'    defw L_{target:04X}' for target in values]
+    for part, label, values in [('first','TokenControlTable',targets[:14]),
+                                ('second','MessageControlTable',targets[14:])]:
+        lines = prologue + [label+':'] + [f'    defw {names.get(target, f"L_{target:04X}"):<32} ; code {n}'
+                                          for n, target in enumerate(values)]
         lines += [f'{label}End:', f'defc {label}Size = {label}End-{label}',
                   f'assert {label}Size = {len(values)*2}']
         if part == 'second':
@@ -456,18 +553,26 @@ def render_adder_source(data, filename, optimize):
                   '; Same labels as adder.asm: include only one of these alternatives.',
                   '; This version needs 8 extra bytes; the current game layout cannot fit it unchanged.']
     lines += ['; Geometry offsets/counts are derived by the assembler.', 'ShipAdderBlueprint:']
-    fields = [('canister_or_commodity_flags','canister/commodity flags'), ('target_size','target size'),
-              ('agility','agility / rotation limit')]
+    fields = [('cargo_flags', cargo_comment(r['cargo_flags'])),
+              ('radius', '+1 radius: near limit, target size, collision box'),
+              ('laser_fire_chance', '+2 AI laser fire chance in 256, halved below 256 kills')]
     lines += [f'    defb {r[key]} ; {comment}' for key, comment in fields]
-    for section, unit in [('Vertices',6),('Edges',4),('Faces',4)]:
-        lines.append(f'    defb (ShipAdder{section}End-ShipAdder{section})/{unit}')
-    lines += [f'    defb {r["maximum_speed"]} ; maximum speed', f'    defb {r["energy"]} ; energy',
-              f'    defw {r["bounty_tenths_cr"]} ; bounty in tenths of a credit',
-              f'    defb ${r["byte_10"]:02X} ; partially decoded property',
-              f'    defb {r["visibility_distance"]} ; visibility distance']
-    lines += [f'    defw ShipAdder{section}-ShipAdderBlueprint' for section in ['Vertices','Edges','Faces']]
-    for key in ['behavior_flags','byte_19','gun_vertex','byte_21','normal_scale']:
-        lines.append(f'    defb ${r[key]:02X} ; {key.replace("_", " ")}')
+    for section, unit, offset in [('Vertices',6,3),('Edges',4,4),('Faces',4,5)]:
+        lines.append(f'    defb (ShipAdder{section}End-ShipAdder{section})/{unit} ; +{offset} count')
+    award = r['combat_score_award']
+    lines += [f'    defb {r["maximum_speed"]} ; +6 maximum speed',
+              f'    defb {r["energy"]} ; +7 energy',
+              f'    defw {r["bounty_tenths_cr"]} ; +8 bounty in tenths of a credit',
+              f'    defb ${r["launch_flags"]:02X} ; {launch_comment(r["launch_flags"])}',
+              f'    defb {r["dot_distance"]} ; +$0B dot distance']
+    lines += [f'    defw ShipAdder{section}-ShipAdderBlueprint ; +${offset:02X} table offset'
+              for section, offset in [('Vertices',0x0C),('Edges',0x0E),('Faces',0x10)]]
+    for value, comment in [(r['behaviour_flags'], behaviour_comment(r['behaviour_flags'])),
+                           (r['normal_scale_shift'], '+$13 normal scale shift'),
+                           (r['gun_vertex'], '+$14 gun vertex'),
+                           (award & 255, f'+$15 combat-score award {award}, low byte'),
+                           (award >> 8, '+$16 combat-score award, high byte')]:
+        lines.append(f'    defb ${value:02X} ; {comment}')
     lines += ['assert $-ShipAdderBlueprint = 23']
     for section, key, unit in [('Vertices','vertices',6),('Edges','edges',4),('Faces','faces',4)]:
         lines.append(f'ShipAdder{section}:')

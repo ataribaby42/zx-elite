@@ -17,6 +17,10 @@ from analyze_ship_blueprints import text_dispatch_targets, write_variant_sources
 from analyze_ship_blueprints import TABLE_ADDRESS
 from font_variant import PATCH_SOURCE, PATCH_SHA256, patch_font, fixed_font
 from verified_annotations import ANNOTATIONS
+from annotations import (LABELS, COMMENTS, SECTIONS, DATA, INLINE, CONSTANTS, OPERANDS,
+                         SEEDS, FIELDS, NORETURN, STOPS, TEXT_CALLS, TEXT_NAMES, ASSERTS,
+                         header_lines)
+from text_codec import TextCodec, clip
 
 sys.path.insert(0, str(ANALYSIS_DEPS))
 try:
@@ -147,14 +151,14 @@ def verified_data_regions(memory):
             raise ValueError('High-byte square table changed')
     return [
         dict(name='InitialRuntimeState', file='initial-runtime-state.asm',
-             start=BASE, end=0x6180, unit=16,
+             start=BASE, end=0x6180, unit=39,
              comment='VERIFIED DATA: initial mutable game/object state; runtime access tracing records reads and writes here, never instruction fetches.'),
         dict(name='ShipBlueprintsAndDispatchTables', file='ship-blueprints-and-tables.asm',
              start=0x6180, end=ENTRY, unit=16,
              comment='VERIFIED DATA: structured ship geometry/blueprint records followed by in-image dispatch pointers; read at runtime and never executed.'),
         dict(name='EncodedTextData', file='encoded-text.asm',
-             start=0x92B5, end=0x9966, unit=16,
-             comment='VERIFIED DATA: zero-terminated game text with high-bit token bytes; text routines point into and read this block.'),
+             start=0x92B7, end=0x9965, unit=16,
+             comment='VERIFIED DATA: message table of zero-terminated game text read by PrintMessage; numbering starts at 1.'),
         dict(name='TextTokenDictionary', file='text-token-dictionary.asm',
              start=0x9A9D, end=0x9E74, unit=16,
              comment='VERIFIED DATA: token dictionary used to expand screen and message text; runtime reads cover this block.'),
@@ -169,39 +173,73 @@ def verified_data_regions(memory):
              comment='VERIFIED DATA: 256 low bytes then 256 high bytes of n*n for n=0..255.'),
     ]
 
-def emit_verified_data(region, memory, labels, payload):
+def emit_verified_data(region, memory, labels, payload, codec):
     start, end, name = region['start'], region['end'], region['name']
     lines = prologue(5, payload) + [
         f'; KNOWN DATA: ${start:04X}..${end-1:04X}, {end-start} bytes.',
         '; ' + region['comment'],
-        '; Field-level names remain for later analysis where the exact format is not yet proved.',
+        '; Field names are given only where code or runtime evidence proves them.',
         '',
     ]
+    # Text tables: one entry per zero-terminated string, with decoded text.
+    entries = {}
+    if name == 'EncodedTextData':
+        number, address = 1, start
+        while address < end:
+            entries[address] = f'Message {number} (${number:02X}): ' + clip(codec.message(number), 100)
+            while memory[address]:
+                address += 1
+            address += 1
+            number += 1
+    elif name == 'TextTokenDictionary':
+        number, address = 0, start
+        while address < end:
+            codes = [f'${number + 0xA0:02X}'] if number < 0x60 else (
+                [f'${number:02X}'] if number < 0x80 else [f'${number - 0x72:02X}'])
+            entries[address] = (f'Token {number} (${number:02X}), PrintToken code {codes[0]}: '
+                                + clip(codec.dictionary(number), 90))
+            while memory[address]:
+                address += 1
+            address += 1
+            number += 1
     pc = start
+    anchor = start
     while pc < end:
+        if pc in entries:
+            anchor = pc
+            if pc not in labels:
+                lines += ['; ' + entries[pc]]
         if pc in labels:
+            entry = LABELS.get(pc)
             if pc in ANNOTATIONS:
                 comments = ANNOTATIONS[pc][1]
-                lines += ['', '; VERIFIED: ' + comments[0]]
-                lines += ['; ' + line for line in comments[1:]]
+                lines += ['', '; VERIFIED: ' + renamed(comments[0])]
+                lines += ['; ' + renamed(line) for line in comments[1:]]
+            if entry and entry[2].strip():
+                if pc not in ANNOTATIONS:
+                    lines.append('')
+                lines += [('; ' + renamed(line)).rstrip() for line in header_lines(entry[1], entry[2])]
             lines += [labels[pc] + ':']
-            if pc in ANNOTATIONS:
-                lines += [f'L_{pc:04X}: ; legacy analysis alias; same address, no emitted bytes']
+            if pc in entries:
+                lines += ['; ' + entries[pc]]
         if name == 'InitialRuntimeState' and labels.get(pc) == 'StationBlueprintPointer':
             # Original slot-zero pointer must match table entry zero. Emit a
             # symbol so the optional Adder layout relocates this instance too.
             if memory[pc:pc+2] != memory[TABLE_ADDRESS+1:TABLE_ADDRESS+3]:
                 raise ValueError('Initial station pointer disagrees with Coriolis table entry')
             lines += ['    ; The persistent station bypasses the generic object/blueprint loader.',
-                      '    defw ShipCoriolisStationBlueprint']
+                      '    defw ShipCoriolisStationBlueprint'.ljust(89) + ' ; ' + f'${pc:04X}'
+                      + ('  ' + renamed(COMMENTS[pc]) if pc in COMMENTS else '')]
             pc += 2
             continue
-        size = min(16, end - pc)
-        while size > 1 and any(pc < address < pc + size for address in labels):
-            size -= 1
+        size = 1
+        while (size < 16 and pc + size < end and (pc + size - anchor) % region['unit']
+               and pc + size not in labels and pc + size not in COMMENTS and pc + size not in entries):
+            size += 1
         chunk = bytes(memory[pc:pc + size])
         text = ''.join(chr(value) if 32 <= value < 127 else '.' for value in chunk)
-        lines += [f'    {bytes_line(chunk):<85} ; ${pc:04X} {text}']
+        comment = f'${pc:04X} {text}' + ('  ' + renamed(COMMENTS[pc]) if pc in COMMENTS else '')
+        lines += [f'    {bytes_line(chunk):<85} ; {comment}']
         pc += size
     lines += ['', name + 'End:', f'defc {name}Size = {name}End - {name}',
               f'assert {name}Size = {end-start}', '']
@@ -256,10 +294,180 @@ def emit_graphics(region, memory, labels, payload, provenance=None):
                   f'assert FontFirstCode + FontGlyphCount = ${region["first_code"]+(end-start)//region["unit"]:02X}']
     write(SOURCE/'data'/region['file'],'\n'.join(lines)+'\n')
 
+# Original code regions replaced by optional modifications.  Their bytes are
+# assembled only in the ELSE branch, so labels inside them exist only when the
+# option is off (except names that the replacement defines as well).
+OPTIONAL_REGIONS = [
+    (0x716B, 0x7189, 'SHIP_ADDER'),
+    (0xA660, 0xA706, 'SCANNER_PIXEL_FIX'),
+    (0xECF2, 0xECFE, 'LASER_SINGLE'),
+    (0xF44A, 0xF470, 'STATION_RANDOM_LAUNCH_FIX'),
+]
+# Labels defined by both the original code and its optional replacement.
+SHARED_OPTIONAL_LABELS = {0x716B, 0x7181, 0xA6D3}
+BRANCH = re.compile(r'^(JP|JR|CALL|DJNZ) (?:([A-Z]+),)?\$([0-9A-F]{4})$')
+BYTE = re.compile(r'(?<![+-])\$([0-9A-F]{2})\b')
+LEGACY_REF = re.compile(r'\bL_([0-9A-F]{4})\b')
+RENAME = [lambda text: text]
+
+
+def renamed(text):
+    """Replace L_xxxx mentions in comments by the final label names."""
+    return RENAME[0](text)
+
+
+def operand_match(operation):
+    """The numeric operand an OPERANDS expression replaces: nn, else the last n."""
+    word = WORD.search(operation)
+    if word:
+        return word, 0xFFFF
+    matches = list(BYTE.finditer(operation))
+    return (matches[-1], 0xFF) if matches else (None, None)
+WORD = re.compile(r'\$([0-9A-F]{4})\b')
+COMMENT_COLUMN = 47
+
+
+def condition_at(pc):
+    for start, end, option in OPTIONAL_REGIONS:
+        if start <= pc < end and pc not in SHARED_OPTIONAL_LABELS and pc != start:
+            return '!' + option
+    return None
+
+
+def decode(memory, end, seeds, entries, barriers, decoder):
+    """Follow control flow from proven seeds; never decode into data."""
+    pending = deque(seeds)
+    code, owners, inline, targets, conflicts = {}, {}, {}, set(entries), []
+    successors = set()
+    def barrier(address):
+        return next((region for region in barriers if region[0] <= address < region[1]), None)
+    while pending:
+        pc = pending.popleft()
+        if not BASE <= pc < end or pc in code:
+            continue
+        region = barrier(pc)
+        if region:
+            raise ValueError(f'Control flow enters {region[2]} at ${pc:04X}')
+        if pc in owners or pc in inline:
+            conflicts.append(pc)
+            continue
+        ins = decoder.disassemble(pc, pc + 1, 'h')[0]
+        op, size = ins.operation, len(ins.data)
+        if op.startswith('DEFB') or pc + size > end:
+            continue
+        if any(a in owners or a in inline or barrier(a) for a in range(pc, pc + size)):
+            conflicts.append(pc)
+            continue
+        code[pc] = ins
+        for a in range(pc, pc + size):
+            owners[a] = pc
+        following = pc + size
+        terminal = op in ('RET', 'RETI', 'RETN') or bool(re.match(r'^(JP|JR) (\$|\()', op))
+        m = BRANCH.match(op)
+        if m:
+            target = int(m[3], 16)
+            if BASE <= target < end:
+                targets.add(target)
+                pending.append(target)
+            if m[1] == 'CALL' and target in INLINE:
+                if m[2]:
+                    raise ValueError(f'Conditional call to inline-argument routine at ${pc:04X}')
+                count, kind = INLINE[target]
+                for index in range(count):
+                    inline[following + index] = (pc, target, index, kind)
+                following += count
+            if m[1] == 'CALL' and target in NORETURN and not m[2]:
+                terminal = True
+        if op == 'RST $28' or pc in STOPS:
+            terminal = True
+        if not terminal:
+            pending.append(following)
+            successors.add(following)
+    return code, owners, inline, targets, conflicts, successors
+
+
+class Evaluator:
+    """Evaluate simple operand expressions to catch annotation mistakes early."""
+    TOKEN = re.compile(r'\s*(\$[0-9A-Fa-f]+|%[01]+|\d+|[A-Za-z_]\w*|<<|>>|[-+*/&|()])')
+
+    def __init__(self, symbols):
+        self.symbols = symbols
+
+    def __call__(self, text):
+        tokens, pos = [], 0
+        while pos < len(text):
+            m = self.TOKEN.match(text, pos)
+            if not m:
+                raise ValueError(f'Cannot parse expression {text!r}')
+            tokens.append(m[1])
+            pos = m.end()
+        python = []
+        for token in tokens:
+            if token.startswith('$'):
+                python.append(str(int(token[1:], 16)))
+            elif token.startswith('%'):
+                python.append(str(int(token[1:], 2)))
+            elif token[0].isalpha() or token[0] == '_':
+                if token not in self.symbols:
+                    return None
+                python.append(str(self.symbols[token]))
+            elif token == '/':
+                python.append('//')
+            else:
+                python.append(token)
+        return eval(''.join(python), {'__builtins__': {}}) & 0xFFFF
+
+
+def comment_text(pc, ins_bytes, extra):
+    text = f'${pc:04X}: ' + ins_bytes
+    return text + ('  ' + extra if extra else '')
+
+
+def code_line(op, comment):
+    return f'    {op:<{COMMENT_COLUMN - 5}} ; {comment}'
+
+
+def data_line(directive, comment):
+    return f'    {directive:<85} ; {comment}'
+
+
+def printable(values):
+    return ''.join(chr(c) if 32 <= c < 127 else '.' for c in values)
+
+
+def text_directives(values):
+    """Split bytes into defm runs of plain ASCII and defb runs of others."""
+    parts, run, kind = [], [], None
+    for value in values:
+        this = 'm' if 32 <= value < 127 and value != 0x22 else 'b'
+        if this != kind and run:
+            parts.append((kind, run))
+            run = []
+        kind = this
+        run.append(value)
+    if run:
+        parts.append((kind, run))
+    return ['defm "' + ''.join(map(chr, run)) + '"' if kind == 'm' else bytes_line(run)
+            for kind, run in parts]
+
+
+def inline_comment(codec, kind, value, target_name):
+    if kind == 'text':
+        return f'{target_name} argument: "' + clip(codec.token(value), 60) + '"'
+    if kind == 'message':
+        return f'{target_name} argument: message {value}: "' + clip(codec.message(value), 50) + '"'
+    if kind == 'column':
+        return f'{target_name} argument: text column {value}'
+    if kind == 'row':
+        return f'{target_name} argument: text row {value}'
+    return f'{target_name} argument'
+
+
 def image(data):
     end = BASE + len(data)
     memory = [0] * 65536
     memory[BASE:end] = data
+    codec = TextCodec(data, TEXT_NAMES)
     graphics_data, graphics_constants = graphics_regions(memory)
     known_data = verified_data_regions(memory) + graphics_data
     known_data.sort(key=lambda region: region['start'])
@@ -267,15 +475,10 @@ def image(data):
                              handle_rst=False, imaker=lambda a,o,b: SimpleNamespace(address=a,operation=o,data=b),
                              opcodes='', wrap=False)
     decoder = Disassembler(memory, config)
-    pending = deque([ENTRY])
-    code, owners, targets, conflicts = {}, {}, {ENTRY}, []
-    # The two text dispatch entry points select these indirect code targets.
+    # The two text dispatch tables select these indirect code targets.
     text_targets = text_dispatch_targets(data)
-    pending.extend(text_targets)
-    targets.update(text_targets)
-    # These addresses are entry points identified by the supplied laser notes.
-    # Keep them separate from automatically discovered direct control flow.
-    pending.extend([0xECD4, 0xEE10])
+    # Entry points identified by the supplied laser notes.
+    laser_targets = [0xECD4, 0xEE10]
     runtime_seed_path = ROOT / 'src' / 'runtime-code-seeds.json'
     runtime_seeds = []
     if runtime_seed_path.exists():
@@ -285,49 +488,61 @@ def image(data):
         if runtime_evidence.get('machine') != 'ZX Spectrum 48K':
             raise ValueError('Runtime code seeds were not captured in ZX Spectrum 48K mode')
         runtime_seeds = [int(value, 16) for value in runtime_evidence['instruction_addresses']]
-        pending.extend(runtime_seeds)
-    while pending:
-        pc = pending.popleft()
-        if not BASE <= pc < end or pc in code:
-            continue
-        if any(r['start'] <= pc < r['end'] for r in known_data):
-            raise ValueError(f'Control flow enters verified graphics data at ${pc:04X}')
-        if pc in owners:
-            conflicts.append(pc)
-            continue
-        ins = decoder.disassemble(pc, pc+1, 'h')[0]
-        op, size = ins.operation, len(ins.data)
-        if op.startswith('DEFB') or pc + size > end:
-            continue
-        if any(a in owners for a in range(pc, pc+size)):
-            conflicts.append(pc)
-            continue
-        code[pc] = ins
-        for a in range(pc, pc+size): owners[a] = pc
-        m = re.match(r'^(?:JP|JR|CALL|DJNZ) (?:[A-Z]+,)?\$([0-9A-F]{4})$', op)
-        if m:
-            target = int(m[1],16)
-            if BASE <= target < end:
-                targets.add(target); pending.append(target)
-        # Stop at unconditional jumps/returns and indirect dispatches.
-        terminal = op in ('RET','RETI','RETN') or re.match(r'^(JP|JR) (\$|\()',op)
-        # ROM calculator uses inline bytecode. Do not misclassify it as Z80.
-        if op == 'RST $28': terminal = True
-        if not terminal:
-            pending.append(pc+size)
+    # Typed data regions from the annotation database, and pointer targets
+    # held in them, which are code or data entry points in their own right.
+    data_regions = []
+    pointer_values = {}
+    for start, (stop, kind, unit) in sorted(DATA.items()):
+        if any(r['start'] < stop and start < r['end'] for r in known_data):
+            raise ValueError(f'Annotated data ${start:04X} overlaps a verified data include')
+        data_regions.append((start, stop, f'annotated {kind} data at ${start:04X}'))
+        if kind == 'pointers':
+            if (stop - start) % 2:
+                raise ValueError(f'Pointer table ${start:04X} has an odd length')
+            for a in range(start, stop, 2):
+                value = memory[a] | memory[a + 1] << 8
+                if not BASE <= value < end:
+                    raise ValueError(f'Pointer ${a:04X} = ${value:04X} is outside the image')
+                pointer_values[a] = value
+    barriers = [(r['start'], r['end'], r['name']) for r in known_data] + data_regions
+    entries = [ENTRY] + text_targets + laser_targets + sorted(SEEDS)
+    seeds = entries + runtime_seeds
+    code, owners, inline, targets, conflicts, successors = decode(
+        memory, end, seeds, entries, barriers, decoder)
+    # A runtime-proved instruction that no static branch or fall-through
+    # reaches is an entry point of its own (indirect jump, RET dispatch...).
+    runtime_entries = {a for a in runtime_seeds if a in code and a not in successors}
+    targets.update(runtime_entries)
+    for address in SEEDS:
+        if address not in code:
+            raise ValueError(f'Annotated code seed ${address:04X} is not an instruction start')
 
-    # All absolute 16-bit references into the image get neutral labels. Values
-    # loaded into register pairs may be pointers or literal constants; these
-    # inferred references are listed in the report and need semantic review.
+    # Absolute 16-bit references into the image get labels.  Operands that
+    # the annotations prove to be numbers stay numeric; register-pair loads
+    # that are not reviewed yet are listed in the report.
     refs = set(targets)
     inferred = []
     for pc, ins in code.items():
-        for m in re.finditer(r'\$([0-9A-F]{4})\b', ins.operation):
-            value = int(m[1],16)
+        if pc in CONSTANTS or pc in OPERANDS:
+            continue
+        for m in WORD.finditer(ins.operation):
+            value = int(m[1], 16)
             if BASE <= value < end:
                 refs.add(value)
-                if ins.operation.startswith(('LD BC,','LD DE,','LD HL,','LD IX,','LD IY,','LD SP,')):
+                if (ins.operation.startswith(('LD BC,','LD DE,','LD HL,','LD IX,','LD IY,','LD SP,'))
+                        and '(' not in ins.operation):
                     inferred.append(dict(address=pc, value=value, operation=ins.operation))
+    for pc in CONSTANTS:
+        if pc not in code:
+            raise ValueError(f'CONSTANTS entry ${pc:04X} is not an instruction start')
+        if not WORD.search(code[pc].operation):
+            raise ValueError(f'CONSTANTS entry ${pc:04X} has no 16-bit operand')
+    refs.update(pointer_values.values())
+    for expression_pc, expression in OPERANDS.items():
+        if expression_pc not in code:
+            raise ValueError(f'OPERANDS entry ${expression_pc:04X} is not an instruction start')
+        for name in re.findall(r'\bL_([0-9A-F]{4})\b', expression):
+            refs.add(int(name, 16))
     # Force landmarks to exist even when they are data/operands, never fake code.
     notes = {
         BASE+0x23: ('StationBlueprintPointer', 'VERIFIED: persistent slot-zero station blueprint pointer; must follow model relocation.'),
@@ -344,7 +559,7 @@ def image(data):
         0xBB69: ('GetCharacterBitmap', 'VERIFIED: FontRuntime + (A-FontFirstCode)*8 selects a relocated glyph.'),
         0xBBBD: ('DrawCharacterRow', 'VERIFIED: XOR one font byte into a screen row, then advance glyph and screen pointers.'),
         0xBBC5: ('CharacterDrawn', 'Eight character rows have been drawn.'),
-        55237: ('MissionGalaxyGateOperand', 'POKE reference: allow missions/pirates in galaxy 1; original byte $4E. Meaning needs surrounding-code review.'),
+        55237: ('MissionGalaxyGateOperand', 'POKE reference: JR offset of the galaxy gate; with 0 the jump counter, missions and pirates also run in galaxy 1 (CurrentGalaxy 0). Original byte $4E.'),
         55298: ('PirateEscapePatchSite', 'POKE reference: 3-byte pirate escape patch site; keep original bytes.'),
         55310: ('PirateChanceOperand', 'POKE reference: forcing boarding changes this original $05 byte to $00.'),
         55315: ('PirateBoardingCompare', 'POKE reference: disable boarding by changing the original $BE byte to $FE.'),
@@ -354,10 +569,13 @@ def image(data):
         0xECFE: ('LaserOriginalContinuation', 'Original first-beam continuation; unreachable with laser=single.'),
         0xEE10: ('DrawLine', 'VERIFIED: shared clipped line renderer. HL/DE are endpoint magnitudes; C holds quadrant bits.'),
         64749: ('UnusedAfterReturnCandidate', 'Research note: proposed pirate patch storage before interrupt-vector region. Preserved, not used.'),
-        65384: ('KeySwapMaskB1', 'POKE reference: first B/Symbol Shift mask pair.'),
-        65385: ('KeySwapMaskB2', 'POKE reference: first B/Symbol Shift mask pair.'),
-        65432: ('KeySwapMaskShift1', 'POKE reference: second B/Symbol Shift mask pair.'),
-        65433: ('KeySwapMaskShift2', 'POKE reference: second B/Symbol Shift mask pair.'),
+        # The key-swap POKE exchanges these two KeyActionTable entries.  The
+        # original values (1,$20) and (4,$10) are KeyFlagsFlight bit 5 (SYMBOL
+        # SHIFT: decelerate) and KeyFlagsChart bit 4 (B: chart cursor home).
+        65384: ('KeySymbolShiftActionByte', 'POKE landmark: key-swap site (SYMBOL SHIFT state byte).'),
+        65385: ('KeySymbolShiftActionMask', 'POKE landmark: key-swap site (SYMBOL SHIFT mask).'),
+        65432: ('KeyBActionByte', 'POKE landmark: key-swap site (B state byte).'),
+        65433: ('KeyBActionMask', 'POKE landmark: key-swap site (B mask).'),
     }
     for region in known_data:
         notes[region['start']] = (region['name'],region['comment'])
@@ -365,14 +583,55 @@ def image(data):
         if address in notes:
             raise ValueError(f'Duplicate annotation at ${address:04X}')
         notes[address] = (name, 'VERIFIED: '+comments[0])
+    for address, (name, status, header) in LABELS.items():
+        if address in notes and name not in (None, notes[address][0]):
+            raise ValueError(f'Annotation at ${address:04X} renames landmark {notes[address][0]}')
     refs.update(notes)
+    refs.update(LABELS)
+    refs.update(start for start in DATA)
     # Boundaries for optional initial data and startup code in original zero fill.
     refs.update([0xC600, 0xC640, 0x7189, 0xA777])
-    labels = {a: notes[a][0] if a in notes else f'L_{a:04X}' for a in refs}
+    def name_for(address):
+        if address in notes:
+            return notes[address][0]
+        if address in LABELS and LABELS[address][0]:
+            return LABELS[address][0]
+        return f'L_{address:04X}'
+    labels = {a: name_for(a) for a in refs}
+    duplicates = {n for n in labels.values() if list(labels.values()).count(n) > 1}
+    if duplicates:
+        raise ValueError('Duplicate label names: ' + ', '.join(sorted(duplicates)))
     # A reference into an instruction names its byte position relative to that
     # instruction, so operand labels survive earlier relocation automatically.
     interior = {a:owners[a] for a in refs if a in owners and owners[a] != a}
     for start in interior.values(): labels.setdefault(start,f'L_{start:04X}')
+    for address in LABELS:
+        if address in inline:
+            raise ValueError(f'Label annotation ${address:04X} is an inline argument byte')
+    symbols = {name: address for address, name in labels.items()}
+    symbols.update({name: value for name, value in graphics_constants.items()})
+    for name, (value, _) in FIELDS.items():
+        if isinstance(value, int):
+            symbols[name] = value
+    evaluate = Evaluator(symbols)
+    for pc, expression in OPERANDS.items():
+        original, mask = operand_match(code[pc].operation)
+        if not original:
+            raise ValueError(f'OPERANDS entry ${pc:04X} has no numeric operand')
+        value = evaluate(expression)
+        if value is not None and value & mask != int(original[1], 16):
+            raise ValueError(f'OPERANDS ${pc:04X}: {expression} = ${value & mask:X}, '
+                             f'original operand is ${original[1]}')
+    def rename(text):
+        def replace(m):
+            name = labels.get(int(m[1], 16))
+            return name if name and not name.startswith('L_') else m[0]
+        return LEGACY_REF.sub(replace, text)
+    RENAME[0] = rename
+    pointer_targets = {}
+    for a, value in pointer_values.items():
+        pointer_targets[a] = labels[value] if value not in interior else labels[value]
+
     for region in known_data:
         if any(a in owners for a in range(region['start'],region['end'])):
             raise ValueError('Instruction overlaps known data: '+region['name'])
@@ -400,9 +659,9 @@ def image(data):
             if blueprint_image != data:
                 raise ValueError('Ship analysis and source reconstruction use different game images')
             write(SOURCE / 'data' / region['file'], render_ship_blueprints(data, blueprint_records))
-            write_variant_sources(data)
+            write_variant_sources(data, labels)
         else:
-            emit_verified_data(region,memory,labels,data)
+            emit_verified_data(region,memory,labels,data,codec)
     # Decode each verified copy/lookup operand symbolically, including its length.
     # Fail loudly if the original instruction ever ceases to match this analysis.
     overrides = {
@@ -431,23 +690,120 @@ def image(data):
     for pc,(expected,_) in overrides.items():
         if pc not in code or code[pc].operation != expected:
             raise ValueError(f'Annotated graphics instruction changed at ${pc:04X}')
+        if pc in OPERANDS or pc in CONSTANTS:
+            raise ValueError(f'Annotation duplicates fixed operand override at ${pc:04X}')
+
+    # ------------------------------------------------------------------
+    # Emission
     lines = prologue(5, data) + [
-        '; Control-flow reconstruction from entry $7000 and supplied laser entry hints.',
-        '; Identified runtime state, models, text, commander, math and graphics data are isolated in data/*.asm.',
-        '; Remaining DEFB bytes are UNCLASSIFIED.',
+        '; Z80 source of the game image $6048..$FFA8 (TAP block 5, entry $7000).',
+        '; Generated from control-flow analysis, runtime evidence and the annotation',
+        '; database in tools/annotations/; see docs/DISASSEMBLY.md for conventions.',
+        '; Each instruction comment starts with its original address and bytes.',
+        '; VERIFIED marks proved meanings; INFERRED marks hypotheses still to be checked.',
+        '; Remaining DEFB bytes marked UNCLASSIFIED have no proved code or data role yet.',
         '; Every original byte is present. This is not yet a fully documented disassembly.',
     ]
     lines += ['; Fixed runtime/screen destinations and character format, verified from original instructions.']
     lines += ['    INCLUDE "options.asm"']
-    # Fixed runtime workspaces come from the reference memory map; movable
-    # on-tape font/graphics sources use their emitted labels instead.
     lines += [f'defc {name} = ${value:04X}' for name,value in graphics_constants.items()]
     lines += ['; Source RAM is reused after the initial font/colour copies.',
               'defc ViewBitmapBuffer = FontBitmap',
-              'defc ViewBitmapBufferSecondHalf = CockpitBitmap',
-              'org GameLoadAddress', 'GameImage:']
+              'defc ViewBitmapBufferSecondHalf = CockpitBitmap']
+    if FIELDS:
+        lines += ['', '; Named constants: structure offsets, fixed workspaces and format values.']
+        for name, (value, text) in FIELDS.items():
+            rendered = f'${value:04X}' if isinstance(value, int) and value > 255 else (
+                f'${value:02X}' if isinstance(value, int) else value)
+            lines.append(f'defc {name} = {rendered}'.ljust(COMMENT_COLUMN) + ' ; ' + text)
+    lines += ['org GameLoadAddress', 'GameImage:']
+    label_context = {}
+    context = [None]
+
+    def emit_label(address):
+        name = labels[address]
+        lines.append(name + ':')
+        label_context[address] = context[-1]
+
+    def emit_header(address):
+        if address in SECTIONS:
+            title, text = SECTIONS[address]
+            lines.extend(['', '; ' + '=' * 76, '; ' + title])
+            lines.extend(('; ' + renamed(line)).rstrip() for line in text.strip('\n').split('\n') if text.strip())
+            lines.append('; ' + '=' * 76)
+        note = notes.get(address)
+        entry = LABELS.get(address)
+        if note or (entry and entry[2].strip()):
+            lines.append('')
+        if note:
+            lines.append('; ' + renamed(note[1]))
+            if address in ANNOTATIONS:
+                lines.extend('; ' + renamed(line) for line in ANNOTATIONS[address][1][1:])
+        if entry and entry[2].strip():
+            lines.extend(('; ' + renamed(line)).rstrip() for line in header_lines(entry[1], entry[2]))
+
     pc = BASE
-    ranges=[]
+    ranges = []
+    def add_range(start, size, kind, name=None):
+        if ranges and ranges[-1]['kind'] == kind and ranges[-1]['end'] == start and not name:
+            ranges[-1]['end'] += size
+        else:
+            ranges.append(dict(start=start, end=start + size, kind=kind, **({'name': name} if name else {})))
+
+    def emit_data_run(start, stop, kind, unit):
+        """Emit an annotated data region, splitting lines at labels/comments."""
+        a = start
+        if kind in ('zeros', 'stack'):
+            if any(memory[start:stop]):
+                raise ValueError(f'{kind} region ${start:04X} is not zero-filled')
+        while a < stop:
+            if a != start:
+                if a in LABELS or a in notes or a in SECTIONS:
+                    emit_header(a)
+                if a in labels and a not in interior:
+                    emit_label(a)
+            step = 2 if kind in ('words', 'pointers') else 1
+            limit = stop
+            boundary = a + step
+            while boundary < stop and (boundary - a) // step < unit and boundary not in labels and boundary not in COMMENTS:
+                boundary += step
+            limit = boundary
+            chunk = memory[a:limit]
+            comment = renamed(COMMENTS.get(a, ''))
+            if kind == 'pointers':
+                directive = 'defw ' + ','.join(pointer_targets[x] for x in range(a, limit, 2))
+                tail = f'${a:04X}' + ('  ' + comment if comment else '')
+            elif kind == 'words':
+                directive = 'defw ' + ','.join(f'${memory[x] | memory[x+1] << 8:04X}' for x in range(a, limit, 2))
+                tail = f'${a:04X}' + ('  ' + comment if comment else '')
+            elif kind in ('zeros', 'stack'):
+                directive = f'defs {limit - a},0'
+                tail = f'${a:04X}..${limit-1:04X}' + ('  ' + comment if comment else '')
+            elif kind == 'text':
+                parts = text_directives(chunk)
+                for part in parts[:-1]:
+                    lines.append('    ' + part)
+                directive = parts[-1]
+                tail = f'${a:04X}' + ('  ' + comment if comment else '')
+            else:
+                directive = bytes_line(chunk)
+                tail = f'${a:04X} {printable(chunk)}' + ('  ' + comment if comment else '')
+            lines.append(data_line(directive, tail))
+            a = limit
+
+    def emit_if(option):
+        lines.append(f'IF {option}')
+        context.append(option)
+
+    def emit_else():
+        lines.append('ELSE')
+        option = context.pop()
+        context.append('!' + option if not option.startswith('!') else option[1:])
+
+    def emit_endif():
+        lines.append('ENDIF')
+        context.pop()
+
     while pc < end:
         region=next((r for r in known_data if r['start']==pc),None)
         if region:
@@ -458,62 +814,47 @@ def image(data):
             if region['name'] == 'FontBitmap':
                 lines += ['ENDIF', 'ENDIF', 'ENDIF']
             lines += ['']
+            for a in range(region['start'], region['end']):
+                if a in labels:
+                    label_context[a] = None
             ranges.append(dict(start=pc,end=region['end'],kind='data',name=region['name']))
             pc=region['end']
             continue
         if pc == 0xECFE:
-            lines.append('ENDIF')
+            emit_endif()
         if pc == 0x7189:
-            lines.append('ENDIF')
+            emit_endif()
         if pc == 0xA706:
-            lines += ['ENDIF', 'assert $-GameImage = CockpitIndicatorsLimit-$6048']
+            emit_endif()
+            lines += ['assert $-GameImage = CockpitIndicatorsLimit-$6048']
         if pc == 0xF470:
-            lines.append('ENDIF')
-        if pc in notes:
-            lines += ['', '; ' + notes[pc][1]]
-            if pc in ANNOTATIONS:
-                lines += ['; '+line for line in ANNOTATIONS[pc][1][1:]]
+            emit_endif()
+        emit_header(pc)
         if pc == 0x716B:
-            lines += ['IF SHIP_ADDER', 'Startup:',
+            emit_if('SHIP_ADDER')
+            lines += ['Startup:',
                       '    INCLUDE "data/text-dispatch-first.asm"',
                       '    defs 2,0 ; preserve the original reclaimed-slot padding',
-                      'defc StartupAfterGraphicsCopy = AdderStartupAfterGraphicsCopy',
-                      'ELSE']
+                      'defc StartupAfterGraphicsCopy = AdderStartupAfterGraphicsCopy']
+            emit_else()
         if pc in labels and pc not in interior:
-            lines += [labels[pc]+':']
-            if pc in ANNOTATIONS:
-                lines += [f'L_{pc:04X}: ; legacy analysis alias; same address, no emitted bytes']
+            emit_label(pc)
         if pc == 0xA660:
-            lines += ['IF SCANNER_PIXEL_FIX', '    INCLUDE "scanner-pixel-fix.asm"', 'ELSE']
+            emit_if('SCANNER_PIXEL_FIX')
+            lines += ['    INCLUDE "scanner-pixel-fix.asm"']
+            emit_else()
         if pc == 0xF44A:
-            lines += ['IF STATION_RANDOM_LAUNCH_FIX', '    INCLUDE "station-random-launch-fix.asm"', 'ELSE']
+            emit_if('STATION_RANDOM_LAUNCH_FIX')
+            lines += ['    INCLUDE "station-random-launch-fix.asm"']
+            emit_else()
         if pc == 0xF470:
             lines += ['    assert SelectParentLaunchType-GameImage = ParentLaunchSelectionStart-$6048',
                       '    assert LaunchSelectedShip-GameImage = ParentLaunchSelectionLimit-$6048']
-        if pc == 0xD0F8:
-            # The preceding L_BA99 consumes only the space. Execution resumes
-            # at LD B,$12, not at the linear decoder's JR NZ / LD (DE),A.
-            if bytes(memory[pc:pc+3]) != bytes.fromhex('20 06 12'):
-                raise ValueError('Legal-status inline space/token setup changed')
-            lines += ['    defb $20                                   ; Space character; L_BA99 prints it and advances its return address past this byte.',
-                      '    LD B,$12                                   ; $D0F9: 06 12; Clean text-token index']
-            ranges += [dict(start=pc,end=pc+1,kind='data',name='LegalStatusSeparator'),
-                       dict(start=pc+1,end=pc+3,kind='code')]
-            pc += 3
-            continue
-        if pc == 0xD137:
-            # L_BA99 consumes one inline character, then returns to the CALL.
-            # Linear decoding mistakes the four bytes for LD DE,nn / POP DE.
-            if bytes(memory[pc:pc+4]) != bytes.fromhex('11 CD A6 D1'):
-                raise ValueError('Status-screen inline character/CALL changed')
-            lines += ['    defb $11                                   ; Inline character consumed by L_BA99',
-                      '    CALL L_D1A6                                ; $D138: CD A6 D1']
-            pc += 4
-            continue
         if pc == 0xECF2:
-            lines += ['IF LASER_SINGLE', '    INCLUDE "single-laser.asm"',
-                      '    defw DrawLine ; unreachable original CALL operand bytes; preserve the layout',
-                      'ELSE']
+            emit_if('LASER_SINGLE')
+            lines += ['    INCLUDE "single-laser.asm"',
+                      '    defw DrawLine ; unreachable original CALL operand bytes; preserve the layout']
+            emit_else()
         if pc == 0xECFE:
             lines += ['IF LASER_SINGLE',
                       '    assert SingleLaserEnd+2 = LaserOriginalContinuation', 'ENDIF']
@@ -528,31 +869,65 @@ def image(data):
         for a,start in sorted(interior.items()):
             if start == pc:
                 if a in notes: lines += ['; ' + notes[a][1]]
+                if a in LABELS and LABELS[a][2].strip():
+                    lines.extend('; ' + renamed(line) for line in header_lines(LABELS[a][1], LABELS[a][2]))
                 lines += [f'defc {labels[a]} = {labels[start]} + {a-start} ; byte inside instruction at ${start:04X}']
+                label_context[a] = context[-1]
+        if pc in DATA:
+            stop, kind, unit = DATA[pc]
+            emit_data_run(pc, stop, kind, unit)
+            add_range(pc, stop - pc, 'data', f'annotated-{kind}')
+            pc = stop
+            continue
         if pc in code:
             ins = code[pc]
-            op = re.sub(r'\$([0-9A-F]{4})\b', lambda m: labels.get(int(m[1],16),m[0]), ins.operation)
+            op = ins.operation
+            if pc in OPERANDS:
+                found, _ = operand_match(op)
+                op = op[:found.start()] + renamed(OPERANDS[pc]) + op[found.end():]
+            elif pc in CONSTANTS:
+                pass
+            else:
+                op = WORD.sub(lambda m: labels.get(int(m[1],16),m[0]), op)
             if pc in overrides: op=overrides[pc][1]
+            extra = renamed(COMMENTS.get(pc, ''))
+            if not extra:
+                extra = auto_comment(pc, ins, code, codec)
+            raw = bytes(ins.data).hex(' ').upper()
             if pc == ENTRY:
-                lines += ['IF SHIP_ADDER', '    JP AdderStartup', 'ELSE']
+                emit_if('SHIP_ADDER')
+                lines += ['    JP AdderStartup']
+                emit_else()
             if pc in (0xF302,0xF308):
-                lines += ['IF SHIP_ADDER', '    NOP ; compact two-byte blueprint pointers', 'ELSE']
-            lines += [f'    {op:<42} ; ${pc:04X}: ' + bytes(ins.data).hex(' ').upper()]
+                emit_if('SHIP_ADDER')
+                lines += ['    NOP ; compact two-byte blueprint pointers']
+                emit_else()
+            lines.append(code_line(op, comment_text(pc, raw, extra)))
             if pc in (ENTRY,0xF302,0xF308):
-                lines.append('ENDIF')
+                emit_endif()
             size=len(ins.data); kind='code'
+        elif pc in inline:
+            caller, target, index, kind_name = inline[pc]
+            extra = renamed(COMMENTS.get(pc, '')) or inline_comment(codec, kind_name, memory[pc], labels[target])
+            lines.append(code_line(f'defb ${memory[pc]:02X}', f'${pc:04X}: {memory[pc]:02X}  {extra}'))
+            size=1; kind='inline'
         else:
             size=1
-            while size<16 and pc+size<end and pc+size not in code and pc+size not in labels:
+            while (size<16 and pc+size<end and pc+size not in code and pc+size not in labels
+                   and pc+size not in inline and pc+size not in DATA and pc+size not in SECTIONS
+                   and not any(r['start']==pc+size for r in known_data) and pc+size not in (0xC600,)):
                 size+=1
             chunk=bytes(memory[pc:pc+size])
-            text=''.join(chr(c) if 32 <= c < 127 else '.' for c in chunk)
-            lines += [f'    {bytes_line(chunk):<85} ; ${pc:04X} {text}']
+            if not ranges or ranges[-1]['kind'] != 'unclassified' or ranges[-1]['end'] != pc:
+                run_end = pc
+                while (run_end < end and run_end not in code and run_end not in inline
+                       and run_end not in DATA and not any(r['start'] <= run_end < r['end'] for r in known_data)
+                       and run_end != 0xC600):
+                    run_end += 1
+                lines.append(f'; UNCLASSIFIED: ${pc:04X}..${run_end-1:04X} ({run_end-pc} bytes); no proved code or data role yet.')
+            lines.append(data_line(bytes_line(chunk), f'${pc:04X} {printable(chunk)}'))
             kind='unclassified'
-        if ranges and ranges[-1]['kind']==kind and ranges[-1]['end']==pc:
-            ranges[-1]['end']+=size
-        else:
-            ranges.append(dict(start=pc,end=pc+size,kind=kind))
+        add_range(pc, size, kind)
         pc+=size
     lines += ['', 'GameImageEnd:',f'assert GameImageEnd-GameImage = {len(data)}',
               f'assert Entry-GameImage = $7000-${BASE:04X}',
@@ -576,20 +951,101 @@ def image(data):
             lines.append('ENDIF')
     for region in known_data:
         lines += [f'assert {region["name"]}End-GameImage = ${region["end"]:04X}-${BASE:04X}']
+    if ASSERTS:
+        lines += ['', '; Layout constraints required by the code (see tools/annotations).']
+        for key, (expression, reason) in sorted(ASSERTS.items()):
+            lines.append(f'assert {renamed(expression)}'.ljust(COMMENT_COLUMN) + ' ; ' + reason)
+    for address in SHARED_OPTIONAL_LABELS:
+        if address in label_context:
+            label_context[address] = None
+    # Legacy aliases keep older notes and analysis tools usable.  They are
+    # grouped by the option context in which the named label exists.
+    aliases = {}
+    for address, name in sorted(labels.items()):
+        legacy = f'L_{address:04X}'
+        if name == legacy:
+            continue
+        aliases.setdefault(label_context.get(address, None), []).append((legacy, name))
+    lines += ['', '; ' + '=' * 76,
+              '; Legacy address aliases',
+              '; Older notes and analysis tools use the neutral L_xxxx names of the original',
+              '; addresses. Each alias equals the descriptive label at the same position.',
+              '; ' + '=' * 76]
+    for option in sorted(aliases, key=lambda value: value or ''):
+        if option:
+            lines.append(f'IF {option}')
+        lines += [f'defc {legacy} = {name}' for legacy, name in aliases[option]]
+        if option:
+            lines.append('ENDIF')
     lines += ['']
     write(SOURCE/'game.asm','\n'.join(lines))
+    static = static_xrefs(code, inline, labels, pointer_values)
     return dict(image_start=BASE,image_end_exclusive=end,entry=ENTRY,
                 code_instructions=len(code),code_bytes=len(owners),
+                inline_argument_bytes=len(inline),
                 known_data_bytes=sum(r['end']-r['start'] for r in known_data),
+                annotated_data_bytes=sum(stop-start for start,(stop,_,_) in DATA.items()),
                 unclassified_bytes=sum(r['end']-r['start'] for r in ranges if r['kind']=='unclassified'),
+                named_labels=sum(1 for a, n in labels.items() if n != f'L_{a:04X}'),
+                neutral_labels=sum(1 for a, n in labels.items() if n == f'L_{a:04X}'),
+                annotated_headers=sum(1 for e in LABELS.values() if e[2].strip()),
+                reviewed_constants=len(CONSTANTS), operand_expressions=len(OPERANDS),
+                label_immediates=len(inferred),
                 known_data=[dict(name=r['name'],file=r['file'],start=r['start'],end=r['end'],comment=r['comment'])
                             for r in known_data],
                 graphics_data=[dict(name=r['name'],file=r['file'],start=r['start'],end=r['end'],comment=r['comment'])
                                for r in graphics_data],
                 graphics_constants=graphics_constants,
                 runtime_code_seeds=len(runtime_seeds),
-                overlap_conflicts=sorted(set(conflicts)),inferred_pointer_immediates=inferred,ranges=ranges,
+                overlap_conflicts=sorted(set(conflicts)),label_immediates_list=inferred,ranges=ranges,
+                labels={f'{a:04X}': n for a, n in sorted(labels.items())},
+                static_xrefs=static,
                 landmarks=[dict(address=a,label=n,reference_byte=memory[a],comment=c) for a,(n,c) in sorted(notes.items())])
+
+
+def auto_comment(pc, ins, code, codec):
+    """Describe a text code loaded into A just before a text routine call."""
+    m = re.match(r'^LD A,\$([0-9A-F]{2})$', ins.operation)
+    if not m:
+        return ''
+    following = code.get(pc + 2)
+    if not following:
+        return ''
+    branch = BRANCH.match(following.operation)
+    if not branch or branch[2] or branch[1] not in ('CALL', 'JP'):
+        return ''
+    kind = TEXT_CALLS.get(int(branch[3], 16))
+    value = int(m[1], 16)
+    if kind == 'token':
+        return 'token: "' + clip(codec.token(value), 70) + '"'
+    if kind == 'message':
+        return f'message {value}: "' + clip(codec.message(value), 60) + '"'
+    return ''
+
+
+def static_xrefs(code, inline, labels, pointer_values):
+    """Callers, jumps and memory operands for every labelled address."""
+    result = {}
+    def add(target, source, kind):
+        result.setdefault(f'{target:04X}', []).append(f'{kind}:{source:04X}')
+    for pc, ins in sorted(code.items()):
+        op = ins.operation
+        m = BRANCH.match(op)
+        if m:
+            add(int(m[3], 16), pc, m[1].lower())
+            continue
+        for value in WORD.finditer(op):
+            target = int(value[1], 16)
+            if target in labels:
+                if re.search(r'\(\$' + value[1] + r'\)', op):
+                    kind = 'write' if re.match(r'^LD \(\$', op) else 'read'
+                else:
+                    kind = 'imm'
+                add(target, pc, kind)
+    for address, value in pointer_values.items():
+        add(value, address, 'ptr')
+    return result
+
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--force',action='store_true');args=p.parse_args()

@@ -1,5 +1,13 @@
 # Verified routine and state names
 
+> **Current state.** This page records the first verified names, which come
+> from `tools/verified_annotations.py`. The complete annotation pass has since
+> named about 900 further routines and variables in the annotation database
+> `tools/annotations/`. See [the disassembly conventions](DISASSEMBLY.md),
+> [data structures](DATA-STRUCTURES.md) and [findings](FINDINGS.md). The
+> generated source and its alias table at the end of `src/game.asm` are the
+> authoritative list of names.
+
 The names below describe code already investigated through source flow and
 the graphics, ship-allocation, station-launch and bounty-hunter checks. These annotations
 do not change instructions, data, addresses or memory usage.

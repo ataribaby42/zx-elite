@@ -161,12 +161,12 @@ ANNOTATIONS = {
         'The check never clears existing hostility. Continue into distance/steering decisions.',
         'Evidence: all 19 blueprints x 256 legal scores in tools/check_bounty_hunters.py.',)),
     0xF8EF: ('SteerShipAwayFromPlayer', (
-        'Build a scaled vector from the ship position relative to the player, preserving its signs.',
+        'Build a scaled vector (position/4) from the ship position relative to the player, keeping its signs.',
         'Set instance +$26 bit 5 and continue to the shared steering calculation at L_F9FA.',
         'This distance/avoidance path can be selected for a hostile ship as well.',
         'Evidence: coordinate readers at $F9DB..$F9F9; docs/BOUNTY-HUNTERS.md.',)),
     0xF90B: ('SteerShipTowardsPlayer', (
-        'Build a scaled vector towards the player by reversing the player-relative position signs.',
+        'Build a scaled vector (position/4) towards the player by reversing the position signs.',
         'Clear instance +$26 bit 5 and continue to shared steering at L_F9FA.',
         'Also used by a player-targeting missile; this entry is not specific to bounty hunters.',
         'Evidence: coordinate readers at $F9DB..$F9F9 and Fer-de-Lance AI traces in tools/check_bounty_hunters.py.',)),

@@ -5,98 +5,289 @@
 
 ; KNOWN DATA: $A816..$A87D, 104 bytes.
 ; VERIFIED DATA: mutable 104-byte commander buffer used directly by ROM tape load/save; the first 102 bytes follow the supplied save map.
-; Field-level names remain for later analysis where the exact format is not yet proved.
+; Field names are given only where code or runtime evidence proves them.
 
 ActiveCommanderRecord:
-    defb $4A,$41,$4D,$45,$53,$4F,$4E,$20,$20,$20,$00                                      ; $A816 JAMESON   .
+    defb $4A,$41,$4D,$45,$53,$4F,$4E,$20,$20,$20                                          ; $A816 JAMESON     +$00 name, 10 characters (this release pads with $00)
+    defb $00                                                                              ; $A820 .  +$0A name terminator
 
 ; VERIFIED: Unsigned legal score in ActiveCommanderRecord at offset 11.
 ; Status display: 0 Clean, 1..49 Offender, 50..255 Fugitive.
 ; Viper and Fer-de-Lance AI becomes hostile at 40, before the Fugitive boundary.
 ; Evidence: SelectLegalStatusToken, UpdateShipHostilityAndSteering and tools/check_bounty_hunters.py.
 PlayerLegalScore:
-L_A821: ; legacy analysis alias; same address, no emitted bytes
-    defb $00                                                                              ; $A821 .
-L_A822:
-    defb $00                                                                              ; $A822 .
-L_A823:
-    defb $00                                                                              ; $A823 .
-L_A824:
-    defb $00                                                                              ; $A824 .
-L_A825:
-    defb $00,$00                                                                          ; $A825 ..
+    defb $00                                                                              ; $A821 .  +$0B legal score (PlayerLegalScore)
+
+; VERIFIED: Combat score, 24 bits: CombatScoreFraction, CombatScoreLow, CombatScoreHigh.
+; AddCombatScore adds blueprint +$15/+$16 / 2 for each kill (L_DB43).  The status
+; screen prints RATING from CombatScoreHigh, or from CombatScoreLow when the high
+; byte is zero (L_D107).  The save path AccessMenuSave also uses it for the security number.
+CombatScoreFraction:
+    defb $00                                                                              ; $A822 .  +$0C combat score, fraction byte
+
+; VERIFIED: Combat score middle byte; a carry out of it raises "RIGHT ON COMMANDER*".
+CombatScoreLow:
+    defb $00                                                                              ; $A823 .  +$0D combat score, low byte
+
+; VERIFIED: Combat score high byte; the cloaking-device item adds one (ScoopCloakingDevice).
+CombatScoreHigh:
+    defb $00                                                                              ; $A824 .  +$0E combat score, high byte
+
+; VERIFIED: 16-bit jump counter incremented by L_D7EE in the hyperspace-arrival checks
+; (reached only when CurrentGalaxy is nonzero).  The mission-flag tests of
+; CommanderFlags bits 0..2 follow the increment.
+JumpCounter:
+    defb $00                                                                              ; $A825 .  +$0F jump counter, word
+    defb $00                                                                              ; $A826 .
+
+; VERIFIED: Zero-based galaxy number: L_D62B increments it modulo 8 for a galactic jump and
+; PrintGalaxyNumber prints it plus one.
 CurrentGalaxy:
-    defb $01                                                                              ; $A827 .
-L_A828:
-    defb $00                                                                              ; $A828 .
-L_A829:
-    defb $00                                                                              ; $A829 .
-L_A82A:
-    defb $00,$00                                                                          ; $A82A ..
-L_A82C:
-    defb $00                                                                              ; $A82C .
-L_A82D:
-    defb $00,$00,$00                                                                      ; $A82D ...
-L_A830:
-    defb $00,$00,$00                                                                      ; $A830 ...
-L_A833:
-    defb $00,$00,$00,$00                                                                  ; $A833 ....
-L_A837:
-    defb $00,$00,$00,$00,$00                                                              ; $A837 .....
-L_A83C:
-    defb $00,$00                                                                          ; $A83C ..
-L_A83E:
-    defb $00                                                                              ; $A83E .
-L_A83F:
-    defb $00,$00,$00,$00                                                                  ; $A83F ....
-L_A843:
-    defb $00                                                                              ; $A843 .
-L_A844:
-    defb $00                                                                              ; $A844 .
-L_A845:
-    defb $00                                                                              ; $A845 .
-L_A846:
-    defb $00                                                                              ; $A846 .
-L_A847:
-    defb $00,$00,$00                                                                      ; $A847 ...
-L_A84A:
-    defb $00                                                                              ; $A84A .
-L_A84B:
-    defb $00                                                                              ; $A84B .
-L_A84C:
-    defb $00                                                                              ; $A84C .
-L_A84D:
-    defb $00                                                                              ; $A84D .
-L_A84E:
-    defb $00                                                                              ; $A84E .
-L_A84F:
-    defb $00,$00,$00                                                                      ; $A84F ...
-L_A852:
-    defb $00,$00,$00,$00,$00,$00                                                          ; $A852 ......
-L_A858:
-    defb $00                                                                              ; $A858 .
-L_A859:
-    defb $00,$00                                                                          ; $A859 ..
-L_A85B:
-    defb $00,$00,$00                                                                      ; $A85B ...
-L_A85E:
-    defb $00                                                                              ; $A85E .
-L_A85F:
-    defb $00                                                                              ; $A85F .
-L_A860:
-    defb $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00                  ; $A860 ................
-L_A870:
-    defb $00                                                                              ; $A870 .
-L_A871:
-    defb $00                                                                              ; $A871 .
-L_A872:
-    defb $00                                                                              ; $A872 .
-L_A873:
-    defb $27,$08,$00,$00,$0A,$19,$00,$00,$3D                                              ; $A873 '.......=
-L_A87C:
-    defb $00                                                                              ; $A87C .
-L_A87D:
-    defb $00                                                                              ; $A87D .
+    defb $01                                                                              ; $A827 .  +$11 galaxy number, zero-based
+
+; VERIFIED: Cash, two words: CashHigh counts units of 10000 tenths (1000.0 Cr), CashLow holds
+; 0..9999 tenths.  AddCash adds with a carry at 10000; SubtractCash subtracts; PrintCash
+; prints both parts.  The JAMESON template holds 1000 = 100.0 Cr.
+CashHigh:
+    defb $00,$00                                                                          ; $A828 ..  +$12 cash high word (units of 1000.0 Cr)
+
+; VERIFIED: Cash low word, 0..9999 tenths of a credit (see CashHigh).
+CashLow:
+    defb $00,$00                                                                          ; $A82A ..  +$14 cash low word (0..9999 tenths of a credit)
+
+; VERIFIED: Market fluctuation byte: RandomiseMarket sets it from AuxRandomSeed on arrival;
+; ComputeMarket adds (fluctuation AND mask) to each base price and base quantity.
+MarketFluctuation:
+    defb $00                                                                              ; $A82C .  +$16 market fluctuation byte
+
+; VERIFIED: 17 cargo quantities indexed by commodity (token $D0+index names it).
+; ScoopCargoItem increments CargoHold+A; L_A626 removes damaged cargo; the
+; inventory lines (PrintCargoLine) and the market code read it.
+CargoHold:
+    defb $00                                                                              ; $A82D .  +$17 cargo 0: FOOD
+    defb $00                                                                              ; $A82E .  +$18 cargo 1: TEXTILES
+    defb $00                                                                              ; $A82F .  +$19 cargo 2: RADIOACTIVES
+
+; VERIFIED: CargoHold+3 (SLAVES); SpawnRandomEncounter reads it directly.
+CargoSlaves:
+    defb $00                                                                              ; $A830 .  +$1A cargo 3: SLAVES
+    defb $00                                                                              ; $A831 .  +$1B cargo 4: LIQUOR/WINES
+    defb $00                                                                              ; $A832 .  +$1C cargo 5: LUXURIES
+
+; VERIFIED: CargoHold+6 (NARCOTICS); SpawnRandomEncounter reads it directly.
+CargoNarcotics:
+    defb $00                                                                              ; $A833 .  +$1D cargo 6: NARCOTICS
+    defb $00                                                                              ; $A834 .  +$1E cargo 7: COMPUTERS
+    defb $00                                                                              ; $A835 .  +$1F cargo 8: MACHINERY
+    defb $00                                                                              ; $A836 .  +$20 cargo 9: ALLOYS
+
+; VERIFIED: CargoHold+10 (FIREARMS); SpawnRandomEncounter reads it directly.
+CargoFirearms:
+    defb $00                                                                              ; $A837 .  +$21 cargo 10: FIREARMS
+    defb $00                                                                              ; $A838 .  +$22 cargo 11: FURS
+    defb $00                                                                              ; $A839 .  +$23 cargo 12: MINERALS
+    defb $00                                                                              ; $A83A .  +$24 cargo 13: GOLD
+    defb $00                                                                              ; $A83B .  +$25 cargo 14: PLATINUM
+
+; VERIFIED: CargoHold+15 (GEM-STONES); the nova reward in SellCargoScreen sets it to 100.
+CargoGemStones:
+    defb $00                                                                              ; $A83C .  +$26 cargo 15: GEM-STONES
+    defb $00                                                                              ; $A83D .  +$27 cargo 16: ALIEN ITEMS
+
+; VERIFIED: Free cargo space in tons: scooping decrements it, cargo lost to damage increments
+; it, the escape pod resets it to 20 or 35 (LargeCargoBayFitted).
+CargoFreeSpace:
+    defb $00                                                                              ; $A83E .  +$28 free cargo space, tons
+
+; VERIFIED: Four laser bytes: front, rear, left, right.  0 none, 1 pulse, 2 beam, 3 military,
+; 4 mining: the status screen prints token $60+view then $66+v (v < 3) or $72+v.
+LaserMounts:
+    defb $00                                                                              ; $A83F .  +$29 front laser (0 none, 1 pulse, 2 beam, 3 military, 4 mining)
+    defb $00                                                                              ; $A840 .  +$2A rear laser
+    defb $00                                                                              ; $A841 .  +$2B left laser
+    defb $00                                                                              ; $A842 .  +$2C right laser
+
+; VERIFIED: Nova mission flag (record +$2D).  Set to 1 by the first mission trigger L_D832 (with
+; CommanderFlags bit 0, red view, fuel leak); cleared, together with ExpandingSunActive,
+; only by GalacticHyperspaceJump.  While it is set:
+; - BuyCargoScreen shows "THE SUN IS GOING NOVA* WILL YOU SAVE US (Y/N)?"; 'Y' empties
+;   the hold, sets free space 0, LargeCargoBayFitted and CommanderFlags bit 5 (refugees);
+; - every hyperspace jump becomes a galactic jump (NormalHyperspaceJump);
+; - launching arms the expanding sun (ArmExpandingSun: ExpandingSunActive = 1);
+; - CheckFlightWarnings broadcasts "MAYDAY * CORIOLIS IN DANGER*" until that launch;
+; - view attributes keep only the paper and ink bit 1 (L_9291); CockpitRestored paints
+;   the view red and L_7ACD skips the white reset; the equipment screen does not list
+;   fuel (L_B56B) and buying item 1 does not fill the tank (L_B5F7);
+; - SellCargoScreen goes straight to the sell list (no reward yet).
+; GetEquipmentStatePointer uses this address as the base of the equipment bytes (item n
+; at +n).  Evidence: message texts; tools/check_routines.py missions/hyperspace-arrival,
+; missions/p5-nova-mission and missions/p5-nova-offer-and-reward.
+NovaMissionActive:
+    defb $00                                                                              ; $A843 .  +$2D nova mission active (NovaMissionActive)
+
+; VERIFIED: Fuel in tenths of a light year (JAMESON: 70).  The status screen prints it after
+; FUEL with PrintDecimalTenths (PrintFuelLine); TriggerFuelLeak empties it for "FUEL LEAK*";
+; SetFuelLevel stores it after a jump (capped at 70); the charts use it for the range circle.
+FuelLevel:
+    defb $00                                                                              ; $A844 .  +$2E fuel, tenths of a light year
+
+; VERIFIED: Number of missiles, drawn by DrawMissileIndicators; a launch decrements it.
+MissileCount:
+    defb $00                                                                              ; $A845 .  +$2F missiles
+
+; VERIFIED: Nonzero: large cargo bay (status token LARGE CARGO BAY; free space 35, not 20).
+LargeCargoBayFitted:
+    defb $00                                                                              ; $A846 .  +$30 large cargo bay
+
+; VERIFIED: Nonzero: E.C.M. system (status token E.C.M.SYSTEM; DamageEquipmentOrCargo offset 0).
+; The following two bytes have no code reference.
+EcmFitted:
+    defb $00                                                                              ; $A847 .  +$31 E.C.M. system
+    defb $00,$00                                                                          ; $A848 ..  +$32 two bytes without any code reference
+
+; VERIFIED: Nonzero: fuel scoops (status token FUEL SCOOPS; L_EA71 checks it before scooping).
+FuelScoopsFitted:
+    defb $00                                                                              ; $A84A .  +$34 fuel scoops
+
+; VERIFIED: Nonzero: escape pod (status token ESCAPE POD; used up by UpdateEscapePod).
+EscapePodFitted:
+    defb $00                                                                              ; $A84B .  +$35 escape pod
+
+; VERIFIED: Nonzero: energy bomb (status token ENERGY BOMB).
+EnergyBombFitted:
+    defb $00                                                                              ; $A84C .  +$36 energy bomb
+
+; VERIFIED: Nonzero: energy unit (status token ENERGY UNIT; doubles RechargeEnergyBanks).
+EnergyUnitFitted:
+    defb $00                                                                              ; $A84D .  +$37 energy unit
+
+; VERIFIED: Nonzero: docking computers (status token DOCKING COMPUTERS).
+DockingComputerFitted:
+    defb $00                                                                              ; $A84E .  +$38 docking computers
+
+; VERIFIED: Nonzero: galactic hyperdrive (status token GALACTIC HYPERSPACE); L_D62B stores A
+; into it when the galactic jump starts.  The next two bytes have no reference.
+GalacticHyperdriveFitted:
+    defb $00                                                                              ; $A84F .  +$39 galactic hyperdrive
+    defb $00,$00                                                                          ; $A850 ..  +$3A two bytes without any code reference
+
+; VERIFIED: Three seed words of the current galaxy: L_D62B rotates each byte left for a
+; galactic jump; LoadGalaxySeedsToGenerator copies them to GeneratorSeeds before
+; the 256 systems are walked.  JAMESON: $5A4A, $0248, $B753 (system 0 TIBEDIED).
+GalaxySeeds:
+    defb $00,$00,$00,$00                                                                  ; $A852 ....  +$3C galaxy seeds s0, s1, s2 (words)
+    defb $00,$00                                                                          ; $A856 ..
+
+; VERIFIED: Seeds s0, s1, s2 of the current system, copied from SelectedSystemSeeds on
+; arrival (ArriveInTargetSystem).  s0 high is the system Y, s1 high its X (JAMESON: Lave, X 20,
+; Y 173).
+CurrentSystemSeeds:
+    defb $00                                                                              ; $A858 .  +$42 current system seeds s0, s1, s2 (words)
+
+; VERIFIED: Current system Y (s0 high byte); also written by L_D7B4 and EnterHyperspaceMisjump.
+CurrentSystemY:
+    defb $00                                                                              ; $A859 .  +$43 current system Y (s0 high)
+    defb $00                                                                              ; $A85A .  +$44 current system s1 low
+
+; VERIFIED: Current system X (s1 high byte); also written by L_D7B4 and EnterHyperspaceMisjump.
+CurrentSystemX:
+    defb $00                                                                              ; $A85B .  +$45 current system X (s1 high)
+    defb $00,$00                                                                          ; $A85C ..  +$46 current system s2
+
+; VERIFIED: Current system tech level, copied from SelectedSystemTechLevel on arrival (ArriveInTargetSystem);
+; read by the equipment screen (EquipShipScreen).  The JAMESON template holds 5, while the
+; generator gives Lave 4 (a simulator check in tools/check_routines.py).
+CurrentTechLevel:
+    defb $00                                                                              ; $A85E .  +$48 current system tech level
+
+; VERIFIED: Current system government, copied from SelectedSystemGovernment on arrival.
+CurrentGovernment:
+    defb $00                                                                              ; $A85F .  +$49 current system government
+
+; VERIFIED: 17 station stock quantities, written by ComputeMarket (alien items always 0) and
+; printed by PrintMarketLine through StockPointer.
+MarketStock:
+    defb $00                                                                              ; $A860 .  +$4A station stock 0: FOOD
+    defb $00                                                                              ; $A861 .  +$4B station stock 1: TEXTILES
+    defb $00                                                                              ; $A862 .  +$4C station stock 2: RADIOACTIVES
+    defb $00                                                                              ; $A863 .  +$4D station stock 3: SLAVES
+    defb $00                                                                              ; $A864 .  +$4E station stock 4: LIQUOR/WINES
+    defb $00                                                                              ; $A865 .  +$4F station stock 5: LUXURIES
+    defb $00                                                                              ; $A866 .  +$50 station stock 6: NARCOTICS
+    defb $00                                                                              ; $A867 .  +$51 station stock 7: COMPUTERS
+    defb $00                                                                              ; $A868 .  +$52 station stock 8: MACHINERY
+    defb $00                                                                              ; $A869 .  +$53 station stock 9: ALLOYS
+    defb $00                                                                              ; $A86A .  +$54 station stock 10: FIREARMS
+    defb $00                                                                              ; $A86B .  +$55 station stock 11: FURS
+    defb $00                                                                              ; $A86C .  +$56 station stock 12: MINERALS
+    defb $00                                                                              ; $A86D .  +$57 station stock 13: GOLD
+    defb $00                                                                              ; $A86E .  +$58 station stock 14: PLATINUM
+    defb $00                                                                              ; $A86F .  +$59 station stock 15: GEM-STONES
+    defb $00                                                                              ; $A870 .  +$5A station stock 16: ALIEN ITEMS
+
+; VERIFIED: Invasion mission state (record +$5B):
+;   0     none;
+;   1     set by the third mission trigger L_D853 (CommanderFlags bit 2): CheckFlightWarnings
+;         broadcasts "MAYDAY * <system> INVADED*", L_F684 may add a Python trader;
+;   2     after the next arrival.  In states 1 and 2 docking shows the GalCop offer
+;         (OfferSpecialMission): 'Y' sets CommanderFlags bit 7 (ECM jammer) and state 3,
+;         anything else state 0;
+;   3     accepted;
+;   4     arrival at the galaxy's first system (seeds equal GalaxySeeds; any nonzero state
+;         there, L_D7B4), 4 -> 3 on other arrivals.  UpdateObjects makes the station
+;         hostile, L_F684 adds Thargoids, AI ECM stays off against the jammer, and
+;         docking ends the game with " THARGON" (CheckMissionStateOnDocking);
+;   $0C   a missile reached the station in state 4 (the hit code after L_F94A: SET 3,
+;         AddCombatScore $FFFF, station +$26 bit 7, the station explodes);
+;   5     the next arrival after that (L_D7B4); docking then awards +256 combat score,
+;         CommanderFlags bit 3 and the HIGHEST HONOUR message, state 0 (AwardHighestHonour).
+; GalacticHyperspaceJump clears it.  The data screen of that first system reports the
+; invasion while it is nonzero (DisplaySystemData, message $DE).
+; Evidence: message texts; tools/check_routines.py missions/hyperspace-arrival and
+; missions/p5-invasion-mission.
+InvasionMissionState:
+    defb $00                                                                              ; $A871 .  +$5B invasion mission state (InvasionMissionState)
+
+; VERIFIED: Flag byte (record +$5C):
+;   bit 0  nova mission triggered (L_D832, jump counter low byte >= $20 outside galaxy 0)
+;   bit 1  cloaked-Asp mission triggered (>= $80); SpawnRandomEncounter creates the
+;          special Asp while bit 6 is still clear
+;   bit 2  invasion mission triggered (>= $FE, L_D853)
+;   bit 3  invasion mission completed (AwardHighestHonour); part of the security number
+;   bit 4  no access found
+;   bit 5  refugees on board: set when the nova offer is accepted, cleared by the reward
+;          in SellCargoScreen or by the escape pod; the inventory prints REFUGEES and
+;          BuyCargoScreen refuses trading
+;   bit 6  cloaking device: set by scooping the $FF canister (ScoopCloakingDevice);
+;          status prints CLOAKING DEVICE, ToggleCloak needs it
+;   bit 7  ECM jammer: set when the invasion mission is accepted; status prints it
+; L_D7EE tests bits 0..2 (only the first clear one); AccessMenuSave folds bits 3 and 6
+; into the security number.  Evidence: instruction semantics and message texts;
+; tools/check_routines.py missions/hyperspace-arrival, missions/special-encounter,
+; missions/p5-nova-offer-and-reward.
+CommanderFlags:
+    defb $00                                                                              ; $A872 .  +$5C flags: missions 0..3, 5 refugees, 6 cloak, 7 ECM jammer
+
+; VERIFIED: Nine bytes: AccessMenuSave copies SunPosition..SunZHigh here before saving; a new commander
+; copies the template copy back (InitialiseCommander).  Not a stored security code:
+; the security number is computed and printed after the save (AccessMenuSave).
+SavedSunPosition:
+    defb $27,$08,$00                                                                      ; $A873 '..  +$5D 9-byte copy of SunPosition..SunZHigh
+    defb $00,$0A,$19,$00,$00,$3D                                                          ; $A876 .....=
+
+; VERIFIED: Tape byte +$66, reused at run time as the expanding-sun flag: ArmExpandingSun sets it
+; at launch while NovaMissionActive is set; UpdateExpandingSun only runs while it is
+; nonzero (sun radius +2 and CabinTemperature +1 per call; radius 256 ends the game);
+; CheckFlightWarnings sends "MAYDAY * CORIOLIS IN DANGER*" only while it is zero.
+; Cleared by StartNewGame and, with NovaMissionActive, by GalacticHyperspaceJump.
+; Evidence: instruction semantics; tools/check_routines.py missions/p5-nova-mission.
+ExpandingSunActive:
+    defb $00                                                                              ; $A87C .  +$66 tape byte; RAM reused as ExpandingSunActive
+
+; VERIFIED: Chart cursor X (tape byte +$67 reused).  The cursor functions move it; selecting a
+; system sets it to the system X; L_D7B4 makes it the current X on arrival.
+ChartCursorX:
+    defb $00                                                                              ; $A87D .  +$67 tape byte; RAM reused as ChartCursorX
 
 ActiveCommanderRecordEnd:
 defc ActiveCommanderRecordSize = ActiveCommanderRecordEnd - ActiveCommanderRecord

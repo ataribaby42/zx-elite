@@ -195,8 +195,8 @@ def main():
             raise AssertionError(f'{label}: station blueprint pointer does not match Coriolis')
     # A reset into ROM can otherwise finish a timed trace with exit status 0.
     # Both text tables must survive every gameplay scenario unchanged.
-    for address,size in [(symbols['Entry'],3),(symbols['L_6FA3'],symbols['L_6FA3Size']),
-                         (symbols['L_6FBF'],symbols['L_6FBFSize'])]:
+    for address,size in [(symbols['Entry'],3),(symbols['TokenControlTable'],symbols['TokenControlTableSize']),
+                         (symbols['MessageControlTable'],symbols['MessageControlTableSize'])]:
         if ram[address:address+size] != initial_ram[address:address+size]:
             raise AssertionError(f'Persistent code/text table was overwritten at ${address:04X}')
     if symbols['SHIP_ADDER'] and any(symbols['Startup']<=pc<symbols['L_7189'] for pc in executed):

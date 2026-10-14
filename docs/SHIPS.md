@@ -35,11 +35,20 @@ to `docs/generated/ship-blueprints.json`.
 ## Blueprint index
 
 `ShipBlueprintTable` contains 19 four-byte entries. Each entry consists of
-`$C3`, a little-endian pointer to a 23-byte blueprint header and a dispatch
-group byte. The loader at `$F2FB` masks the requested ID to six bits, multiplies
+`$C3`, a little-endian pointer to a 23-byte blueprint header and a group
+byte. The loader at `$F2FB` masks the requested ID to six bits, multiplies
 it by four and reads the pointer from bytes 1 and 2 of the selected entry.
+No instruction reads byte 0 (`$C3`, the opcode of `JP`) or the group byte:
+the loader is the only code that addresses the table, the 48K runtime traces
+never read those bytes, overwriting them does not change what the loader
+creates (check `s1-blueprint-instance-initialisation`), and the `ship=adder`
+layout omits both. The group values (0 station and missile, 1 debris and
+Asteroid, 2 traders, Viper and Rock hermit, 3 pirates, Asp Mk II,
+Fer-de-Lance and Thargoid, 4 Sidewinder, Krait and Thargon) are therefore
+only a classification left in the data. "Cargo nibble" is the
+low nibble of header byte +0; the game only tests it for zero (see below).
 
-| ID | Ship or object | Header | Vertices / edges / faces | Speed | Energy | Bounty | Max. canisters | Group |
+| ID | Ship or object | Header | Vertices / edges / faces | Speed | Energy | Bounty | Cargo nibble | Group |
 |---:|---|---:|---:|---:|---:|---:|---:|---:|
 | 0 | Coriolis station | `$6A9D` | 16 / 28 / 14 | 0 | 240 | 0.0 Cr | 0 | 0 |
 | 1 | Missile | `$67A6` | 17 / 24 / 9 | 44 | 2 | 0.0 Cr | 0 | 0 |
@@ -105,38 +114,120 @@ input for the 128K-compatible target.
 
 Each blueprint starts with a 23-byte header. Counts and offsets are validated
 against the actual geometry boundaries, so malformed or shifted data cause the
-analysis to fail.
+analysis to fail. Every field below was identified from the instructions that
+read it (reference addresses; `IY` or `HL` holds the header address there).
+The header is never written at run time. `tools/check_routines.py` group
+`structures` runs these readers in the Z80 simulator.
 
-| Offset | Size | Meaning |
-|---:|---:|---|
-| `+0` | 1 | Canister/commodity flags; low nibble is maximum spawned canisters |
-| `+1` | 1 | Target size |
-| `+2` | 1 | Agility or rotation limit |
-| `+3` | 1 | Vertex count |
-| `+4` | 1 | Edge count |
-| `+5` | 1 | Face count |
-| `+6` | 1 | Maximum speed |
-| `+7` | 1 | Energy |
-| `+8` | 2 | Bounty in tenths of a credit, little-endian |
-| `+10` | 1 | Partially decoded property byte |
-| `+11` | 1 | Visibility distance |
-| `+12` | 2 | Vertex-table offset relative to this header |
-| `+14` | 2 | Edge-table offset relative to this header |
-| `+16` | 2 | Face-table offset relative to this header; zero for the alloy plate |
-| `+18` | 1 | Behaviour flags |
-| `+19` | 1 | Normal-scaling control, read at `$E93A`; see SHIP-COMPARISON.md |
-| `+20` | 1 | Gun vertex |
-| `+21` | 1 | Low byte of the word read at `$DB53..$DB56`, halved and passed to `$A8EE` |
-| `+22` | 1 | High byte of that word; not the normal-scaling exponent |
+| Offset | Size | Meaning | Readers |
+|---:|---:|---|---|
+| `+0` | 1 | Cargo flags: high nibble = scooped commodity - 1; low nibble nonzero = drops a canister when killed | `$EAB5`, `$ECB3`, `$F7D4` |
+| `+1` | 1 | Radius: near limit, projected target size and collision/scoop box | `$E02D`, `$EA58`, `$DB38` |
+| `+2` | 1 | AI laser fire chance out of 256 | `$FAB3` |
+| `+3` | 1 | Vertex count | `$E2F5` |
+| `+4` | 1 | Edge count | `$E72F` |
+| `+5` | 1 | Face count; zero means no face table | `$E940` |
+| `+6` | 1 | Maximum speed | `$F33B`, `$DD7E`, `$DACD` |
+| `+7` | 1 | Energy: initial value and regeneration limit | `$F320`, `$F733`, `$F76E`, `$ECBE` |
+| `+8` | 2 | Bounty in tenths of a credit, little-endian | `$DB4A`/`$DB4D` |
+| `+10` | 1 | Launch flags: bits 0..2 payload count, bits 4..7 launch subtype | `$F32F`, `$F794` |
+| `+11` | 1 | Dot distance | `$E112` |
+| `+12` | 2 | Vertex-table offset relative to this header | `$E2FA`/`$E2FD` |
+| `+14` | 2 | Edge-table offset relative to this header | `$E729`/`$E72C` |
+| `+16` | 2 | Face-table offset relative to this header; zero for the alloy plate | `$E92F`/`$E932` |
+| `+18` | 1 | Behaviour flags | `$F326`, `$F7DF` |
+| `+19` | 1 | Normal scale shift | `$E93A` |
+| `+20` | 1 | Gun vertex | `$E1A5` |
+| `+21` | 2 | Combat-score award, little-endian | `$DB53`/`$DB56` |
 
-Vertices use six bytes each; edges and face normals use four bytes each. Their
-packed bit fields still need field-by-field naming, but their boundaries and
-their relationship to each header are verified.
+Field details:
+
+- **+0 cargo flags.** When a fuel scoop collects a scoopable object, the
+  commodity index is the high nibble plus one: Escape capsule Slaves, Alloy
+  plate Alloys, Splinter Minerals, Thargon Alien items. A zero high nibble
+  (Cargo canister) gives a random commodity 0..7 (Food..Computers), or the
+  cloaking device while `MissionAspEncounterState` is 3. When the player's
+  laser destroys an object, a nonzero low nibble creates exactly one Cargo
+  canister (event 6); the values 1..7 are not used as a count. A ship below
+  one eighth of its energy that passes the random test against instance
+  `+$25` and has no escape capsule left drops one canister when the whole
+  byte is nonzero.
+- **+1 radius.** `DrawObjectInView` draws an object only when its depth
+  exceeds the radius and uses 256 x radius / depth as the projected size for
+  the crosshair target test. The proximity test at `$EA51` treats an object as
+  touching the player when |x|, |y| and |z| are all below the radius (plus 256
+  for a missile aimed at the player; 180 for scoopable objects). `$DB38`
+  compares it with 30, which no blueprint uses.
+- **+2 laser fire chance.** A hostile ship pointing at the player fires only when
+  a random byte is below this value; the value is halved while
+  `CombatScoreHigh` is zero, that is while the kill count is below 256.
+  Range and alignment gates follow.
+- **+6 maximum speed.** A new ship starts at half of it. Accelerated speed is
+  clamped to it (four times it when behaviour bit 0 is set). Under an energy
+  bomb, a value of 39 identifies the Thargoid; the test reads the blueprint of
+  the previous slot, see `UpdateObjects`.
+- **+7 energy.** Initial energy and regeneration limit (one unit per AI step,
+  four when the value is at least `$F0`); the launch and escape decisions use
+  half and one eighth of it. For debris after a player kill, at least 85
+  gives two Alloy plates and exactly 60 (Asteroid) with mining-laser damage 50
+  gives two Splinters.
+- **+10 launch flags.** Bits 0..2 are copied to instance `+$20` as the
+  payload count, which each successful AI launch decrements. The high nibble
+  selects the child: 0 a missile (event 2), otherwise event 4 with subtype
+  1 Viper, 2 Cobra Mk III or Python trader, 3 Thargon, 4 Thargoid,
+  5 Sidewinder or slot 17. The Rock hermit (`$52`) launches up to two
+  fighters and the Thargoid (`$36`) up to six Thargons. Bit 3 is clear in
+  every record. The station's `$06` is never loaded: slot 0 is not created by
+  `InitialiseShipFromBlueprint` and its initial `+$20` holds no payload.
+- **+11 dot distance.** The wireframe is drawn while the high byte of the
+  depth is below this value; farther away the object is a 2 x 2 dot.
+- **+18 behaviour flags.** `+$12 AND $6F` becomes instance `+$21` and bit 7
+  becomes instance `+$20` bit 7. Bit 0 quadruples the speed limit (Escape
+  capsule, Rock hermit). Bit 1 makes the ship hostile when the legal score is
+  at least 40 (Viper, Fer-de-Lance). Bit 2 is hostility. Bit 3 makes a hostile
+  ship take the steer-away branch while a station is present (except in
+  mission state 4). Bits 5 and 6
+  are tested together: killing such a ship sets legal-score bit 6, and a
+  hostile one raises the shared alert (bit 5: traders and Rock hermit; bit 6:
+  Viper). Bit 4 is masked off and clear in every record. Bit 7 means an
+  escape capsule is on board. The exact value 4 (Thargon) selects the test
+  that leaves Thargons inert when no Thargoid remains.
+- **+19 normal scale shift.** Rotated face normals are multiplied by 2/2^n
+  before being added to the object position in the face test.
+- **+20 gun vertex.** The vertex from which an AI laser beam is drawn; it is
+  below the vertex count in every record.
+- **+21 combat-score award.** Half of this word is added to the 24-bit combat
+  score, so a kill raises the kill count (`CombatScoreLow`/`CombatScoreHigh`)
+  by word / 512: for example 4 for a Thargoid (`$0800`), 1.75 for a pirate
+  Python or Cobra Mk III (`$0380`) and 0.5 for a Sidewinder or Krait
+  (`$0100`).
+
+Vertices use six bytes each; edges and face normals use four bytes each:
+
+| Record | Byte | Meaning | Readers |
+|---|---:|---|---|
+| Vertex | 0..2 | Magnitudes of x, y and z | `RotateRow`, `RotateRowPrecise` |
+| Vertex | 3 | Bits 7, 6 and 5: signs of x, y and z; bits 0..4: visibility threshold | `$E30F`, `RotateRow` |
+| Vertex | 4, 5 | Four face numbers, one per nibble | `$E31F`, `$E327` |
+| Edge | 0 | Visibility threshold (whole byte) | `$E739` |
+| Edge | 1, 2 | Vertex numbers of the two ends | `$E74F`, `$E759` |
+| Edge | 3 | Two face numbers, one per nibble | `$E747` |
+| Face | 0..2 | Magnitudes of the normal's x, y and z | `RotateRow` via `ComputeFaceAxis` |
+| Face | 3 | Bits 7, 6 and 5: signs; bits 0..4: visibility threshold | `$E950`, `RotateRow` |
+
+The detail level is min(`$1F`, high byte of 2 x depth) - 2. A vertex, edge or
+face is used only while the detail level is below its threshold; `$1F` means
+always. A vertex is projected and an edge drawn only when at least one of
+their faces is visible (an edge also needs both ends in front of the view).
+Face number 15 never names a stored face: its entry in `FaceVisibilityFlags`
+stays 1, so 15 means "always visible". The alloy plate has no faces;
+`ComputeFaceVisibility` then sets only face 0 visible, and all its vertex and
+edge face numbers are 15.
 
 See [Cross-platform model comparison](SHIP-COMPARISON.md) for every vertex
-and the differences from the C64 and BBC sources. Its code evidence corrects
-the legacy analyzer's misleading `normal_scale` name for header byte +22;
-the normal-scaling field is +19.
+and the differences from the C64 and BBC sources. Its code evidence corrected
+the old analyzer name `normal_scale` for header byte +22; the analyzer now
+names byte +19 `normal_scale_shift` and the word at +21 `combat_score_award`.
 
 ## Asteroid mining and the missing Boulder
 

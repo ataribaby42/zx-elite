@@ -5,71 +5,312 @@
 
 ; KNOWN DATA: $9A9D..$9E73, 983 bytes.
 ; VERIFIED DATA: token dictionary used to expand screen and message text; runtime reads cover this block.
-; Field-level names remain for later analysis where the exact format is not yet proved.
+; Field names are given only where code or runtime evidence proves them.
 
 TextTokenDictionary:
-    defb $6F,$10,$00,$20,$43,$48,$8A,$54,$00,$47,$4F,$96,$52,$4E,$4D,$92                  ; $9A9D o.. CH.T.GO.RNM.
-    defb $54,$00,$06,$44,$91,$41,$10,$03,$08,$00,$06,$8C,$96,$4E,$54,$99                  ; $9AAD T..D.A.......NT.
-    defb $59,$08,$00,$53,$59,$53,$9C,$4D,$00,$50,$9E,$85,$00,$02,$20,$8B                  ; $9ABD Y..SYS.M.P.... .
-    defb $52,$4B,$45,$54,$20,$A6,$53,$00,$8C,$44,$88,$54,$9E,$80,$00,$41                  ; $9ACD RKET .S..D.T...A
-    defb $47,$9E,$43,$55,$4C,$54,$55,$94,$4C,$00,$9E,$43,$48,$20,$00,$41                  ; $9ADD G.CULTU.L..CH .A
-    defb $96,$94,$83,$20,$00,$50,$4F,$99,$20,$00,$8B,$8C,$4C,$59,$20,$00                  ; $9AED ... .PO. ...LY .
-    defb $55,$4E,$49,$54,$00,$20,$56,$49,$45,$57,$20,$00,$9A,$9B,$97,$54                  ; $9AFD UNIT. VIEW ....T
-    defb $59,$00,$9B,$8A,$43,$48,$59,$00,$46,$45,$55,$44,$80,$00,$4D,$55                  ; $9B0D Y...CHY.FEUD..MU
-    defb $4C,$97,$2D,$A2,$00,$8D,$43,$54,$91,$99,$B9,$00,$FB,$4D,$55,$4E                  ; $9B1D L.-...CT.....MUN
-    defb $9D,$54,$00,$43,$9F,$46,$98,$90,$41,$43,$59,$00,$44,$45,$4D,$4F                  ; $9B2D .T.C.F..ACY.DEMO
-    defb $43,$94,$43,$59,$00,$43,$99,$50,$99,$91,$45,$20,$CB,$91,$45,$00                  ; $9B3D C.CY.C.P..E ..E.
-    defb $53,$48,$49,$50,$00,$50,$FE,$44,$55,$43,$54,$00,$20,$95,$53,$90                  ; $9B4D SHIP.P.DUCT. .S.
-    defb $00,$48,$55,$4D,$9B,$20,$43,$4F,$4C,$9F,$49,$80,$00,$48,$59,$50                  ; $9B5D .HUM. COL.I..HYP
-    defb $90,$53,$50,$41,$85,$00,$06,$53,$48,$99,$54,$20,$CA,$A1,$08,$00                  ; $9B6D .SPA...SH.T ....
-    defb $8D,$CB,$9B,$85,$00,$BD,$20,$2D,$2D,$20,$03,$00,$BD,$20,$CA,$20                  ; $9B7D ...... -- ... . 
-    defb $3F,$00,$06,$4D,$41,$59,$44,$41,$59,$08,$2A,$20,$43,$99,$49,$4F                  ; $9B8D ?..MAYDAY.* C.IO
-    defb $4C,$49,$53,$20,$8C,$20,$44,$41,$4E,$83,$52,$2A,$00,$20,$4C,$49                  ; $9B9D LIS . DAN.R*. LI
-    defb $47,$48,$54,$20,$59,$45,$8A,$53,$00,$9C,$43,$48,$2E,$81,$96,$4C                  ; $9BAD GHT YE.S..CH...L
-    defb $00,$43,$41,$53,$48,$00,$20,$86,$0E,$49,$9F,$00,$06,$7A,$A1,$08                  ; $9BBD .CASH. ..I...z..
-    defb $01,$00,$54,$8A,$83,$54,$20,$4C,$4F,$CB,$00,$6A,$20,$4A,$41,$4D                  ; $9BCD ..T..T LO..j JAM
-    defb $4D,$98,$00,$52,$9B,$83,$00,$53,$54,$00,$B0,$20,$4F,$46,$20,$00                  ; $9BDD M..R...ST.. OF .
-    defb $53,$45,$0E,$00,$20,$43,$8A,$47,$4F,$00,$45,$9A,$49,$50,$00,$46                  ; $9BED SE.. C.GO.E.IP.F
-    defb $4F,$4F,$44,$00,$9C,$58,$97,$4C,$89,$00,$94,$8D,$4F,$41,$43,$97                  ; $9BFD OOD..X.L....OAC.
-    defb $96,$53,$00,$53,$95,$96,$53,$00,$4C,$49,$9A,$99,$2F,$57,$8C,$89                  ; $9C0D .S.S..S.LI../W..
-    defb $00,$4C,$55,$58,$55,$9E,$89,$00,$4E,$8A,$43,$4F,$97,$43,$53,$00                  ; $9C1D .LUXU...N.CO.CS.
-    defb $FB,$50,$55,$54,$90,$53,$00,$8B,$43,$48,$8C,$90,$59,$00,$41,$4C                  ; $9C2D .PUT.S..CH..Y.AL
-    defb $4C,$4F,$59,$53,$00,$46,$49,$8E,$8A,$4D,$53,$00,$46,$55,$52,$53                  ; $9C3D LOYS.FI..MS.FURS
-    defb $00,$4D,$8C,$90,$80,$53,$00,$47,$4F,$4C,$44,$00,$50,$4C,$91,$8C                  ; $9C4D .M...S.GOLD.PL..
-    defb $55,$4D,$00,$83,$4D,$2D,$CB,$9F,$89,$00,$80,$49,$92,$20,$7F,$53                  ; $9C5D UM..M-.....I. .S
-    defb $00,$20,$4E,$4F,$54,$20,$46,$4F,$55,$4E,$44,$00,$20,$43,$52,$00                  ; $9C6D . NOT FOUND. CR.
-    defb $4C,$8A,$83,$00,$46,$49,$90,$85,$00,$53,$8B,$0E,$00,$47,$8E,$92                  ; $9C7D L...FI...S...G..
-    defb $00,$52,$98,$00,$59,$45,$0E,$4F,$57,$00,$42,$4C,$55,$45,$00,$42                  ; $9C8D .R..YE.OW.BLUE.B
-    defb $95,$43,$4B,$00,$15,$00,$53,$4C,$49,$4D,$59,$00,$42,$55,$47,$2D                  ; $9C9D .CK...SLIMY.BUG-
-    defb $45,$59,$98,$00,$48,$99,$4E,$98,$00,$42,$9F,$59,$00,$46,$91,$00                  ; $9CAD EY..H.N..B.Y.F..
-    defb $46,$55,$52,$52,$59,$00,$FE,$44,$92,$54,$00,$46,$FE,$47,$00,$4C                  ; $9CBD FURRY..D.T.F.G.L
-    defb $49,$84,$52,$44,$00,$4C,$4F,$42,$CB,$90,$00,$86,$52,$44,$00,$48                  ; $9CCD I.RD.LOB....RD.H
-    defb $55,$4D,$9B,$4F,$49,$44,$00,$46,$45,$4C,$8C,$45,$00,$8C,$53,$45                  ; $9CDD UM.OID.FEL.E..SE
-    defb $43,$54,$00,$AB,$94,$8D,$88,$00,$43,$4F,$4D,$00,$FB,$4D,$9B,$44                  ; $9CED CT......COM..M.D
-    defb $90,$00,$20,$44,$89,$54,$FE,$59,$98,$00,$52,$4F,$00,$06,$AE,$20                  ; $9CFD .. D.T.Y..RO... 
-    defb $20,$B0,$09,$BA,$20,$20,$20,$20,$AE,$20,$A6,$20,$46,$99,$20,$53                  ; $9D0D  ...    . . F. S
-    defb $41,$81,$08,$09,$00,$46,$52,$9F,$54,$00,$8E,$8A,$00,$81,$46,$54                  ; $9D1D A....FR.T.....FT
-    defb $00,$9E,$47,$48,$54,$00,$79,$4C,$4F,$57,$00,$63,$10,$FC,$2A,$00                  ; $9D2D ..GHT.yLOW.c..*.
-    defb $45,$58,$54,$94,$20,$00,$50,$55,$4C,$53,$45,$BB,$00,$93,$41,$4D                  ; $9D3D EXT. .PULSE...AM
-    defb $BB,$00,$46,$55,$45,$4C,$00,$4D,$9D,$53,$49,$81,$00,$E3,$CE,$20                  ; $9D4D ..FUEL.M.SI.... 
-    defb $42,$41,$59,$00,$45,$2E,$43,$2E,$4D,$2E,$A5,$00,$66,$67,$53,$00                  ; $9D5D BAY.E.C.M...fgS.
-    defb $66,$68,$53,$00,$69,$20,$53,$43,$4F,$4F,$50,$53,$00,$89,$43,$41                  ; $9D6D fhS.i SCOOPS..CA
-    defb $50,$45,$20,$50,$4F,$44,$00,$79,$42,$4F,$4D,$42,$00,$79,$AE,$00                  ; $9D7D PE POD.yBOMB.y..
-    defb $44,$4F,$43,$4B,$8C,$47,$20,$D7,$00,$7A,$20,$BD,$00,$4D,$49,$4C                  ; $9D8D DOCK.G ..z ..MIL
-    defb $49,$54,$8A,$59,$BB,$00,$4D,$8C,$8C,$47,$BB,$00,$09,$09,$09,$00                  ; $9D9D IT.Y..M..G......
-    defb $8C,$FB,$8C,$47,$20,$6A,$00,$92,$90,$47,$59,$20,$00,$47,$41,$95                  ; $9DAD ...G j...GY .GA.
-    defb $43,$97,$43,$00,$73,$20,$4F,$4E,$00,$41,$0E,$00,$43,$4C,$4F,$41                  ; $9DBD C.C.s ON.A..CLOA
-    defb $4B,$8C,$47,$20,$44,$45,$56,$49,$85,$00,$06,$FC,$20,$04,$08,$77                  ; $9DCD K.G DEVI.... ..w
-    defb $50,$8E,$53,$92,$54,$20,$A5,$09,$BD,$20,$A5,$09,$00,$49,$9C,$4D                  ; $9DDD P.S.T ... ...I.M
-    defb $00,$4C,$4C,$00,$06,$4D,$41,$59,$44,$41,$59,$08,$2A,$20,$0B,$20                  ; $9DED .LL..MAYDAY.* . 
-    defb $8C,$56,$41,$44,$98,$2A,$00,$20,$9F,$20,$00,$06,$CF,$4D,$92,$54                  ; $9DFD .VAD.*. . ...M.T
-    defb $08,$3A,$00,$43,$81,$9B,$00,$4F,$46,$46,$92,$44,$90,$00,$46,$55                  ; $9E0D .:.C...OFF.D..FU
-    defb $47,$49,$97,$96,$00,$48,$8A,$4D,$81,$53,$53,$00,$4D,$4F,$CB,$4C                  ; $9E1D GI...H.M.SS.MO.L
-    defb $59,$20,$15,$00,$AC,$00,$AB,$00,$41,$42,$4F,$96,$20,$AB,$00,$FB                  ; $9E2D Y ......ABO. ...
-    defb $50,$45,$54,$92,$54,$00,$44,$9B,$83,$FE,$88,$00,$44,$45,$41,$44                  ; $9E3D PET.T.D.....DEAD
-    defb $4C,$59,$00,$2D,$2D,$2D,$2D,$20,$45,$20,$4C,$20,$49,$20,$54,$20                  ; $9E4D LY.---- E L I T 
-    defb $45,$20,$2D,$2D,$2D,$2D,$00,$50,$8E,$53,$92,$54,$00,$69,$20,$81                  ; $9E5D E ----.P.S.T.i .
-    defb $41,$4B,$2A,$00,$00,$00,$00                                                      ; $9E6D AK*....
+; Token 0 ($00), PrintToken code $A0: FUEL SCOOPS ON 
+    defb $6F,$10,$00                                                                      ; $9A9D o..
+; Token 1 ($01), PrintToken code $A1:  CHART
+    defb $20,$43,$48,$8A,$54,$00                                                          ; $9AA0  CH.T.
+; Token 2 ($02), PrintToken code $A2: GOVERNMENT
+    defb $47,$4F,$96,$52,$4E,$4D,$92,$54,$00                                              ; $9AA6 GO.RNM.T.
+; Token 3 ($03), PrintToken code $A3: {caps}DATA ON {selected-system}{title-case}
+    defb $06,$44,$91,$41,$10,$03,$08,$00                                                  ; $9AAF .D.A....
+; Token 4 ($04), PrintToken code $A4: {caps}INVENTORY{title-case}
+    defb $06,$8C,$96,$4E,$54,$99,$59,$08,$00                                              ; $9AB7 ...NT.Y..
+; Token 5 ($05), PrintToken code $A5: SYSTEM
+    defb $53,$59,$53,$9C,$4D,$00                                                          ; $9AC0 SYS.M.
+; Token 6 ($06), PrintToken code $A6: PRICE
+    defb $50,$9E,$85,$00                                                                  ; $9AC6 P...
+; Token 7 ($07), PrintToken code $A7: {present-system} MARKET PRICES
+    defb $02,$20,$8B,$52,$4B,$45,$54,$20,$A6,$53,$00                                      ; $9ACA . .RKET .S.
+; Token 8 ($08), PrintToken code $A8: INDUSTRIAL
+    defb $8C,$44,$88,$54,$9E,$80,$00                                                      ; $9AD5 .D.T...
+; Token 9 ($09), PrintToken code $A9: AGRICULTURAL
+    defb $41,$47,$9E,$43,$55,$4C,$54,$55,$94,$4C,$00                                      ; $9ADC AG.CULTU.L.
+; Token 10 ($0A), PrintToken code $AA: RICH 
+    defb $9E,$43,$48,$20,$00                                                              ; $9AE7 .CH .
+; Token 11 ($0B), PrintToken code $AB: AVERAGE 
+    defb $41,$96,$94,$83,$20,$00                                                          ; $9AEC A... .
+; Token 12 ($0C), PrintToken code $AC: POOR 
+    defb $50,$4F,$99,$20,$00                                                              ; $9AF2 PO. .
+; Token 13 ($0D), PrintToken code $AD: MAINLY 
+    defb $8B,$8C,$4C,$59,$20,$00                                                          ; $9AF7 ..LY .
+; Token 14 ($0E), PrintToken code $AE: UNIT
+    defb $55,$4E,$49,$54,$00                                                              ; $9AFD UNIT.
+; Token 15 ($0F), PrintToken code $AF:  VIEW 
+    defb $20,$56,$49,$45,$57,$20,$00                                                      ; $9B02  VIEW .
+; Token 16 ($10), PrintToken code $B0: QUANTITY
+    defb $9A,$9B,$97,$54,$59,$00                                                          ; $9B09 ...TY.
+; Token 17 ($11), PrintToken code $B1: ANARCHY
+    defb $9B,$8A,$43,$48,$59,$00                                                          ; $9B0F ..CHY.
+; Token 18 ($12), PrintToken code $B2: FEUDAL
+    defb $46,$45,$55,$44,$80,$00                                                          ; $9B15 FEUD..
+; Token 19 ($13), PrintToken code $B3: MULTI-GOVERNMENT
+    defb $4D,$55,$4C,$97,$2D,$A2,$00                                                      ; $9B1B MUL.-..
+; Token 20 ($14), PrintToken code $B4: DICTATORSHIP
+    defb $8D,$43,$54,$91,$99,$B9,$00                                                      ; $9B22 .CT....
+; Token 21 ($15), PrintToken code $B5: COMMUNIST
+    defb $FB,$4D,$55,$4E,$9D,$54,$00                                                      ; $9B29 .MUN.T.
+; Token 22 ($16), PrintToken code $B6: CONFEDERACY
+    defb $43,$9F,$46,$98,$90,$41,$43,$59,$00                                              ; $9B30 C.F..ACY.
+; Token 23 ($17), PrintToken code $B7: DEMOCRACY
+    defb $44,$45,$4D,$4F,$43,$94,$43,$59,$00                                              ; $9B39 DEMOC.CY.
+; Token 24 ($18), PrintToken code $B8: CORPORATE STATE
+    defb $43,$99,$50,$99,$91,$45,$20,$CB,$91,$45,$00                                      ; $9B42 C.P..E ..E.
+; Token 25 ($19), PrintToken code $B9: SHIP
+    defb $53,$48,$49,$50,$00                                                              ; $9B4D SHIP.
+; Token 26 ($1A), PrintToken code $BA: PRODUCT
+    defb $50,$FE,$44,$55,$43,$54,$00                                                      ; $9B52 P.DUCT.
+; Token 27 ($1B), PrintToken code $BB:  LASER
+    defb $20,$95,$53,$90,$00                                                              ; $9B59  .S..
+; Token 28 ($1C), PrintToken code $BC: HUMAN COLONIAL
+    defb $48,$55,$4D,$9B,$20,$43,$4F,$4C,$9F,$49,$80,$00                                  ; $9B5E HUM. COL.I..
+; Token 29 ($1D), PrintToken code $BD: HYPERSPACE
+    defb $48,$59,$50,$90,$53,$50,$41,$85,$00                                              ; $9B6A HYP.SPA..
+; Token 30 ($1E), PrintToken code $BE: {caps}SHORT RANGE CHART{title-case}
+    defb $06,$53,$48,$99,$54,$20,$CA,$A1,$08,$00                                          ; $9B73 .SH.T ....
+; Token 31 ($1F), PrintToken code $BF: DISTANCE
+    defb $8D,$CB,$9B,$85,$00                                                              ; $9B7D .....
+; Token 32 ($20), PrintToken code $C0: HYPERSPACE -- {selected-system}
+    defb $BD,$20,$2D,$2D,$20,$03,$00                                                      ; $9B82 . -- ..
+; Token 33 ($21), PrintToken code $C1: HYPERSPACE RANGE ?
+    defb $BD,$20,$CA,$20,$3F,$00                                                          ; $9B89 . . ?.
+; Token 34 ($22), PrintToken code $C2: {caps}MAYDAY{title-case}* CORIOLIS IN DANGER*
+    defb $06,$4D,$41,$59,$44,$41,$59,$08,$2A,$20,$43,$99,$49,$4F,$4C,$49                  ; $9B8F .MAYDAY.* C.IOLI
+    defb $53,$20,$8C,$20,$44,$41,$4E,$83,$52,$2A,$00                                      ; $9B9F S . DAN.R*.
+; Token 35 ($23), PrintToken code $C3:  LIGHT YEARS
+    defb $20,$4C,$49,$47,$48,$54,$20,$59,$45,$8A,$53,$00                                  ; $9BAA  LIGHT YE.S.
+; Token 36 ($24), PrintToken code $C4: TECH.LEVEL
+    defb $9C,$43,$48,$2E,$81,$96,$4C,$00                                                  ; $9BB6 .CH...L.
+; Token 37 ($25), PrintToken code $C5: CASH
+    defb $43,$41,$53,$48,$00                                                              ; $9BBE CASH.
+; Token 38 ($26), PrintToken code $C6:  BILLION
+    defb $20,$86,$0E,$49,$9F,$00                                                          ; $9BC3  ..I..
+; Token 39 ($27), PrintToken code $C7: {caps}GALACTIC CHART{title-case}{galaxy}
+    defb $06,$7A,$A1,$08,$01,$00                                                          ; $9BC9 .z....
+; Token 40 ($28), PrintToken code $C8: TARGET LOST
+    defb $54,$8A,$83,$54,$20,$4C,$4F,$CB,$00                                              ; $9BCF T..T LO..
+; Token 41 ($29), PrintToken code $C9: MISSILE JAMMED
+    defb $6A,$20,$4A,$41,$4D,$4D,$98,$00                                                  ; $9BD8 j JAMM..
+; Token 42 ($2A), PrintToken code $CA: RANGE
+    defb $52,$9B,$83,$00                                                                  ; $9BE0 R...
+; Token 43 ($2B), PrintToken code $CB: ST
+    defb $53,$54,$00                                                                      ; $9BE4 ST.
+; Token 44 ($2C), PrintToken code $CC: QUANTITY OF 
+    defb $B0,$20,$4F,$46,$20,$00                                                          ; $9BE7 . OF .
+; Token 45 ($2D), PrintToken code $CD: SELL
+    defb $53,$45,$0E,$00                                                                  ; $9BED SE..
+; Token 46 ($2E), PrintToken code $CE:  CARGO
+    defb $20,$43,$8A,$47,$4F,$00                                                          ; $9BF1  C.GO.
+; Token 47 ($2F), PrintToken code $CF: EQUIP
+    defb $45,$9A,$49,$50,$00                                                              ; $9BF7 E.IP.
+; Token 48 ($30), PrintToken code $D0: FOOD
+    defb $46,$4F,$4F,$44,$00                                                              ; $9BFC FOOD.
+; Token 49 ($31), PrintToken code $D1: TEXTILES
+    defb $9C,$58,$97,$4C,$89,$00                                                          ; $9C01 .X.L..
+; Token 50 ($32), PrintToken code $D2: RADIOACTIVES
+    defb $94,$8D,$4F,$41,$43,$97,$96,$53,$00                                              ; $9C07 ..OAC..S.
+; Token 51 ($33), PrintToken code $D3: SLAVES
+    defb $53,$95,$96,$53,$00                                                              ; $9C10 S..S.
+; Token 52 ($34), PrintToken code $D4: LIQUOR/WINES
+    defb $4C,$49,$9A,$99,$2F,$57,$8C,$89,$00                                              ; $9C15 LI../W...
+; Token 53 ($35), PrintToken code $D5: LUXURIES
+    defb $4C,$55,$58,$55,$9E,$89,$00                                                      ; $9C1E LUXU...
+; Token 54 ($36), PrintToken code $D6: NARCOTICS
+    defb $4E,$8A,$43,$4F,$97,$43,$53,$00                                                  ; $9C25 N.CO.CS.
+; Token 55 ($37), PrintToken code $D7: COMPUTERS
+    defb $FB,$50,$55,$54,$90,$53,$00                                                      ; $9C2D .PUT.S.
+; Token 56 ($38), PrintToken code $D8: MACHINERY
+    defb $8B,$43,$48,$8C,$90,$59,$00                                                      ; $9C34 .CH..Y.
+; Token 57 ($39), PrintToken code $D9: ALLOYS
+    defb $41,$4C,$4C,$4F,$59,$53,$00                                                      ; $9C3B ALLOYS.
+; Token 58 ($3A), PrintToken code $DA: FIREARMS
+    defb $46,$49,$8E,$8A,$4D,$53,$00                                                      ; $9C42 FI..MS.
+; Token 59 ($3B), PrintToken code $DB: FURS
+    defb $46,$55,$52,$53,$00                                                              ; $9C49 FURS.
+; Token 60 ($3C), PrintToken code $DC: MINERALS
+    defb $4D,$8C,$90,$80,$53,$00                                                          ; $9C4E M...S.
+; Token 61 ($3D), PrintToken code $DD: GOLD
+    defb $47,$4F,$4C,$44,$00                                                              ; $9C54 GOLD.
+; Token 62 ($3E), PrintToken code $DE: PLATINUM
+    defb $50,$4C,$91,$8C,$55,$4D,$00                                                      ; $9C59 PL..UM.
+; Token 63 ($3F), PrintToken code $DF: GEM-STONES
+    defb $83,$4D,$2D,$CB,$9F,$89,$00                                                      ; $9C60 .M-....
+; Token 64 ($40), PrintToken code $E0: ALIEN ITEMS
+    defb $80,$49,$92,$20,$7F,$53,$00                                                      ; $9C67 .I. .S.
+; Token 65 ($41), PrintToken code $E1:  NOT FOUND
+    defb $20,$4E,$4F,$54,$20,$46,$4F,$55,$4E,$44,$00                                      ; $9C6E  NOT FOUND.
+; Token 66 ($42), PrintToken code $E2:  CR
+    defb $20,$43,$52,$00                                                                  ; $9C79  CR.
+; Token 67 ($43), PrintToken code $E3: LARGE
+    defb $4C,$8A,$83,$00                                                                  ; $9C7D L...
+; Token 68 ($44), PrintToken code $E4: FIERCE
+    defb $46,$49,$90,$85,$00                                                              ; $9C81 FI...
+; Token 69 ($45), PrintToken code $E5: SMALL
+    defb $53,$8B,$0E,$00                                                                  ; $9C86 S...
+; Token 70 ($46), PrintToken code $E6: GREEN
+    defb $47,$8E,$92,$00                                                                  ; $9C8A G...
+; Token 71 ($47), PrintToken code $E7: RED
+    defb $52,$98,$00                                                                      ; $9C8E R..
+; Token 72 ($48), PrintToken code $E8: YELLOW
+    defb $59,$45,$0E,$4F,$57,$00                                                          ; $9C91 YE.OW.
+; Token 73 ($49), PrintToken code $E9: BLUE
+    defb $42,$4C,$55,$45,$00                                                              ; $9C97 BLUE.
+; Token 74 ($4A), PrintToken code $EA: BLACK
+    defb $42,$95,$43,$4B,$00                                                              ; $9C9C B.CK.
+; Token 75 ($4B), PrintToken code $EB: HARMLESS
+    defb $15,$00                                                                          ; $9CA1 ..
+; Token 76 ($4C), PrintToken code $EC: SLIMY
+    defb $53,$4C,$49,$4D,$59,$00                                                          ; $9CA3 SLIMY.
+; Token 77 ($4D), PrintToken code $ED: BUG-EYED
+    defb $42,$55,$47,$2D,$45,$59,$98,$00                                                  ; $9CA9 BUG-EY..
+; Token 78 ($4E), PrintToken code $EE: HORNED
+    defb $48,$99,$4E,$98,$00                                                              ; $9CB1 H.N..
+; Token 79 ($4F), PrintToken code $EF: BONY
+    defb $42,$9F,$59,$00                                                                  ; $9CB6 B.Y.
+; Token 80 ($50), PrintToken code $F0: FAT
+    defb $46,$91,$00                                                                      ; $9CBA F..
+; Token 81 ($51), PrintToken code $F1: FURRY
+    defb $46,$55,$52,$52,$59,$00                                                          ; $9CBD FURRY.
+; Token 82 ($52), PrintToken code $F2: RODENT
+    defb $FE,$44,$92,$54,$00                                                              ; $9CC3 .D.T.
+; Token 83 ($53), PrintToken code $F3: FROG
+    defb $46,$FE,$47,$00                                                                  ; $9CC8 F.G.
+; Token 84 ($54), PrintToken code $F4: LIZARD
+    defb $4C,$49,$84,$52,$44,$00                                                          ; $9CCC LI.RD.
+; Token 85 ($55), PrintToken code $F5: LOBSTER
+    defb $4C,$4F,$42,$CB,$90,$00                                                          ; $9CD2 LOB...
+; Token 86 ($56), PrintToken code $F6: BIRD
+    defb $86,$52,$44,$00                                                                  ; $9CD8 .RD.
+; Token 87 ($57), PrintToken code $F7: HUMANOID
+    defb $48,$55,$4D,$9B,$4F,$49,$44,$00                                                  ; $9CDC HUM.OID.
+; Token 88 ($58), PrintToken code $F8: FELINE
+    defb $46,$45,$4C,$8C,$45,$00                                                          ; $9CE4 FEL.E.
+; Token 89 ($59), PrintToken code $F9: INSECT
+    defb $8C,$53,$45,$43,$54,$00                                                          ; $9CEA .SECT.
+; Token 90 ($5A), PrintToken code $FA: AVERAGE RADIUS
+    defb $AB,$94,$8D,$88,$00                                                              ; $9CF0 .....
+; Token 91 ($5B), PrintToken code $FB: COM
+    defb $43,$4F,$4D,$00                                                                  ; $9CF5 COM.
+; Token 92 ($5C), PrintToken code $FC: COMMANDER
+    defb $FB,$4D,$9B,$44,$90,$00                                                          ; $9CF9 .M.D..
+; Token 93 ($5D), PrintToken code $FD:  DESTROYED
+    defb $20,$44,$89,$54,$FE,$59,$98,$00                                                  ; $9CFF  D.T.Y..
+; Token 94 ($5E), PrintToken code $FE: RO
+    defb $52,$4F,$00                                                                      ; $9D07 RO.
+; Token 95 ($5F), PrintToken code $FF: {caps}UNIT  QUANTITY{cr}PRODUCT    UNIT PRICE FOR SALE{title-case}{cr}
+    defb $06,$AE,$20,$20,$B0,$09,$BA,$20,$20,$20,$20,$AE,$20,$A6,$20,$46                  ; $9D0A ..  ...    . . F
+    defb $99,$20,$53,$41,$81,$08,$09,$00                                                  ; $9D1A . SA....
+; Token 96 ($60), PrintToken code $60: FRONT
+    defb $46,$52,$9F,$54,$00                                                              ; $9D22 FR.T.
+; Token 97 ($61), PrintToken code $61: REAR
+    defb $8E,$8A,$00                                                                      ; $9D27 ...
+; Token 98 ($62), PrintToken code $62: LEFT
+    defb $81,$46,$54,$00                                                                  ; $9D2A .FT.
+; Token 99 ($63), PrintToken code $63: RIGHT
+    defb $9E,$47,$48,$54,$00                                                              ; $9D2E .GHT.
+; Token 100 ($64), PrintToken code $64: ENERGY LOW
+    defb $79,$4C,$4F,$57,$00                                                              ; $9D33 yLOW.
+; Token 101 ($65), PrintToken code $65: RIGHT ON COMMANDER*
+    defb $63,$10,$FC,$2A,$00                                                              ; $9D38 c..*.
+; Token 102 ($66), PrintToken code $66: EXTRA 
+    defb $45,$58,$54,$94,$20,$00                                                          ; $9D3D EXT. .
+; Token 103 ($67), PrintToken code $67: PULSE LASER
+    defb $50,$55,$4C,$53,$45,$BB,$00                                                      ; $9D43 PULSE..
+; Token 104 ($68), PrintToken code $68: BEAM LASER
+    defb $93,$41,$4D,$BB,$00                                                              ; $9D4A .AM..
+; Token 105 ($69), PrintToken code $69: FUEL
+    defb $46,$55,$45,$4C,$00                                                              ; $9D4F FUEL.
+; Token 106 ($6A), PrintToken code $6A: MISSILE
+    defb $4D,$9D,$53,$49,$81,$00                                                          ; $9D54 M.SI..
+; Token 107 ($6B), PrintToken code $6B: LARGE CARGO BAY
+    defb $E3,$CE,$20,$42,$41,$59,$00                                                      ; $9D5A .. BAY.
+; Token 108 ($6C), PrintToken code $6C: E.C.M.SYSTEM
+    defb $45,$2E,$43,$2E,$4D,$2E,$A5,$00                                                  ; $9D61 E.C.M...
+; Token 109 ($6D), PrintToken code $6D: EXTRA PULSE LASERS
+    defb $66,$67,$53,$00                                                                  ; $9D69 fgS.
+; Token 110 ($6E), PrintToken code $6E: EXTRA BEAM LASERS
+    defb $66,$68,$53,$00                                                                  ; $9D6D fhS.
+; Token 111 ($6F), PrintToken code $6F: FUEL SCOOPS
+    defb $69,$20,$53,$43,$4F,$4F,$50,$53,$00                                              ; $9D71 i SCOOPS.
+; Token 112 ($70), PrintToken code $70: ESCAPE POD
+    defb $89,$43,$41,$50,$45,$20,$50,$4F,$44,$00                                          ; $9D7A .CAPE POD.
+; Token 113 ($71), PrintToken code $71: ENERGY BOMB
+    defb $79,$42,$4F,$4D,$42,$00                                                          ; $9D84 yBOMB.
+; Token 114 ($72), PrintToken code $72: ENERGY UNIT
+    defb $79,$AE,$00                                                                      ; $9D8A y..
+; Token 115 ($73), PrintToken code $73: DOCKING COMPUTERS
+    defb $44,$4F,$43,$4B,$8C,$47,$20,$D7,$00                                              ; $9D8D DOCK.G ..
+; Token 116 ($74), PrintToken code $74: GALACTIC HYPERSPACE
+    defb $7A,$20,$BD,$00                                                                  ; $9D96 z ..
+; Token 117 ($75), PrintToken code $75: MILITARY LASER
+    defb $4D,$49,$4C,$49,$54,$8A,$59,$BB,$00                                              ; $9D9A MILIT.Y..
+; Token 118 ($76), PrintToken code $76: MINING LASER
+    defb $4D,$8C,$8C,$47,$BB,$00                                                          ; $9DA3 M..G..
+; Token 119 ($77), PrintToken code $77: {cr}{cr}{cr}
+    defb $09,$09,$09,$00                                                                  ; $9DA9 ....
+; Token 120 ($78), PrintToken code $78: INCOMING MISSILE
+    defb $8C,$FB,$8C,$47,$20,$6A,$00                                                      ; $9DAD ...G j.
+; Token 121 ($79), PrintToken code $79: ENERGY 
+    defb $92,$90,$47,$59,$20,$00                                                          ; $9DB4 ..GY .
+; Token 122 ($7A), PrintToken code $7A: GALACTIC
+    defb $47,$41,$95,$43,$97,$43,$00                                                      ; $9DBA GA.C.C.
+; Token 123 ($7B), PrintToken code $7B: DOCKING COMPUTERS ON
+    defb $73,$20,$4F,$4E,$00                                                              ; $9DC1 s ON.
+; Token 124 ($7C), PrintToken code $7C: ALL
+    defb $41,$0E,$00                                                                      ; $9DC6 A..
+; Token 125 ($7D), PrintToken code $7D: CLOAKING DEVICE
+    defb $43,$4C,$4F,$41,$4B,$8C,$47,$20,$44,$45,$56,$49,$85,$00                          ; $9DC9 CLOAK.G DEVI..
+; Token 126 ($7E), PrintToken code $7E: {caps}COMMANDER {commander}{title-case}{cr}{cr}{cr}PRESENT SYSTEM{cr}HYPERSPACE SYSTEM{cr}
+    defb $06,$FC,$20,$04,$08,$77,$50,$8E,$53,$92,$54,$20,$A5,$09,$BD,$20                  ; $9DD7 .. ..wP.S.T ... 
+    defb $A5,$09,$00                                                                      ; $9DE7 ...
+; Token 127 ($7F), PrintToken code $7F: ITEM
+    defb $49,$9C,$4D,$00                                                                  ; $9DEA I.M.
+; Token 128 ($80), PrintToken code $0E: LL
+    defb $4C,$4C,$00                                                                      ; $9DEE LL.
+; Token 129 ($81), PrintToken code $0F: {caps}MAYDAY{title-case}* {first-system} INVADED*
+    defb $06,$4D,$41,$59,$44,$41,$59,$08,$2A,$20,$0B,$20,$8C,$56,$41,$44                  ; $9DF1 .MAYDAY.* . .VAD
+    defb $98,$2A,$00                                                                      ; $9E01 .*.
+; Token 130 ($82), PrintToken code $10:  ON 
+    defb $20,$9F,$20,$00                                                                  ; $9E04  . .
+; Token 131 ($83), PrintToken code $11: {caps}EQUIPMENT{title-case}:
+    defb $06,$CF,$4D,$92,$54,$08,$3A,$00                                                  ; $9E08 ..M.T.:.
+; Token 132 ($84), PrintToken code $12: CLEAN
+    defb $43,$81,$9B,$00                                                                  ; $9E10 C...
+; Token 133 ($85), PrintToken code $13: OFFENDER
+    defb $4F,$46,$46,$92,$44,$90,$00                                                      ; $9E14 OFF.D..
+; Token 134 ($86), PrintToken code $14: FUGITIVE
+    defb $46,$55,$47,$49,$97,$96,$00                                                      ; $9E1B FUGI...
+; Token 135 ($87), PrintToken code $15: HARMLESS
+    defb $48,$8A,$4D,$81,$53,$53,$00                                                      ; $9E22 H.M.SS.
+; Token 136 ($88), PrintToken code $16: MOSTLY HARMLESS
+    defb $4D,$4F,$CB,$4C,$59,$20,$15,$00                                                  ; $9E29 MO.LY ..
+; Token 137 ($89), PrintToken code $17: POOR 
+    defb $AC,$00                                                                          ; $9E31 ..
+; Token 138 ($8A), PrintToken code $18: AVERAGE 
+    defb $AB,$00                                                                          ; $9E33 ..
+; Token 139 ($8B), PrintToken code $19: ABOVE AVERAGE 
+    defb $41,$42,$4F,$96,$20,$AB,$00                                                      ; $9E35 ABO. ..
+; Token 140 ($8C), PrintToken code $1A: COMPETENT
+    defb $FB,$50,$45,$54,$92,$54,$00                                                      ; $9E3C .PET.T.
+; Token 141 ($8D), PrintToken code $1B: DANGEROUS
+    defb $44,$9B,$83,$FE,$88,$00                                                          ; $9E43 D.....
+; Token 142 ($8E), PrintToken code $1C: DEADLY
+    defb $44,$45,$41,$44,$4C,$59,$00                                                      ; $9E49 DEADLY.
+; Token 143 ($8F), PrintToken code $1D: ---- E L I T E ----
+    defb $2D,$2D,$2D,$2D,$20,$45,$20,$4C,$20,$49,$20,$54,$20,$45,$20,$2D                  ; $9E50 ---- E L I T E -
+    defb $2D,$2D,$2D,$00                                                                  ; $9E60 ---.
+; Token 144 ($90), PrintToken code $1E: PRESENT
+    defb $50,$8E,$53,$92,$54,$00                                                          ; $9E64 P.S.T.
+; Token 145 ($91), PrintToken code $1F: FUEL LEAK*
+    defb $69,$20,$81,$41,$4B,$2A,$00                                                      ; $9E6A i .AK*.
+; Token 146 ($92), PrintToken code $20: 
+    defb $00                                                                              ; $9E71 .
+; Token 147 ($93), PrintToken code $21: 
+    defb $00                                                                              ; $9E72 .
+; Token 148 ($94), PrintToken code $22: 
+    defb $00                                                                              ; $9E73 .
 
 TextTokenDictionaryEnd:
 defc TextTokenDictionarySize = TextTokenDictionaryEnd - TextTokenDictionary

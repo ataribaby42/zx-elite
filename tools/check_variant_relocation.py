@@ -55,8 +55,10 @@ GameImage:
     defs {padding},0
     INCLUDE "single-laser.asm"
     defs (CockpitIndicatorsStart-GameLoadAddress)-($-GameImage),0
+DrawCockpitIndicators:
 L_A660:
     INCLUDE "scanner-pixel-fix.asm"
+EnableInterruptMode2:
 L_FF4C:
     LD A,1
     LD (BootstrapCalled),A
@@ -66,10 +68,12 @@ L_7189:
     RET
 DrawLine:
     RET
+PrintToken:
 L_BA9D:
     RET
 BootstrapCalled:
     defb 0
+StartupStackPointer:
 L_74B2:
     defw 0
 EcmTimer:
@@ -84,6 +88,7 @@ L_BBBF:
 TextColumn:
 L_A80D:
     defw 0
+MissileCount:
 L_A845:
     defb 0
     defs {padding},0

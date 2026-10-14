@@ -97,12 +97,11 @@ StationOffTiles:
 ; above. Still draw exactly four slots, keeping the original mode on return:
 ; NOP for four missiles, XOR otherwise. Valid commander count is 0..4.
 DrawMissileIndicators:
-L_A6D3: ; legacy analysis alias
     LD HL,MissileDisplayCoordinates
     LD (TextColumn),HL
     XOR A
     LD (CharacterBlendOpcode),A
-    LD A,(L_A845)
+    LD A,(MissileCount)
     LD C,A
     LD B,4
 DrawMissileSlots:
@@ -112,7 +111,7 @@ DrawMissileSlots:
     LD A,$40
 DrawMissileSlot:
     PUSH BC
-    CALL L_BA9D
+    CALL PrintToken
     POP BC
     DJNZ DrawMissileSlots
     LD A,C
@@ -123,5 +122,5 @@ DrawMissileSlot:
     RET
 
 CockpitIndicatorsEnd:
-assert CockpitIndicatorsEnd-L_A660 <= CockpitIndicatorsLimit-CockpitIndicatorsStart
-    defs (CockpitIndicatorsLimit-CockpitIndicatorsStart)-(CockpitIndicatorsEnd-L_A660),0
+assert CockpitIndicatorsEnd-DrawCockpitIndicators <= CockpitIndicatorsLimit-CockpitIndicatorsStart
+    defs (CockpitIndicatorsLimit-CockpitIndicatorsStart)-(CockpitIndicatorsEnd-DrawCockpitIndicators),0

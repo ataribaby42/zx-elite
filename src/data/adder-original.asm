@@ -8,25 +8,25 @@
 ; This version needs 8 extra bytes; the current game layout cannot fit it unchanged.
 ; Geometry offsets/counts are derived by the assembler.
 ShipAdderBlueprint:
-    defb 0 ; canister/commodity flags
-    defb 50 ; target size
-    defb 100 ; agility / rotation limit
-    defb (ShipAdderVerticesEnd-ShipAdderVertices)/6
-    defb (ShipAdderEdgesEnd-ShipAdderEdges)/4
-    defb (ShipAdderFacesEnd-ShipAdderFaces)/4
-    defb 24 ; maximum speed
-    defb 85 ; energy
-    defw 40 ; bounty in tenths of a credit
-    defb $01 ; partially decoded property
-    defb 20 ; visibility distance
-    defw ShipAdderVertices-ShipAdderBlueprint
-    defw ShipAdderEdges-ShipAdderBlueprint
-    defw ShipAdderFaces-ShipAdderBlueprint
-    defb $8C ; behavior flags
-    defb $02 ; byte 19
-    defb $00 ; gun vertex
-    defb $10 ; byte 21
-    defb $01 ; normal scale
+    defb 0 ; +0 cargo: scooped as random Food..Computers; no canister when killed
+    defb 50 ; +1 radius: near limit, target size, collision box
+    defb 100 ; +2 AI laser fire chance in 256, halved below 256 kills
+    defb (ShipAdderVerticesEnd-ShipAdderVertices)/6 ; +3 count
+    defb (ShipAdderEdgesEnd-ShipAdderEdges)/4 ; +4 count
+    defb (ShipAdderFacesEnd-ShipAdderFaces)/4 ; +5 count
+    defb 24 ; +6 maximum speed
+    defb 85 ; +7 energy
+    defw 40 ; +8 bounty in tenths of a credit
+    defb $01 ; +$0A launches: 1 x missile
+    defb 20 ; +$0B dot distance
+    defw ShipAdderVertices-ShipAdderBlueprint ; +$0C table offset
+    defw ShipAdderEdges-ShipAdderBlueprint ; +$0E table offset
+    defw ShipAdderFaces-ShipAdderBlueprint ; +$10 table offset
+    defb $8C ; +$12 behaviour: hostile, steers away near station, escape capsule
+    defb $02 ; +$13 normal scale shift
+    defb $00 ; +$14 gun vertex
+    defb $10 ; +$15 combat-score award 272, low byte
+    defb $01 ; +$16 combat-score award, high byte
 assert $-ShipAdderBlueprint = 23
 ShipAdderVertices:
     defb $12,$00,$28,$9F,$01,$BC

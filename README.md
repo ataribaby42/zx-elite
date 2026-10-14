@@ -14,8 +14,11 @@ All three tape payloads are assembled from the source files in
 to construct the output. The original tape is read only for verification
 during a normal build.
 
-The source covers every byte, but it is not yet a fully documented
-disassembly. See **Reconstruction status** below before changing game logic.
+The source covers every byte as an annotated disassembly. Code and data are
+separated and labelled, and routines and variables carry comments that
+distinguish verified meanings from inferences. See **Reconstruction status**
+below and [the disassembly conventions](docs/DISASSEMBLY.md) before changing
+game logic.
 
 ## Build
 
@@ -148,7 +151,7 @@ assembled payloads; game origin and entry are checked against the linker map.
 | `AGENTS.md` | Scope, verification requirements and rules for future work |
 | `src/basic.asm` | Tokenized BASIC, with line lengths derived from labels |
 | `src/screen.asm` | Loading bitmap and attribute bytes |
-| `src/game.asm` | Z80 instructions, labels and preserved unclassified bytes |
+| `src/game.asm` | Annotated Z80 source of the game image: code, typed data, labels, comments and legacy aliases |
 | `src/single-laser.asm` | Optional centred laser with the original endpoint wiggle |
 | `src/data/font.asm` | Verified 91-glyph font / graphic character set |
 | `src/data/cockpit-bitmap.asm` | Initial 256 x 64 cockpit bitmap |
@@ -162,7 +165,14 @@ assembled payloads; game origin and entry are checked against the linker map.
 | `src/data/square-tables.asm` | Verified low/high-byte square lookup tables |
 | `tools/build.py` | Assembly, TAP packaging and binary identity checks |
 | `tools/tape.py` | TAP parser, header and checksum helpers |
-| `tools/bootstrap_sources.py` | Deliberate, one-time source regeneration |
+| `tools/bootstrap_sources.py` | Deliberate source regeneration from the reference tape and the annotation database |
+| `tools/annotations/` | Annotation database: names, comments, data types, operand expressions (see `docs/DISASSEMBLY.md`) |
+| `tools/text_codec.py` | Decoder for the token dictionary and message table, used for text comments |
+| `tools/trace_xrefs.py` | 48K gameplay scenarios with PC-attributed memory reads and writes |
+| `tools/xref_listing.py` | Analysis copy of the source with static and runtime cross-references |
+| `tools/check_core_routines.py` | Exhaustive checks of the shared arithmetic helpers |
+| `tools/check_routines.py` | Simulator checks of the routine meanings recorded as verified |
+| `tools/compare_skool.py` | Compare an external SkoolKit `.skool` disassembly with this source |
 | `tools/emulator_check.py` | Optional Z80 execution, text recognition, memory-access tracing and screenshots |
 | `tools/analyze_runtime.py` | Aggregate verified 48K play scenarios into code seeds and a runtime map |
 | `tools/run_runtime_scenarios.py` | Reproduce docked, flight, trading and hyperspace traces without screenshots |
@@ -180,6 +190,11 @@ assembled payloads; game origin and entry are checked against the linker map.
 | `docs/GRAPHICS.md`, `docs/images/` | Verified graphics documentation and retained font image |
 | `docs/COMMANDER-STATE.md` | Verified active record, tape buffer, snapshot and death/restart behaviour |
 | `docs/SHIPS.md` | Verified ship/object IDs, blueprint records, shared geometry, 48K Adder comparison and mining chain |
+| `docs/DISASSEMBLY.md` | Source conventions, annotation database and evidence tools |
+| `docs/DATA-STRUCTURES.md` | Object instances, commander record, input state, buffers and text encoding |
+| `docs/FINDINGS.md` | Original-game defects, corrections to research notes and layout findings |
+| `docs/ROUTINE-CHECKS.md` | The routine checks and the claims they support |
+| `docs/COMPARISON-SKOOLKIT.md` | Comparison with the independent SkoolKit disassembly of this release |
 
 Assembler source lives directly in `src/`, with data includes in `src/data/`.
 The extraction tools use the same layout; there is no separate generated-source
@@ -193,12 +208,30 @@ Build outputs and analysis dependencies are ignored by Git.
 
 ## Reconstruction status
 
-Control-flow discovery starts at `$7000`, plus two entry candidates identified
-by the supplied laser notes. It currently yields:
+Control-flow discovery starts at `$7000`, at the two text-control dispatch
+tables and the laser entry points. It also uses instruction addresses proved
+by 48K runtime traces and seeds recorded in the annotation database. Of the
+40,801 bytes of the game image:
 
-- **13,390 candidate instructions**, covering **26,168 bytes**;
-- **10,470 bytes of verified data**, isolated in named ASM includes;
-- **4,163 unclassified bytes**, preserved as explicit `DEFB` source.
+- **27,378 bytes are code** (14,095 instructions), plus **61 inline argument
+  bytes** read through the return address of text routines;
+- **10,467 bytes are verified data** in named ASM includes, and **2,824 bytes**
+  are typed data inside `game.asm` (variables, tables, pointer tables, text,
+  zero fills and workspaces);
+- 64 bytes are the zero-filled area reserved for the optional Adder start-up;
+- **7 bytes remain unclassified**: three unreferenced fragments, each with an
+  explanatory comment.
+
+There are 1,160 annotated headers, 925 of them with verified descriptive names
+and 15 marked INFERRED, plus 5,745 line comments. 48 section banners
+group the code into subsystems. Self-modifying code sites and their patchers
+are documented. The patch tables of the circle renderer are emitted as
+pointer data, so they relocate with the code. See
+[findings](docs/FINDINGS.md) for original-game defects and corrections to the
+research notes uncovered by this work. A second pass used an
+[independent disassembly](docs/COMPARISON-SKOOLKIT.md) as a pointer to gaps
+and filled them from this project's own evidence. 124 simulator checks
+([list](docs/ROUTINE-CHECKS.md)) back the verified meanings.
 
 The font is 91 glyphs x 8 rows = 728 bytes, not 768 or 2,048 bytes. The
 retained [font image and graphics documentation](docs/GRAPHICS.md) show the
@@ -211,21 +244,21 @@ code** reached by indirect dispatch. Instruction discovery is not a proof
 that every candidate has the intended semantics. Neutral labels retain
 original addresses; comments distinguish verified facts from research hints.
 
-Direct in-image branch and call targets use labels. Immediate register-pair
-values that look like addresses also have labels, but some may actually be
-numeric constants. These inferred references and any overlapping decode
-candidates are recorded in `docs/generated/reconstruction.json`. Review them
-before relocating code. Undecoded tables may still contain numeric pointers;
-this initial reconstruction is deliberately fixed to the original layout.
+Direct in-image branch and call targets use labels. Every 16-bit immediate
+whose value lies in the image range was reviewed. Numbers such as bit
+patterns, port pairs and coordinates are emitted numerically, and structure
+offsets use expressions such as `InitialRuntimeState+InstanceBehaviour`.
+Table pages and the IM 2 vector table have layout assertions. The remaining
+label immediates are listed in `docs/generated/reconstruction.json`.
 
 POKE landmarks have labels and placement assertions, but **none of the
 supplied POKE modifications are applied**. Existing docs describe several
 different releases; their meanings must be checked against this tape before
 use. C64 or BBC offsets must never be substituted.
 
-Exact binary identity is the acceptance condition for this baseline. It does
-not mean that all routines, ship models, save fields or mission logic have
-already been understood and annotated.
+Exact binary identity remains the acceptance condition. Names and comments
+record what the evidence supports. INFERRED lines and neutral `L_xxxx` labels
+mark the parts whose gameplay meaning is still a hypothesis.
 
 The [ship and object blueprint map](docs/SHIPS.md) now identifies all 19
 records in the 128K-compatible release. It also verifies the Krait in slot 17,
@@ -242,16 +275,20 @@ directory and needs access to PyPI:
 tools\install_analysis_tools.bat
 ```
 
-To deliberately reconstruct the three source files again:
+To deliberately regenerate the source files:
 
 ```bat
 python tools\bootstrap_sources.py --force
 ```
 
-**This discards later source annotations or edits.** Back them up first.
-Without `--force`, the generator refuses to overwrite existing source.
-The generator also creates `docs/generated/reconstruction.json` with byte
-coverage, inferred references, landmarks and the tape block map.
+Regeneration rebuilds `src/game.asm` and the generated data includes from the
+reference tape, the runtime seeds and the annotation database in
+`tools/annotations/`. Annotations therefore survive regeneration, but direct
+edits to generated files do not. Record lasting changes in the database (see
+[the disassembly conventions](docs/DISASSEMBLY.md)). Without `--force`, the
+generator refuses to overwrite existing source. It also creates
+`docs/generated/reconstruction.json` with byte coverage, labels, static
+cross-references, landmarks and the tape block map.
 
 Verified gameplay traces are documented in [the runtime map](docs/RUNTIME-MAP.md).
 `tools/analyze_runtime.py` converts program counters reached through indirect
