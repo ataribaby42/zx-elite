@@ -9,3 +9,6 @@ __pycache__/
 *.map
 *.sym
 *.def
+
+# Claude Code: local only
+.claude/
