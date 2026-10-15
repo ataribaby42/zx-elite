@@ -68,50 +68,52 @@ boundaries or semantic names.
 ## Memory-access evidence
 
 The access runs use SkoolKit's slower Python Z80 simulator with a
-list-compatible memory recorder. Opcode fetches explain most reads in
-candidate-code ranges. Reads from unclassified ranges identify likely
-tables, text, models or mutable workspace for further analysis.
-Each report also lists `memory_read_before_write_map`: addresses read while
-they still hold their loaded value, so only there can the tape byte matter.
-In the view buffer `$C000..$CFFF` these are exactly the 3,032 bytes of the
-font, cockpit colours and cockpit bitmap. All other buffer bytes, including
-`ViewBufferResidueAfterLoader`, are written before any read.
+list-compatible memory recorder. Opcode fetches explain most reads in code
+ranges. Kinds come from `docs/generated/reconstruction.json`; inline
+arguments are bytes consumed by the preceding call. A read from an
+unclassified range would identify a likely table, text, model or mutable
+workspace for further analysis. Writes to code outside the view buffer are
+self-modifying code. Code inside the view buffer (`DormantPortLoader`) is
+counted separately: it is overwritten when the buffer is reused, and none
+of it is executed in the traces.
 
-| Scenario | Image reads | Unclassified reads | Image writes | Unclassified writes | Writes in candidate code |
-|---|---:|---:|---:|---:|---:|
-| `access-docked-baseline` | 14,118 | 1,481 | 4,576 | 1,380 | 21 |
-| `access-docked-market` | 14,518 | 1,546 | 4,585 | 1,387 | 23 |
-| `access-docked-equipment` | 14,568 | 1,528 | 4,594 | 1,396 | 23 |
-| `access-trade-complete` | 15,325 | 1,575 | 4,599 | 1,401 | 23 |
-| `access-inflight-screens` | 23,739 | 2,297 | 5,113 | 1,766 | 99 |
-| `access-hyperspace-zaonce` | 23,011 | 2,149 | 5,040 | 1,698 | 92 |
-| `access-galactic-hyperspace` | 22,500 | 2,021 | 5,003 | 1,688 | 64 |
+Each report also lists `memory_read_before_write_map`: addresses read
+while they still hold their loaded value, so only there can the tape byte
+matter. In the view buffer `$C000..$CFFF` these are, in every access
+trace, exactly the 3,032 bytes of the font, cockpit colours and cockpit
+bitmap. All other buffer bytes, including `ViewBufferResidueAfterLoader`,
+are written before any read.
 
-Largest contiguous unclassified regions actually read:
+| Scenario | Image reads | Unclassified reads | Image writes | Unclassified writes | Self-modifying code writes | Code overwritten in view buffer |
+|---|---:|---:|---:|---:|---:|---:|
+| `access-docked-baseline` | 14,118 | 0 | 4,576 | 0 | 21 | 188 |
+| `access-docked-market` | 14,518 | 0 | 4,585 | 0 | 23 | 188 |
+| `access-docked-equipment` | 14,568 | 0 | 4,594 | 0 | 23 | 188 |
+| `access-trade-complete` | 15,325 | 0 | 4,599 | 0 | 23 | 188 |
+| `access-inflight-screens` | 23,739 | 0 | 5,113 | 0 | 99 | 188 |
+| `access-hyperspace-zaonce` | 23,011 | 0 | 5,040 | 0 | 92 | 188 |
+| `access-galactic-hyperspace` | 22,500 | 0 | 5,003 | 0 | 64 | 188 |
 
-- `$C2D8-$C6FF`: 1,064 observed byte addresses
-- `$91D2-$925F`: 142 observed byte addresses
-- `$84C5-$8544`: 128 observed byte addresses
-- `$8BAE-$8C14`: 103 observed byte addresses
-- `$7003-$705E`: 92 observed byte addresses
-- `$FBBF-$FC15`: 87 observed byte addresses
-- `$E222-$E275`: 84 observed byte addresses
-- `$A46C-$A4BB`: 80 observed byte addresses
-- `$9A0A-$9A39`: 48 observed byte addresses
-- `$AF0E-$AF38`: 43 observed byte addresses
-- `$F2A1-$F2C8`: 40 observed byte addresses
-- `$E2CD-$E2F0`: 36 observed byte addresses
+No unclassified region was read: every image byte is classified as code,
+inline argument or data, so every recorded access falls in one of them.
+A classified range is not necessarily understood; see `src/game.asm`
+for the remaining neutral labels and `INFERRED:` hypotheses.
 
 ## Reproduction
 
-Run the scripted text-only scenarios, then aggregate and rebuild:
+Build and verify the default reconstruction first. The emulator loads
+`release/elite-128k.tap` and compares the loaded image with
+`build/game.bin`, so a previously built variant must not remain there.
+Then run the scripted text-only scenarios, aggregate and rebuild:
 
 ```bat
+make.bat
+verify.bat
 python tools\run_runtime_scenarios.py
 python tools\run_runtime_scenarios.py --accesses
 python tools\analyze_runtime.py
 python tools\bootstrap_sources.py --force
-build.bat
+make.bat
 verify.bat
 ```
 
