@@ -288,7 +288,8 @@ scenarios with `tools/run_runtime_scenarios.py`, always in 48K mode. The build
 option check deliberately leaves an Adder TAP with
 `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
 stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
-scannerblipfix=yes stardustfix=yes` for testing.
+scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes` for
+testing.
 Rebuild the default Krait version before collecting reference reconstruction/runtime-code seeds.
 The Adder test compares 128 actual rendered frames with the original side-B
 model, in addition to checking all 19 object loaders and other ship geometry.
@@ -499,6 +500,32 @@ change where a particle is drawn, never where it is. Run
 `tools/check_stardust_fix.py --emulator` for both ship choices, each built
 with the default tapfile, plus `python tools/check_routines.py --only dust` on
 the default build and the option check.
+
+`missiletargetfix=no` preserves the original `ReleaseTargetLocks`, which tests
+the missile flag of the removed object (`BIT 0,(IX+$26)`) instead of the
+scanned slot. The optional `yes` changes only that instruction
+(`$EB82..$EB85`) to `BIT 0,(IY+$26)`, asserted with
+`MissileTargetCheckStart`/`MissileTargetCheckLimit` and listed in
+`OPTION_PARTS`. Leave the player's lock release (`MissileState`,
+`TargetLostMessage`), the callers and `UpdateMissileGuidance` unchanged. Run
+`tools/check_missile_target_fix.py --emulator` for both ship choices, each
+built with the default tapfile, plus `python tools/check_routines.py --only
+contact` on the default build and the option check.
+
+`textfullstopfix=no` preserves the original justified printer, which loses a
+full stop arriving as the 31st character of a line. The optional `yes` macros
+in `src/text-full-stop-fix.asm` replace only the first 31 bytes of
+`BufferJustifiedCharacter` (`$BCFC..$BD1A`) and the zero padding
+`$BDF5..$BDFF` before the square tables, each asserted with its
+`TextFullStop...Start`/`Limit` constants. With the option on, that padding is
+no longer free. Count every character before the full stop test, wrap a 31st
+full stop with the original code from `JustifyWrapWord` and then print its
+line at once. Keep the handling of every other character, the line width and
+the page alignment of the square tables. The generator closes an optional
+part before a data include that starts at its limit; keep that order. Run
+`tools/check_text_full_stop_fix.py --emulator` for both ship choices, each
+built with the default tapfile, plus `python tools/check_routines.py --only
+text` on the default build and the option check.
 
 - Source boundaries, offsets and lengths must be calculated by scripts or
   labels. No tool may silently truncate or pad a block.

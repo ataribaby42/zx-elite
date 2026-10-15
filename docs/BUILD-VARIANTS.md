@@ -42,7 +42,8 @@ python tools/build.py --verify-only --verify no
 `ship` accepts `krait` (default) or `adder`; `laser` accepts `original` (default)
 or `single`. `font` accepts `128` (default), `48`, `128fix` or `128fix_ecm_s`. `scannerpixelfix`,
 `stationrandomlaunchfix`, `stationslotfix`, `fuelfix`, `hyperspacedockingfix`, `aicouragefix`,
-`scannerblipfix` and `stardustfix` accept `no` (default) or `yes`.
+`scannerblipfix`, `stardustfix`, `missiletargetfix` and `textfullstopfix` accept `no` (default) or
+`yes`.
 `verify` accepts `yes`
 (default) or `no`. A build does not change the saved BAT settings or remember
 its command-line overrides. No modification silently weakens verification: select
@@ -616,6 +617,129 @@ final screen has holes in the bottom frame line, the fixed one none, while
 particles at negative zero remain. Build the option with the default tapfile
 for this mode. Reports are in `build/stardust-fix-check/`.
 
+## Missile target fix
+
+```bat
+make.bat missiletargetfix=yes verify=no
+python tools/check_missile_target_fix.py
+python tools/check_missile_target_fix.py --emulator
+```
+
+The equivalent Python option is `--missiletargetfix yes`. The default `no`
+keeps the original bytes and behaviour.
+
+A missile keeps its target in `+$25` as the counter of the target's slot (8
+for slot 0 down to 1 for slot 7). `UpdateMissileGuidance` steers towards that
+slot without checking that it is still occupied. Whenever an object is
+removed (destroyed, scooped, collided or out of range), `ReleaseTargetLocks`
+gets H = `ObjectLoopCounter`, the counter of the removed slot, and IX = the
+removed object. It ends the player's own lock (`MissileState` 2, TARGET LOST)
+correctly. It then scans slots 1..7 to explode every live missile aimed at H,
+but tests the missile flag (`+$26` bit 0) with `BIT 0,(IX+$26)`, on the
+removed object instead of the scanned slot (IY). As a result:
+
+- a missile whose target is removed is not exploded. It keeps steering
+  towards the target's slot: the last coordinates of the removed object, or
+  whatever is created in that slot next;
+- when a missile is removed, every live object whose `+$25` equals the
+  missile's counter explodes. For a ship `+$25` is the AI courage byte.
+
+The fix changes the index prefix of that one instruction at `$EB82` from
+`$DD` to `$FD`, giving `BIT 0,(IY+$26)`. Its boundaries are asserted
+(`MissileTargetCheckStart` and `MissileTargetCheckLimit` in
+`src/options.asm`). Missiles aimed at a removed object now explode, as after
+an ECM, and removing a missile no longer affects other objects. The player's
+lock is handled as before.
+
+`tools/check_missile_target_fix.py` runs `ReleaseTargetLocks` of the
+assembled image and of a baseline with the original byte, using the supplied
+48K ROM in SkoolKit's simulator. For every counter, both kinds of removed
+object and 4,064 cases of random slot contents, each image matches its
+model, the player's lock is released identically, and only the explosion
+flags differ.
+
+`--emulator` loads `release/elite-128k.tap` through the 48K ROM and launches.
+A test-only poke then adds:
+
+- a player missile in slot 7, aimed at a cargo canister in slot 1;
+- an enemy missile in slot 2;
+- a canister in slot 3 whose `+$25` equals the counter of slot 2.
+
+The objects in slots 1 and 2 lie beyond the removal distance, so the first
+object update removes them. The poke also clears the station's ECM bit;
+otherwise the station may fire its ECM at the player's missile and destroy
+every missile. A second run also restores the original byte with a test-only
+poke. In the original the player's missile flies on after its target is
+removed. In the recorded run a police Viper then launched from the station
+into the freed slot 1, and the missile turned towards it. The canister in
+slot 3 explodes when the enemy missile is removed. In the fixed image the
+player's missile explodes and the canister survives. Build the option with
+the default tapfile for this mode. Reports are in
+`build/missile-target-fix-check/`.
+
+## Text full stop fix
+
+```bat
+make.bat textfullstopfix=yes verify=no
+python tools/check_text_full_stop_fix.py
+python tools/check_text_full_stop_fix.py --emulator
+```
+
+The equivalent Python option is `--textfullstopfix yes`. The default `no`
+keeps the original bytes and behaviour.
+
+Justified text (message control 14, used for the planet descriptions on the
+DATA ON screen) is laid out by `BufferJustifiedCharacter` in lines of 30
+characters. A full stop prints the line at once. The original tests for the
+full stop before it counts the character. A full stop that arrives as the
+31st character is therefore stored after the 30 printed characters
+(`WrapOverflowChar`) and lost, while any other character in that position
+is wrapped to the next line with its word. In the game this removes the
+final full stop of 72 of the 2,048 planet descriptions, those whose last
+line is exactly 30 characters wide. SOCELAGE (galaxy 1) ends with "noted for
+Its Exotic Goat Meat".
+
+The fix has two parts (`src/text-full-stop-fix.asm`):
+
+| Area | Original | Fixed |
+|---|---|---|
+| `$BCFC..$BD1A` (31 B, start of `BufferJustifiedCharacter`) | full stop test, then the count | count first; up to the 30th character a full stop prints the line at once, as before; as the 31st it goes to `JustifyWrapFullStop` |
+| `$BDF5..$BDFF` (11 B, zero padding before the square tables) | zeros | `JustifyWrapFullStop` wraps the word with the original code from `JustifyWrapWord` (`$BD1B`) and then prints the next line at once; `JustifyCharacterInLine` returns for other characters |
+
+The last word then moves to a new line with its full stop, and the line
+before it is justified like any other. In mid-text the next sentence starts
+on a new line, as after every full stop. Characters other than a full stop
+are handled as before. The routine returns with the character in A and the
+line-length address in HL instead of the length and the write pointer; all
+descriptions and the random texts below print identically otherwise.
+Assertions protect both parts (`TextFullStopBuffer...` and
+`TextFullStopHook...` in `src/options.asm`), and the square tables keep
+their page-aligned address. The longest fixed description has five lines,
+screen rows 19 to 23 of the DATA ON screen; the original already has two
+descriptions of six lines.
+
+`tools/check_text_full_stop_fix.py` compares the assembled image with a
+baseline whose two parts are restored from the reference tape, using the
+supplied 48K ROM in SkoolKit's simulator. It takes about a minute:
+
+- all 2,048 planet descriptions: both images receive the same characters,
+  every fixed description ends with its full stop, the original loses it in
+  exactly 72, and all others are printed identically. In the 72, the last
+  word moves to a new line with its full stop, and the line before it is
+  justified to 30 characters;
+- a full stop as the 31st character in mid-text prints its word on a line of
+  its own, and the next sentence starts a new line;
+- 600 random texts lose no character in the fixed image and are otherwise
+  printed as by the original.
+
+`--emulator` loads `release/elite-128k.tap` through the 48K ROM, finds
+SOCELAGE with the galactic chart search and opens its DATA ON screen with
+real key presses. A second run restores the original bytes with a test-only
+poke. The original ends the description with "Goat Meat" and no full stop;
+the fixed image prints "Meat." on the next line. Build the option with the
+default tapfile for this mode. Reports are in
+`build/text-full-stop-fix-check/`.
+
 ## What verification means
 
 Always checked, including `verify=no`:
@@ -826,7 +950,7 @@ Every area below is free for three independent reasons:
 | `$A89B..$A8A9` | 15 | Dormant `JP` vectors and a three-byte fragment |
 | `$B31B..$B32A` | 16 | Dormant attribute-fill routine |
 | `$9A3A..$9A45` | 12 | Bytes after `DustPlotList` |
-| `$BDF5..$BDFF` | 11 | Zero padding before the page-aligned square tables |
+| `$BDF5..$BDFF` | 11 | Zero padding before the page-aligned square tables (used by `textfullstopfix=yes`) |
 | `$91C9..$91D1` | 9 | Three unreferenced `JP` instructions |
 | `$7818..$781E` | 7 | Unreferenced cloak-colour test |
 | `$780F..$7812` | 4 | Unreferenced code that falls into the used `L_7813` |
@@ -876,9 +1000,11 @@ completely: `$B31B..$B32A`, `$A89B..$A8A9` and `$9A3A..$9A45`, 43 bytes. Every
 other option leaves the free areas unchanged; `hyperspacedockingfix` changes
 two bytes in place, `aicouragefix` nine within its original 19 and
 `scannerblipfix` 32 within three parts of the scanner routine and
-`stardustfix` 57 within the 69 bytes of the dust pixel routine. With both
-the station slot and fuel fixes 53 bytes remain free in 16 areas, the
-largest 11 bytes (`$BDF5..$BDFF`).
+`stardustfix` 57 within the 69 bytes of the dust pixel routine and
+`missiletargetfix` one byte in place. `textfullstopfix=yes` rewrites 31 bytes
+in place and fills `$BDF5..$BDFF`. With the station slot, fuel and text full
+stop fixes 42 bytes remain free in 15 areas, the largest 9 bytes
+(`$91C9..$91D1`).
 
 ### Rules for using free space
 
@@ -914,7 +1040,7 @@ The inherited broader gameplay scenarios above remain available; they are
 not all required for a font-only data substitution.
 
 The option check (`tools/check_build_options.py`) runs in about 20 seconds
-(76 builds). It checks the following:
+(84 builds). It checks the following:
 
 - The default build reproduces the reference tape.
 - Every non-default value alone builds in both verification modes. The strict
@@ -929,12 +1055,14 @@ The option check (`tools/check_build_options.py`) runs in about 20 seconds
   - the docking fix: its one operand;
   - the AI courage fix: its 19 bytes;
   - the scanner contact fix: its three parts;
-  - the stardust fix: its 69 bytes.
+  - the stardust fix: its 69 bytes;
+  - the missile target fix: its one instruction;
+  - the text full stop fix: its two parts.
 - These areas, together with every byte `ship=adder` changes, are pairwise
   disjoint. That is what makes the options composable.
 - Combinations are built in both modes:
   - a greedy covering array in which every pair of values of two options is
-    built together at least once (260 pairs in 13 combinations), so two includes
+    built together at least once (360 pairs in 14 combinations), so two includes
     that clash on a symbol or an assertion fail there;
   - every option on at once for each ship and non-default font.
 
@@ -945,11 +1073,12 @@ The option check (`tools/check_build_options.py`) runs in about 20 seconds
   are rejected even with identity disabled.
 
 `python tools/check_build_options.py --full` builds the complete product of
-all values instead of the selected combinations: 4,096 combinations, about 40
-minutes. Use it after changing the build machinery itself. Either mode leaves
+all values instead of the selected combinations: 16,384 combinations, several
+hours. Use it after changing the build machinery itself. Either mode leaves
 Adder with `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
 stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
-scannerblipfix=yes stardustfix=yes` built. A new option must be added to `OPTIONS`, and a new
+scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes`
+built. A new option must be added to `OPTIONS`, and a new
 fix's areas to `FIX_PARTS`, in that tool.
 
 The ship check compares all other models with the original bytes, resolves
@@ -999,7 +1128,7 @@ Maintained files for this feature:
 - `build.bat`, `make.bat`, `verify.bat`, `tools/build.py`;
 - `src/options.asm`, `src/adder-startup.asm`, `src/single-laser.asm`,
   `src/station-slot-fix.asm`, `src/fuel-fix.asm`, `src/ai-courage-fix.asm`,
-  `src/scanner-blip-fix.asm`, `src/stardust-fix.asm`;
+  `src/scanner-blip-fix.asm`, `src/stardust-fix.asm`, `src/text-full-stop-fix.asm`;
 - `src/data/font.asm`, `src/data/font-48.asm`, `tools/font_variant.py`;
 - `src/game.asm`, `src/data/ship-blueprints-and-tables.asm`;
 - `src/data/initial-runtime-state.asm`;
@@ -1008,7 +1137,8 @@ Maintained files for this feature:
 - `tools/check_build_options.py`, `tools/check_laser_variant.py`, `tools/check_ship_variant.py`,
   `tools/check_graphics.py`, `tools/check_station_slot_fix.py`, `tools/check_fuel_fix.py`,
   `tools/check_hyperspace_docking_fix.py`, `tools/check_ai_courage_fix.py`,
-  `tools/check_scanner_blip_fix.py`, `tools/check_stardust_fix.py`, `tools/emulator_check.py`;
+  `tools/check_scanner_blip_fix.py`, `tools/check_stardust_fix.py`,
+  `tools/check_missile_target_fix.py`, `tools/check_text_full_stop_fix.py`, `tools/emulator_check.py`;
 - `AGENTS.md`, `README.md`, `docs/SHIPS.md`, `docs/GRAPHICS.md`, this document.
 
 The bootstrap generator preserves these conditional hooks and regenerates

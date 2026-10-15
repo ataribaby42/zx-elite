@@ -549,10 +549,13 @@ PrintCharacter output while L_A894 = 1 (character on the stack): store it
 in the line buffer.  A '.' prints the line at once.  When the 31st
 character arrives, a space ends the line; otherwise the partial word is
 moved to the carry buffer L_7023, the line is padded by inserting spaces at
-earlier gaps (L_D000) and printed.  Quirk: a character other than a space that
-arrives as the 31st character is stored after the 30 printed ones and lost, so a
-line-ending '.' can disappear (text/justified-full-stop-loss).
-Evidence: docked-system-data trace; tools/check_routines.py text checks."""),
+earlier gaps (L_D000) and printed.  Quirk: the '.' test comes before the
+character is counted, so a '.' that arrives as the 31st character is stored
+after the 30 printed ones (L_7022) and lost (text/justified-full-stop-loss);
+other characters in that position are wrapped with their word.
+textfullstopfix=yes wraps the '.' as well (src/text-full-stop-fix.asm).
+Evidence: docked-system-data trace; tools/check_routines.py text checks;
+tools/check_text_full_stop_fix.py."""),
     0xBD5D: ('PrintJustifiedLine', 'verified', """
 Print the 30 buffered characters at L_7004 with PutCharacter, a new line,
 clear L_A892, then StartNextJustifiedLine."""),

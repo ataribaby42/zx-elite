@@ -13811,11 +13811,18 @@ JustifyNextWritePointer:
 ; in the line buffer.  A '.' prints the line at once.  When the 31st
 ; character arrives, a space ends the line; otherwise the partial word is
 ; moved to the carry buffer WrapCarryBuffer, the line is padded by inserting spaces at
-; earlier gaps (InsertSpaceInTextBuffer) and printed.  Quirk: a character other than a space that
-; arrives as the 31st character is stored after the 30 printed ones and lost, so a
-; line-ending '.' can disappear (text/justified-full-stop-loss).
-; Evidence: docked-system-data trace; tools/check_routines.py text checks.
+; earlier gaps (InsertSpaceInTextBuffer) and printed.  Quirk: the '.' test comes before the
+; character is counted, so a '.' that arrives as the 31st character is stored
+; after the 30 printed ones (WrapOverflowChar) and lost (text/justified-full-stop-loss);
+; other characters in that position are wrapped with their word.
+; textfullstopfix=yes wraps the '.' as well (src/text-full-stop-fix.asm).
+; Evidence: docked-system-data trace; tools/check_routines.py text checks;
+; tools/check_text_full_stop_fix.py.
 BufferJustifiedCharacter:
+assert $-GameImage = TextFullStopBufferStart-GameLoadAddress
+IF TEXT_FULL_STOP_FIX
+    TextFullStopBufferCode
+ELSE
     LD HL,(JustifyWritePointer)                ; $BCFC: 2A F6 BC  advance to the next free position
     INC HL                                     ; $BCFF: 23
     LD (JustifyWritePointer),HL                ; $BD00: 22 F6 BC
@@ -13832,6 +13839,8 @@ BufferJustifiedCharacter:
     LD A,$20                                   ; $BD15: 3E 20  the 31st character: a space just ends the line
     CP B                                       ; $BD17: B8
     JP Z,PrintJustifiedLine                    ; $BD18: CA 5D BD
+ENDIF
+assert $-GameImage = TextFullStopBufferLimit-GameLoadAddress
     CALL FindPreviousSpace                     ; $BD1B: CD C6 BD  B = length of the word cut by the line end
     LD A,B                                     ; $BD1E: 78
     LD (JustifyCarryLength),A                  ; $BD1F: 32 F8 BC
@@ -13977,7 +13986,13 @@ ActivatePlayerEcm:
 ; INFERRED: Eleven zero bytes up to the page-aligned SquareLookupTables; no reference.
 ; Probably alignment padding.
 L_BDF5:
+assert $-GameImage = TextFullStopHookStart-GameLoadAddress
+IF TEXT_FULL_STOP_FIX
+    TextFullStopHookCode
+ELSE
     defs 11,0                                                                             ; $BDF5..$BDFF
+ENDIF
+assert $-GameImage = TextFullStopHookLimit-GameLoadAddress
 
 ; KNOWN DATA: VERIFIED DATA: 256 low bytes then 256 high bytes of n*n for n=0..255.
     INCLUDE "data/square-tables.asm"
@@ -19352,8 +19367,10 @@ L_EB5E:
 ; IY preserved; returns DE = InstanceSize, B = 0.
 ; NOTE: the bit 0 test reads the removed object, not the scanned slot.  A missile
 ; locked on a removed ship therefore survives, and a ship whose +$25 AI state happens
-; to equal the counter of a removed missile explodes.
-; Evidence: tools/check_routines.py contact/p9-release-target-locks; runtime: executed
+; to equal the counter of a removed missile explodes.  missiletargetfix=yes tests
+; the scanned slot instead (src/options.asm).
+; Evidence: tools/check_routines.py contact/p9-release-target-locks,
+; tools/check_missile_target_fix.py; runtime: executed
 ; in the flight scenarios (callers L_DB43, L_DCF3, L_EAAC and the collision path).
 ReleaseTargetLocks:
     LD A,(ObjectLoopCounter)                   ; $EB65: 3A 1C DA  H = counter of the removed object
@@ -19370,7 +19387,13 @@ L_EB74:
     LD A,(IY+$25)                              ; $EB7C: FD 7E 25  its +$25 equals the removed counter?
     CP H                                       ; $EB7F: BC
     JR NZ,L_EB8C                               ; $EB80: 20 0A
+assert $-GameImage = MissileTargetCheckStart-GameLoadAddress
+IF MISSILE_TARGET_FIX
+    BIT 0,(IY+InstanceRoleFlags)               ; the scanned slot is a missile
+ELSE
     BIT 0,(IX+$26)                             ; $EB82: DD CB 26 46  tests the removed object, not this slot
+ENDIF
+assert $-GameImage = MissileTargetCheckLimit-GameLoadAddress
     JR Z,L_EB8C                                ; $EB86: 28 04
     SET 4,(IY+$20)                             ; $EB88: FD CB 20 E6  start this object's explosion
 L_EB8C:

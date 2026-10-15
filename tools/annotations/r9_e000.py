@@ -431,8 +431,10 @@ player's missile lock ends: MissileState = 0 and TargetLostMessage bit 7 raised.
 IY preserved; returns DE = InstanceSize, B = 0.
 NOTE: the bit 0 test reads the removed object, not the scanned slot.  A missile
 locked on a removed ship therefore survives, and a ship whose +$25 AI state happens
-to equal the counter of a removed missile explodes.
-Evidence: tools/check_routines.py contact/p9-release-target-locks; runtime: executed
+to equal the counter of a removed missile explodes.  missiletargetfix=yes tests
+the scanned slot instead (src/options.asm).
+Evidence: tools/check_routines.py contact/p9-release-target-locks,
+tools/check_missile_target_fix.py; runtime: executed
 in the flight scenarios (callers L_DB43, L_DCF3, L_EAAC and the collision path)."""),
     0xEBA4: ('ClearAllShipSlots', 'verified', """
 Set SoundEffectRequests bit 2, select the front view (CurrentScreenId = 0), zero the

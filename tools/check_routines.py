@@ -76,7 +76,7 @@ FRESH_REGISTERS = dict(a=0, f=0, bc=0, de=0, hl=0, ix=0, iy=ROM_IY)   # a new Si
 OPTION_SYMBOLS = ('SHIP_ADDER', 'LASER_SINGLE', 'FONT_48', 'FONT_128FIX', 'FONT_128FIX_ECM_S',
                   'SCANNER_PIXEL_FIX', 'STATION_RANDOM_LAUNCH_FIX', 'STATION_SLOT_FIX',
                   'FUEL_FIX', 'HYPERSPACE_DOCKING_FIX', 'AI_COURAGE_FIX',
-                  'SCANNER_BLIP_FIX', 'STARDUST_FIX')
+                  'SCANNER_BLIP_FIX', 'STARDUST_FIX', 'MISSILE_TARGET_FIX', 'TEXT_FULL_STOP_FIX')
 OUTPUT = ROOT / 'build/routine-checks/verification.json'
 
 # Object instance fields (offsets inside a 39-byte slot; tools/annotations, docs/SHIPS.md)
@@ -5357,8 +5357,9 @@ def check_p2_screen_circle_minimum_radius(ctx):
 
 # --- BEGIN INTEGRATION CHECKS ---
 @check('text', 'justified-full-stop-loss', ['PrintCharacter', 'EndJustifiedText'], 'integration',
-       'Original quirk: a character that arrives as the 31st character of a justified line is '
-       'stored after the 30 printed characters and lost; here the final full stop disappears.')
+       'Original quirk: a full stop that arrives as the 31st character of a justified line is '
+       'stored after the 30 printed characters and lost (other characters there are wrapped with '
+       'their word); textfullstopfix=yes wraps it as well.')
 def check_justified_full_stop_loss(ctx):
     """Stubs as in text/justified-word-wrap: PutCharacter and NewLine only record output."""
     m = ctx.machine()

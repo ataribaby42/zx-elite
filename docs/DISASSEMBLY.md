@@ -17,8 +17,8 @@ lasting improvements belong in the annotation database, not in the
 generated files. The hand-maintained optional modules (`src/options.asm`,
 `src/scanner-pixel-fix.asm`, `src/station-random-launch-fix.asm`,
 `src/station-slot-fix.asm`, `src/fuel-fix.asm`, `src/ai-courage-fix.asm`,
-`src/scanner-blip-fix.asm`, `src/stardust-fix.asm`, `src/single-laser.asm`,
-`src/adder-startup.asm`) are never generated.
+`src/scanner-blip-fix.asm`, `src/stardust-fix.asm`, `src/text-full-stop-fix.asm`,
+`src/single-laser.asm`, `src/adder-startup.asm`) are never generated.
 
 ## Reading the source
 

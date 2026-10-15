@@ -126,6 +126,33 @@ IF STARDUST_FIX
     INCLUDE "stardust-fix.asm"
 ENDIF
 
+IFNDEF MISSILE_TARGET_FIX
+    defc MISSILE_TARGET_FIX = 0
+ENDIF
+assert MISSILE_TARGET_FIX = 0 || MISSILE_TARGET_FIX = 1
+
+; Original fixed boundaries of the missile test in ReleaseTargetLocks that
+; missiletargetfix=yes replaces: BIT 0,(IX+$26), which tests the removed object,
+; becomes BIT 0,(IY+$26), which tests the slot being scanned.
+defc MissileTargetCheckStart = $EB82
+defc MissileTargetCheckLimit = $EB86
+
+IFNDEF TEXT_FULL_STOP_FIX
+    defc TEXT_FULL_STOP_FIX = 0
+ENDIF
+assert TEXT_FULL_STOP_FIX = 0 || TEXT_FULL_STOP_FIX = 1
+
+; Original fixed boundaries of the two parts that textfullstopfix=yes replaces
+; (src/text-full-stop-fix.asm): the start of BufferJustifiedCharacter, and the zero
+; padding before the page-aligned square tables.
+defc TextFullStopBufferStart = $BCFC
+defc TextFullStopBufferLimit = $BD1B
+defc TextFullStopHookStart = $BDF5
+defc TextFullStopHookLimit = $BE00
+IF TEXT_FULL_STOP_FIX
+    INCLUDE "text-full-stop-fix.asm"
+ENDIF
+
 ; Original fixed boundaries of the shared parent-ship launch selector.
 defc ParentLaunchSelectionStart = $F44A
 defc ParentLaunchSelectionLimit = $F470

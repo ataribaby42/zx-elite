@@ -317,6 +317,9 @@ OPTIONAL_REGIONS = [
     (0x8D0B, 0x8D0D, 'SCANNER_BLIP_FIX'),
     (0x8DCC, 0x8DDE, 'SCANNER_BLIP_FIX'),
     (0xA2EF, 0xA334, 'STARDUST_FIX'),
+    (0xEB82, 0xEB86, 'MISSILE_TARGET_FIX'),
+    (0xBCFC, 0xBD1B, 'TEXT_FULL_STOP_FIX'),
+    (0xBDF5, 0xBE00, 'TEXT_FULL_STOP_FIX'),
 ]
 # Options made of several parts: region start -> (macro or instruction, comment, limit
 # constant in src/options.asm; the start constant has Start in place of Limit).
@@ -340,6 +343,9 @@ OPTION_PARTS = {
     0x8D0B: ('ScannerBlipCentreCode', None, 'ScannerBlipCentreLimit'),
     0x8DCC: ('ScannerBlipGuardCode', None, 'ScannerBlipGuardLimit'),
     0xA2EF: ('StardustPixelCode', None, 'StardustPixelLimit'),
+    0xEB82: ('BIT 0,(IY+InstanceRoleFlags)', 'the scanned slot is a missile', 'MissileTargetCheckLimit'),
+    0xBCFC: ('TextFullStopBufferCode', None, 'TextFullStopBufferLimit'),
+    0xBDF5: ('TextFullStopHookCode', None, 'TextFullStopHookLimit'),
 }
 OPTION_PART_REGIONS = {start: (end, option) for start, end, option in OPTIONAL_REGIONS
                        if start in OPTION_PARTS}
@@ -846,6 +852,10 @@ def image(data):
         context.pop()
 
     while pc < end:
+        # Close an optional part first: one may end where a data include begins.
+        if pc in OPTION_PART_ENDS:
+            emit_endif()
+            lines += [f'assert $-GameImage = {OPTION_PART_ENDS[pc]}-GameLoadAddress']
         region=next((r for r in known_data if r['start']==pc),None)
         if region:
             lines += ['', '; KNOWN DATA: '+region['comment']]
@@ -870,9 +880,6 @@ def image(data):
             lines += ['assert $-GameImage = CockpitIndicatorsLimit-$6048']
         if pc == 0xF470:
             emit_endif()
-        if pc in OPTION_PART_ENDS:
-            emit_endif()
-            lines += [f'assert $-GameImage = {OPTION_PART_ENDS[pc]}-GameLoadAddress']
         emit_header(pc)
         if pc == 0x716B:
             emit_if('SHIP_ADDER')

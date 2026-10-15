@@ -1,6 +1,6 @@
 """Exercise the build options; leave Adder/single/48K with every fix built.
 
-Default mode (76 builds, about 20 seconds):
+Default mode (84 builds, about 25 seconds):
 
 1. The default build must reproduce the reference tape.
 2. Every non-default value alone, in both verification modes: the strict build
@@ -19,7 +19,7 @@ Default mode (76 builds, about 20 seconds):
    must fail even with identity checks off.
 
 --full builds the complete product of all values instead of step 4's
-selection (4,096 combinations, about 40 minutes).  Use it after changing the
+selection (16,384 combinations, several hours).  Use it after changing the
 build machinery itself.
 """
 import argparse
@@ -44,10 +44,13 @@ OPTIONS = (
     ('aicouragefix', ('no', 'yes')),
     ('scannerblipfix', ('no', 'yes')),
     ('stardustfix', ('no', 'yes')),
+    ('missiletargetfix', ('no', 'yes')),
+    ('textfullstopfix', ('no', 'yes')),
 )
 NAMES = tuple(name for name, _ in OPTIONS)
 DEFAULT = tuple(values[0] for _, values in OPTIONS)
-ALL_FIXES = tuple('yes' for _, values in OPTIONS if values == ('no', 'yes'))
+FIX_NAMES = tuple(name for name, values in OPTIONS if values == ('no', 'yes'))
+ALL_FIXES = ('yes',) * len(FIX_NAMES)
 FINAL = ('adder', 'single', '48') + ALL_FIXES
 # Areas a fix replaces: Start/Limit constant prefixes in src/options.asm, with the
 # original addresses they must keep.
@@ -62,6 +65,8 @@ FIX_PARTS = {
     'scannerblipfix': (('ScannerBlipStep', 'ScannerBlipCentre', 'ScannerBlipGuard'),
                        [(0x8CE0, 0x8CF3), (0x8D0B, 0x8D0D), (0x8DCC, 0x8DDE)]),
     'stardustfix': (('StardustPixel',), [(0xA2EF, 0xA334)]),
+    'missiletargetfix': (('MissileTargetCheck',), [(0xEB82, 0xEB86)]),
+    'textfullstopfix': (('TextFullStopBuffer', 'TextFullStopHook'), [(0xBCFC, 0xBD1B), (0xBDF5, 0xBE00)]),
 }
 LASER_PATCH = bytes.fromhex('21 3f 00 79 f6 03 4f c3')  # + DrawLine, the owner's final ten-byte patch
 
@@ -119,8 +124,14 @@ def main():
         return result
 
     def label(row):
-        return '-'.join(f'{name}{value}' for name, value, default in zip(NAMES, row, DEFAULT) if value != default) \
-            or 'defaults'
+        """Short log name (Windows paths): changed non-fix values, then one digit per fix."""
+        values = dict(zip(NAMES, row))
+        parts = [f'{name}{value}' for name, value, default in zip(NAMES, row, DEFAULT)
+                 if value != default and name not in FIX_NAMES]
+        fixes = ''.join('1' if values[name] == 'yes' else '0' for name in FIX_NAMES)
+        if '1' in fixes:
+            parts.append('fixes' + fixes)
+        return '-'.join(parts) or 'defaults'
 
     def build_both(row):
         """Strict build (must fail unless row is the default), then the relaxed build."""
