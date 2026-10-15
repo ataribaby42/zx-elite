@@ -274,7 +274,8 @@ For ship variants run `tools/check_build_options.py`,
 `tools/check_ship_variant.py` and `tools/check_graphics.py`, then gameplay
 scenarios with `tools/run_runtime_scenarios.py`, always in 48K mode. The build
 option check deliberately leaves an Adder TAP with
-`laser=single font=48 scannerpixelfix=yes` for testing.
+`laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
+stationslotfix=yes` for testing.
 Rebuild the default Krait version before collecting reference reconstruction/runtime-code seeds.
 The Adder test compares 128 actual rendered frames with the original side-B
 model, in addition to checking all 19 object loaders and other ship geometry.
@@ -352,7 +353,7 @@ for codes `$20..$7A`, with the same symbols, source address and runtime copy.
 Do not copy 768 bytes into the active font: the extra 40 bytes would overlap
 the game image. Preserve the conditional include in source regeneration.
 The optional font requires explicit `verify=no`; no other PATCH128 changes
-are imported. Run the 64-case build matrix, graphics tests and 48K emulator
+are imported. Run the 128-combination build matrix, graphics tests and 48K emulator
 startup/screen checks after changing this option. Normal builds use ASM data
 only and never depend on the patch tape. The owner has requested permanent
 previews of both fonts in `docs/images/`; preserve the two named atlases above.
@@ -383,7 +384,30 @@ Police Viper, Thargon and special-mode Thargoid launches must remain intact.
 Run `tools/check_station_random_launch_fix.py` for both ship choices; include
 the preceding launch gates, all 65,536 seed states, and actual allocation
 with free/full slots. Preserve the include and assertions in regeneration.
-Use the 64-case option matrix and 48K ROM-load/launch regression as well.
+Use the 128-combination option matrix and 48K ROM-load/launch regression as well.
+
+`stationslotfix=no` preserves the original station orientation, including
+the two documented defects in `docs/FINDINGS.md`: a dormant station's axes do
+not follow the player's turns, and the arrival code reverses the slot for a
+negative planet x. The optional `yes` macros in `src/station-slot-fix.asm`
+replace only the switch-on flag store at `$77CB..$77CD` (now
+`CALL StationSlotAlign`) and three free areas: `$E88B..$E8CE`,
+`$AC56..$AC76` and `$FCED..$FCFF`. With the option on, those areas are no
+longer free; another option must not reuse them. Keep each part padded to its
+original length, both boundaries asserted with the limits in
+`src/options.asm`, no extra RAM, and IX/IY as the original leaves them.
+Point the docking slot (local Z axis) at the planet centre only when
+`UpdateStationDormancy` switches the station on, using the actual
+planet-minus-station geometry. Do not rotate a dormant station's axes every frame instead:
+the truncated pitch/2 in `RotateVectorRollPitch` leaves slow pitch
+unrotated. Leave the arrival code, `MoveObject` and active-station updates
+unchanged; every path that does not switch the station on must match the
+original. The macros use labels only; keep `HalveCoordinateDifference` and the
+other names they call. Preserve the four conditional blocks
+(`STATION_SLOT_PARTS` in `tools/bootstrap_sources.py`) in source regeneration.
+Run `tools/check_station_slot_fix.py --emulator` for both ship choices, each
+built with the default tapfile, `python tools/check_routines.py --only station`
+on the default build, and the 128-combination option matrix.
 
 - Source boundaries, offsets and lengths must be calculated by scripts or
   labels. No tool may silently truncate or pad a block.

@@ -1066,7 +1066,8 @@ Output pointer of GenerateSystemName."""),
 Dormant code: CurrentGalaxy = (CurrentGalaxy + 1) AND 7, then rotate each byte of the
 three GalaxySeeds words left (L_AC6D per word): the same galaxy step as
 GalacticHyperspaceJump, without its other effects.  No word in the image points here
-and it never runs in the recorded scenarios.  INFERRED: a superseded copy."""),
+and it never runs in the recorded scenarios.  INFERRED: a superseded copy.
+stationslotfix=yes replaces these 33 bytes (with L_AC6D) with StationSlotRoof."""),
     # ------------------------------------------------------------------ search/select
     0xAC77: ('FindSystemByName', 'verified', """
 Search the galaxy for the system named in NameInputBuffer.  Found: select it

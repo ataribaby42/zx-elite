@@ -346,6 +346,23 @@ and comments it added (see `docs/COMPARISON-SKOOLKIT.md`).
 | `justified-full-stop-loss` | `PrintCharacter`, `EndJustifiedText` | 1 | Original quirk: a character that arrives as the 31st character of a justified line is stored after the 30 printed characters and lost; here the final full stop disappears. |
 | `description-full-stop-loss` | `DeriveSelectedSystemData`, `GenerateSystemName`, `L_BA49` | 1 | The same quirk in real game text: the "DATA ON" description of SOCELAGE (galaxy 1, system 45) is generated with a final full stop, but its second line is exactly 30 characters wide, so the full stop never reaches the screen. A scan of all 2,048 descriptions found 72 such cases, always the final full stop. |
 
+## Checks added in the station-slot investigation
+
+These checks back the station-orientation findings in
+[findings](FINDINGS.md#found-in-the-station-slot-investigation). They run on
+the default build like every other group. The optional repair has its own
+tool, `tools/check_station_slot_fix.py` (see
+[build variants](BUILD-VARIANTS.md#station-slot-fix)).
+
+### `station`: Station orientation (3,358 cases)
+
+| Check | Routines | Cases | Claim supported |
+|---|---|---:|---|
+| `arrival-slot-direction` | `ArriveInTargetSystem` | 2,048 | For all 2,048 systems the station is placed $18000 from the planet, along z in galaxies 1, 3, 5 and 8 and along x in galaxies 2, 4, 6 and 7. Every z placement points the nose (docking slot) at the planet. For x, the raw compare of sign-magnitude bytes reverses the nose for a negative planet x: 464 systems (96, 128, 112 and 128 in galaxies 2, 4, 6 and 7), each exactly 180 degrees away. Entered after `RandomiseMarket`, at the instruction found by its bytes `LD B,$12` / `XOR A` / `LD HL,SunPosition`. |
+| `dormant-orientation-frozen` | `UpdateStationDormancy`, `MoveObject` | 2 | After arriving at DISO (galaxy 1, slot facing the planet) the station is dormant. 20 updates of `MoveSunAndPlanet` and `UpdateStationDormancy` at pitch 8 turn the station and planet positions, but the station axes stay byte for byte the same, so the slot error grows from 0 to 38 degrees. Once moved next to the player, the station is switched on and its axes turn. |
+| `orientation-pitch-quantisation` | `RotateVectorRollPitch`, `ApplyPlayerMotion` | 8 | Axes get the shear steps of `ApplyPlayerMotion` at the same scale, but with pitch/2 truncated. Over 32 updates, pitch 1 turns a position by 7.2 degrees and a unit axis not at all. Pitch 3 turns the axis by 14.5 degrees like pitch 2, while the position turns by 21.4. Roll 1 turns both alike, by 14.5 and 14.1 degrees. |
+| `roll-drift-keeps-slot` | `ApplyPlayerMotion`, `RotateVectorRollPitch`, `MoveObject`, `OrthogonaliseYVector`, `RenormaliseOrientationVector` | 1,300 | The roll-reversal drift does not turn an active station away from the planet. Start from the launch layout: planet $18000 ahead, station just behind with unit axes and active. Then 20 updates at pitch 8 and the 1,280 alternating-roll updates of `maths/roll-reversal-drift` move the planet 2.29 times further from the view axis. The slot error only changes from 3.5 to 8.6 degrees. Each update runs `MoveSunAndPlanet`, `UpdateStationDormancy` and the slot-0 part of `UpdateObjects` from `L_DB8B` to `L_DBA3`. |
+
 ## Differences from the former ad-hoc tests
 
 - Random sample sizes are smaller where the former scripts used tens or

@@ -68,10 +68,12 @@ python tools/run_runtime_scenarios.py docked-baseline docked-equipment inflight-
 ```
 
 `check_variant_relocation.py` assembles the actual optional ASM includes into
-four disposable fixtures with two different origins/layouts and both fonts.
+eight disposable fixtures with two different origins/layouts and all four fonts.
 It executes the startup copies, observes the laser's relocated target and
 parameters, verifies Adder geometry offsets and compares all scanner pixels
-in 32 cases. Startup/line-renderer external calls are test stubs here; the
+in 64 cases. The fixed screen constants come from a probe assembly of
+`src/options.asm`, so the check runs after a build with any options.
+Startup/line-renderer external calls are test stubs here; the
 full routines and real rendering are covered by the separate game tests.
 The fixture test does not weaken normal game bounds or alter the release.
 

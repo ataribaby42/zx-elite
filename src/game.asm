@@ -500,7 +500,7 @@ MakeSunRelativeToStation:
 
 ; VERIFIED: One axis of MakeSunRelativeToStation: difference, double, keep the sign.
 L_7116:
-    CALL L_712C                                ; $7116: CD 2C 71
+    CALL HalveCoordinateDifference             ; $7116: CD 2C 71
     ADD HL,HL                                  ; $7119: 29  restore the halved difference
     JR NC,L_711E                               ; $711A: 30 02  carry = sign of the halved value
     SET 7,H                                    ; $711C: CB FC  negative: set the sign again
@@ -512,9 +512,12 @@ L_711E:
     ADD IX,DE                                  ; $7129: DD 19
     RET                                        ; $712B: C9
 
-; VERIFIED: HL = word at IY+1 (sun), DE = word at IX+1 (station); continue in HalveDifferenceSignMagnitude,
-; which returns (HL - DE)/2 in sign-magnitude form.
-L_712C:
+; VERIFIED: HL = word at IY+1, DE = word at IX+1: the middle and high bytes of two 24-bit
+; sign-magnitude coordinates, i.e. coordinate/256 with the sign in bit 15.  Continue in
+; HalveDifferenceSignMagnitude, which returns (HL - DE)/2 in sign-magnitude form.  MakeSunRelativeToStation
+; uses it for sun minus station (IY = sun, IX = station).
+; Evidence: tools/check_routines.py maths/sun-relative-to-station.
+HalveCoordinateDifference:
     LD H,(IY+$02)                              ; $712C: FD 66 02
     LD L,(IY+$01)                              ; $712F: FD 6E 01
     LD D,(IX+$02)                              ; $7132: DD 56 02
@@ -1730,6 +1733,14 @@ MoveSunAndPlanet:
 ; when every coordinate word is below 256; HandleTorusJumpKey only jumps while the
 ; flag is set.
 ; Called by the in-flight main loop outside witchspace.
+; NOTE: a dormant station is far away, so MoveObject removes it again before its
+; orientation step.  Its position follows the player's roll and pitch, but its axes
+; do not: the docking slot (the Z axis) stays fixed in the player's frame from the
+; hyperspace arrival until the station is switched on, and every turn made in that
+; time turns the slot away from the planet by the same amount.
+; Evidence: tools/check_routines.py station/dormant-orientation-frozen.
+; stationslotfix=yes replaces the flag store at the switch-on with a call that first
+; points the slot at the planet centre (see docs/BUILD-VARIANTS.md).
 UpdateStationDormancy:
     LD A,(StationDormantFlag)                  ; $779D: 3A 78 70
     AND A                                      ; $77A0: A7
@@ -1754,7 +1765,13 @@ L_77B0:
     BIT 7,(IX+$26)                             ; $77C5: DD CB 26 7E  byte +$26 bit 7
     RET NZ                                     ; $77C9: C0
     XOR A                                      ; $77CA: AF
+assert $-GameImage = StationSwitchOnStoreStart-GameLoadAddress
+IF STATION_SLOT_FIX
+    CALL StationSlotAlign                      ; switch-on: point the slot at the planet first
+ELSE
     LD (StationDormantFlag),A                  ; $77CB: 32 78 70  station active again
+ENDIF
+assert $-GameImage = StationSwitchOnStoreLimit-GameLoadAddress
     LD A,$F0                                   ; $77CE: 3E F0  station energy $F0
     LD (IX+$22),A                              ; $77D0: DD 77 22
     RET                                        ; $77D3: C9
@@ -10480,7 +10497,12 @@ NameWritePointer:
 ; three GalaxySeeds words left (L_AC6D per word): the same galaxy step as
 ; GalacticHyperspaceJump, without its other effects.  No word in the image points here
 ; and it never runs in the recorded scenarios.  INFERRED: a superseded copy.
+; stationslotfix=yes replaces these 33 bytes (with L_AC6D) with StationSlotRoof.
 L_AC56:
+assert $-GameImage = StationSlotRoofStart-GameLoadAddress
+IF STATION_SLOT_FIX
+    StationSlotRoofCode
+ELSE
     LD HL,CurrentGalaxy                        ; $AC56: 21 27 A8
     LD A,(HL)                                  ; $AC59: 7E
     INC A                                      ; $AC5A: 3C
@@ -10503,6 +10525,8 @@ L_AC6D:
     RLC D                                      ; $AC73: CB 02
     LD (HL),D                                  ; $AC75: 72
     RET                                        ; $AC76: C9
+ENDIF
+assert $-GameImage = StationSlotRoofLimit-GameLoadAddress
 
 ; VERIFIED: Search the galaxy for the system named in NameInputBuffer.  Found: select it
 ; (seeds, data, cursor redrawn, SelectedSystemName, distance) and return carry
@@ -15484,8 +15508,13 @@ EnterHyperspaceMisjump:
 ; (crossing zero for a high magnitude of 1).  Its orientation becomes Y = (0, 1, 0), the
 ; Z (nose) axis along the offset axis and X along the other horizontal axis; the nose
 ; points to + when the station's high byte is below the planet's (raw byte compare, sign
-; bit included), else to -, which for positive coordinates (always for z) is towards the
-; planet.  Then L_D7B4.
+; bit included), else to -.  For positive coordinates (always for z) that is towards the
+; planet.  For a negative planet x the raw compare is reversed, and so is the
+; nose: the docking slot then faces directly away from the planet.
+; Over all 2048 systems the offset is along z in galaxies 1, 3, 5 and 8 (all slots face
+; the planet) and along x in galaxies 2, 4, 6 and 7, where 464 systems get the reversed
+; slot.  Then L_D7B4.
+; Evidence: tools/check_routines.py station/arrival-slot-direction.
 ArriveInTargetSystem:
     XOR A                                      ; $D6B3: AF
     LD (WitchspaceFlag),A                      ; $D6B4: 32 61 70  leave the mis-jump state
@@ -15599,7 +15628,7 @@ L_D76E:
     LD (DE),A                                  ; $D787: 12
     LD HL,PlanetXHigh                          ; $D788: 21 70 70
     LD A,(InitialRuntimeState+InstanceX+2)     ; $D78B: 3A 4A 60
-    CP (HL)                                    ; $D78E: BE  x high bytes compared raw (sign included)
+    CP (HL)                                    ; $D78E: BE  x high bytes compared raw (sign included): wrong for negative x
     LD A,$FF                                   ; $D78F: 3E FF
     JR C,L_D796                                ; $D791: 38 03  station below: X axis z = -1
     LD (DE),A                                  ; $D793: 12  otherwise Z axis x = -1
@@ -16724,6 +16753,10 @@ PitchRotationAngle:
 ; position along the vector at +9 (L_DD92).
 ; On removal ReleaseTargetLocks releases the references to the slot given by ObjectLoopCounter, so
 ; callers outside the slot loop (L_77B0) depend on its current value.
+; A removed object skips the orientation step.  For the dormant station, which
+; UpdateStationDormancy moves while it is far away, the position therefore follows the
+; player's motion but the axes do not.
+; Evidence: tools/check_routines.py station/dormant-orientation-frozen.
 MoveObject:
     CALL ApplyPlayerMotion                     ; $DCE0: CD D1 DE  HL = z sign/high and mid bytes afterwards
     BIT 2,(IX+$26)                             ; $DCE3: DD CB 26 56  the station has no z distance limit
@@ -16916,6 +16949,10 @@ L_DE01:
 ; High bytes at IX+1/+3/+5 (x, y, z): z += y*(-pitch/2)/128, x += y*(-roll)/128,
 ; y += x*roll/128, y += z*(pitch/2)/128 (AddScaledSignMagnitude, updated values used at
 ; once); IX += 6, DE = 6.
+; NOTE: these are the shear steps of ApplyPlayerMotion at the same scale, but pitch/2 is
+; truncated.  At pitch 1 positions turn and the axes do not; an odd pitch turns the
+; axes like the next lower even one.
+; Evidence: tools/check_routines.py station/orientation-pitch-quantisation.
 RotateVectorRollPitch:
     LD A,(PitchRotationAngle)                  ; $DE0B: 3A DF DC
     XOR $80                                    ; $DE0E: EE 80
@@ -18647,7 +18684,12 @@ L_E885:
 ; (the low word accumulates in IX, which is restored).  Inherits the quarter-square
 ; error, so HL can be lower than the exact high word.
 ; Evidence: tools/check_routines.py (maths group) matches the partial-product model exactly.
+; stationslotfix=yes replaces these 68 bytes with StationSlotAlign.
 UnusedMultiplyWordHigh:
+assert $-GameImage = StationSlotAlignStart-GameLoadAddress
+IF STATION_SLOT_FIX
+    StationSlotAlignCode
+ELSE
     PUSH IX                                    ; $E88B: DD E5
     LD IX,$0000                                ; $E88D: DD 21 00 00  IX accumulates the low word
     LD B,A                                     ; $E891: 47
@@ -18697,6 +18739,8 @@ L_E8C2:
     ADD HL,DE                                  ; $E8CB: 19
     POP IX                                     ; $E8CC: DD E1
     RET                                        ; $E8CE: C9
+ENDIF
+assert $-GameImage = StationSlotAlignLimit-GameLoadAddress
 
 ; ============================================================================
 ; Arithmetic helpers
@@ -18734,7 +18778,7 @@ L_E8E8:
 ; VERIFIED: HL = (HL - DE) / 2 for 16-bit sign-magnitude values (bit 15 sign): negates DE's sign
 ; and continues in HalveSumSignMagnitude.
 ; Callers form half the per-axis difference of two positions
-; (L_712C: sun minus station; L_F9B2: missile target minus missile); bit 15 of the
+; (HalveCoordinateDifference: sun minus station; L_F9B2: missile target minus missile); bit 15 of the
 ; result is set when the first position is the smaller one.
 HalveDifferenceSignMagnitude:
     LD A,D                                     ; $E8F0: 7A
@@ -22565,8 +22609,15 @@ L_FCD4:
 ; Research note: proposed pirate patch storage before interrupt-vector region. Preserved, not used.
 ; INFERRED: 19 zero bytes before the vector table; no static or runtime reader or writer.
 ; The research note proposes them as patch storage; they are kept as zeros.
+; stationslotfix=yes uses them for StationSlotFinish.
 UnusedAfterReturnCandidate:
+assert $-GameImage = StationSlotFinishStart-GameLoadAddress
+IF STATION_SLOT_FIX
+    StationSlotFinishCode
+ELSE
     defs 19,0                                                                             ; $FCED..$FCFF
+ENDIF
+assert $-GameImage = StationSlotFinishLimit-GameLoadAddress
 
 ; VERIFIED: IM 2 vector table: 257 bytes of $FE at a page boundary, so that both bytes
 ; of the vector word read at I*256+bus value are $FE.
@@ -23135,6 +23186,7 @@ defc L_70CF = CheckDockingComputerKey
 defc L_70FB = DockWithStation
 defc L_7102 = StartDockingSequence
 defc L_7108 = MakeSunRelativeToStation
+defc L_712C = HalveCoordinateDifference
 defc L_713B = HandleChartCursorKeys
 defc L_7169 = UnusedEnableInterrupts
 defc L_716B = Startup

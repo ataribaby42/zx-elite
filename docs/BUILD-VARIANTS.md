@@ -15,7 +15,7 @@ make.bat ship=krait laser=original font=128 verify=yes
 option settings. Preserve the owner's simplified BAT files and their selected
 options, including REM examples. Run the BAT files from the project directory;
 run `make.bat` directly for command-line options. The Python helper's defaults
-remain Krait, original laser, 128K-compatible font, both fixes disabled and
+remain Krait, original laser, 128K-compatible font, all fixes disabled and
 strict verification.
 
 Build the byte-identical Krait reconstruction independently of `build.bat` settings:
@@ -40,8 +40,8 @@ python tools/build.py --verify-only --verify no
 ```
 
 `ship` accepts `krait` (default) or `adder`; `laser` accepts `original` (default)
-or `single`. `font` accepts `128` (default), `48`, `128fix` or `128fix_ecm_s`. `scannerpixelfix` and
-`stationrandomlaunchfix` accept `no` (default) or `yes`. `verify` accepts `yes`
+or `single`. `font` accepts `128` (default), `48`, `128fix` or `128fix_ecm_s`. `scannerpixelfix`,
+`stationrandomlaunchfix` and `stationslotfix` accept `no` (default) or `yes`. `verify` accepts `yes`
 (default) or `no`. A build does not change the saved BAT settings or remember
 its command-line overrides. No modification silently weakens verification: select
 `verify=no` explicitly. Modified builds with `verify=yes` correctly fail the
@@ -147,6 +147,102 @@ including RNG call counts and final seed values. An additional 240 paired
 full-allocation cases cover actual blueprints, inherited hostility, parent
 restoration and full-slot failure; non-trader resulting game state matches
 the baseline. Reports are in `build/station-random-launch-check/`.
+
+## Station slot fix
+
+```bat
+make.bat stationslotfix=yes verify=no
+python tools/check_station_slot_fix.py
+python tools/check_station_slot_fix.py --emulator
+```
+
+The equivalent Python option is `--stationslotfix yes`. The default `no`
+keeps the original bytes and behaviour.
+
+In the original game the docking slot of the Coriolis station often does not
+face the planet when the station appears after a hyperspace jump. There are
+two causes; see [findings](FINDINGS.md#found-in-the-station-slot-investigation).
+While the station is dormant and far away, `MoveObject` turns its position
+with the player's roll and pitch but not its axes. In galaxies 2, 4, 6 and 7
+the arrival code also reverses the slot for a negative planet x (464
+systems). The roll-reversal drift is not a cause.
+
+The fix acts when `UpdateStationDormancy` switches the station on: every
+coordinate below $10000, flag cleared, energy $F0. A dormant station has no
+energy, so it is neither drawn nor shown on the scanner, and its stale
+orientation is never visible. At the switch-on `StationSlotAlign` does the
+following:
+
+1. It forms planet minus station per axis with the existing
+   `HalveCoordinateDifference`, in units of 512.
+2. It doubles the three words until one reaches $2000, then scales the
+   vector to unit length with `NormaliseVector`. The result is the new nose,
+   which is the slot axis.
+3. It sets the roof to the unit axis least aligned with the nose (y, else x,
+   else z), makes it perpendicular with `OrthogonaliseYVector` and rebuilds
+   the side axis with `BuildRotationMatrix`.
+4. It clears `StationDormantFlag`, the instruction that the call replaces.
+
+From then on the station is updated exactly as in the original, including its
+own roll about the nose and the per-frame orthogonalisation and
+renormalisation. Nothing changes while the station stays active, for example
+after a launch, when the original already points the slot at the planet.
+
+The only in-place change is the three-byte flag store at `$77CB`, which
+becomes `CALL StationSlotAlign`. The 114 bytes of new code occupy three areas
+listed as [persistently free](#persistently-free-bytes-in-the-image):
+
+| Area | Original contents | New contents |
+|---|---|---|
+| `$E88B..$E8CE` (68 B) | `UnusedMultiplyWordHigh` | `StationSlotAlign`, 66 B |
+| `$AC56..$AC76` (33 B) | Dormant galaxy-step copy (`L_AC56`, `L_AC6D`) | `StationSlotRoof`, 31 B |
+| `$FCED..$FCFF` (19 B) | Zeros before the IM 2 vector table | `StationSlotFinish`, 17 B |
+
+`src/station-slot-fix.asm` defines the three parts as macros, and
+`src/game.asm` expands each one in place of the original bytes. Each part is
+padded to its original length. Assembler assertions protect both boundaries
+of all four areas, using the original limits in `src/options.asm`. No other
+byte changes, 118 bytes in total, and no RAM is added. `StationSlotAlign`
+preserves IY, as the original routine does, and returns with IX unchanged.
+The source generator re-creates the four conditional blocks.
+
+The planet direction is resolved in units of 512 and the axes in steps of
+1/127. In the check, the slot error at the switch-on is at most 0.79 degrees
+for station-to-planet distances from $10000; the arrival places the station
+$18000 from the planet. The shortest tested distance, $6000, gives at most
+1.90 degrees.
+
+The fix leaves the arrival code and the pitch rounding of
+`RotateVectorRollPitch` unchanged. After the station has appeared, slow
+pitching can still turn the slot a few degrees off the planet, as it does for
+every object in the original.
+
+`tools/check_station_slot_fix.py` runs the assembled image with the supplied
+48K ROM in SkoolKit's simulator. It compares it with a baseline whose four
+areas are restored from the reference tape, and checks the following:
+
+- only the four areas differ;
+- 600 far, blocked (`+$26` bit 7) and already active cases leave RAM, IX and
+  IY exactly as the original does;
+- 3,036 switch-on geometries: 36 axis and near-axis cases and 3,000 random
+  ones, at distances from $6000 to $60000, with random previous frames. Each
+  case checks the slot error, unit lengths, a perpendicular roof and side
+  axis, a right-handed frame and the preserved IY. Eight further active
+  frames keep the slot within 1.64 degrees and the roof perpendicular;
+- all 2,048 hyperspace arrivals, each followed by 12 turned dormant updates
+  and a move next to the station. The slot error is at most 0.90 degrees. In
+  a sample of 512 the original keeps every reversed slot and is more than
+  10 degrees off in 186.
+
+`--emulator` loads `release/elite-128k.tap` through the 48K ROM with
+`tools/emulator_check.py`. It runs Lave to Diso with one second of pitch, and
+the galactic jump to Inoran followed by a jump to LEMAED. A test-only poke then
+moves sun, planet and station together next to the player, so that the real
+main loop switches the station on. In the default Krait build the slot error
+changed from 59.5 to 0.52 degrees at Diso, and from 180.0 to 0.02 degrees at
+LEMAED. The combined Adder, single-laser, `font=48` build with all three fixes
+gave 64.3 to 0.84 and 180.0 to 0.00 degrees. Build the option with the default
+tapfile for this mode. Reports are in `build/station-slot-fix-check/`.
 
 ## What verification means
 
@@ -401,8 +497,11 @@ table.
 choice reuse only their own original regions and need no extra memory. With
 `ship=adder` the blueprint table and the old start-up code are compacted. The
 ship and table region before `$7000` then has no spare capacity, and the
-one-time start-up runs in the start-up-only area above. The free areas listed
-above are unchanged by every option.
+one-time start-up runs in the start-up-only area above. `stationslotfix=yes`
+uses three of the free areas listed above: `$E88B..$E8CE`, `$AC56..$AC76` and
+`$FCED..$FCFF`, 114 of their 120 bytes. Every other option leaves the free
+areas unchanged. Without `stationslotfix` the remaining free capacity is 216
+bytes; with it, 96 bytes are left in the other 19 areas, the largest 16 bytes.
 
 ### Rules for using free space
 
@@ -438,15 +537,16 @@ The inherited broader gameplay scenarios above remain available; they are
 not all required for a font-only data substitution.
 
 The option check builds all 128 `ship`/`laser`/`font`/`scannerpixelfix`/
-`stationrandomlaunchfix` combinations in both verification modes, expects
+`stationrandomlaunchfix`/`stationslotfix` combinations in both verification modes, expects
 strict verification of any modification to fail, checks stale-output
 removal and rejects damaged checksums, invalid metadata with a valid XOR, and
 truncated TAP data even with identity disabled. It also verifies the exact
 ten-byte laser patch, exact font bytes from PATCH128 and absence of unrelated
 changes for each ship option. The scanner fix is limited to the original
 instrument region and its two missile-call operands; the station launch fix
-is limited to its original 38-byte selector. It leaves Adder with
-`laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes` built.
+is limited to its original 38-byte selector, and the station slot fix to its
+four areas. It leaves Adder with `laser=single font=48 scannerpixelfix=yes
+stationrandomlaunchfix=yes stationslotfix=yes` built.
 
 The ship check compares all other models with the original bytes, resolves
 every Adder vertex/edge face reference to the original normal, and executes
@@ -493,14 +593,15 @@ No commit or push is made by any build or test command.
 Maintained files for this feature:
 
 - `build.bat`, `make.bat`, `verify.bat`, `tools/build.py`;
-- `src/options.asm`, `src/adder-startup.asm`, `src/single-laser.asm`;
+- `src/options.asm`, `src/adder-startup.asm`, `src/single-laser.asm`,
+  `src/station-slot-fix.asm`;
 - `src/data/font.asm`, `src/data/font-48.asm`, `tools/font_variant.py`;
 - `src/game.asm`, `src/data/ship-blueprints-and-tables.asm`;
 - `src/data/initial-runtime-state.asm`;
 - `src/data/adder.asm`, `adder-original.asm`, `text-dispatch-first.asm`, `text-dispatch-second.asm`;
 - `tools/bootstrap_sources.py`, `tools/analyze_ship_blueprints.py`;
 - `tools/check_build_options.py`, `tools/check_laser_variant.py`, `tools/check_ship_variant.py`,
-  `tools/check_graphics.py`, `tools/emulator_check.py`;
+  `tools/check_graphics.py`, `tools/check_station_slot_fix.py`, `tools/emulator_check.py`;
 - `AGENTS.md`, `README.md`, `docs/SHIPS.md`, `docs/GRAPHICS.md`, this document.
 
 The bootstrap generator preserves these conditional hooks and regenerates

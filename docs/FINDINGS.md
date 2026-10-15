@@ -64,6 +64,30 @@ statements; the corrected texts are in the source:
 - `CommanderFlags` bits 0..2 are set when missions 1..3 are triggered, not
   when they are completed.
 
+### Found in the station-slot investigation
+
+After a hyperspace jump the docking slot of the Coriolis station often does
+not face the planet. The slot is the station's local Z axis:
+`TestStationDocking` requires that axis to point at the player. Each item
+was reproduced by the named check in `tools/check_routines.py` (group
+`station`) and confirmed in ZX Spectrum 48K emulator runs.
+
+| Address | Routine | Finding |
+|---|---|---|
+| `$77B0` | `UpdateStationDormancy` | After an arrival the station is dormant until every coordinate is below $10000. While dormant it is moved by `MoveObject`, which removes far objects before the orientation step. Its position follows the player's roll and pitch, but its axes do not, so every turn made before the station appears turns the slot away from the planet by the same angle. After arriving at Diso, 20 updates at pitch 8 leave the slot 38 degrees off (`station/dormant-orientation-frozen`). In a 48K emulator run, holding S for one second after the arrival left it 59.5 degrees off. |
+| `$D78E` | `ArriveInTargetSystem` | For an offset along x, the nose direction comes from a raw compare of sign-magnitude high bytes. For a negative planet x the result is reversed, and the slot faces exactly away from the planet. This happens in 464 of the 2,048 systems: 96, 128, 112 and 128 in galaxies 2, 4, 6 and 7. Galaxies 1, 3, 5 and 8 always use a z offset and are correct. A 48K emulator run to LEMAED (galaxy 2) measured 180.0 degrees (`station/arrival-slot-direction`). |
+| `$DE0B` | `RotateVectorRollPitch` | Axes get the same shear steps as positions, but the pitch term uses a truncated pitch/2. Over 32 updates pitch 1 turns a position by 7.2 degrees and an axis not at all. Pitch 3 turns the axis like pitch 2: 14.5 degrees, while the position turns by 21.4. Slow pitching therefore turns active objects slightly off their geometry (`station/orientation-pitch-quantisation`). |
+
+The roll-reversal drift of `ApplyPlayerMotion` listed above is not the
+cause. An active station's axes get the same shear steps as the positions.
+In `station/roll-drift-keeps-slot`, 1,280 updates of alternating roll move
+the planet 2.29 times further from the view axis, while the slot error only
+changes from 3.5 to 8.6 degrees.
+
+`stationslotfix=yes` points the slot at the planet centre when the station
+is switched on; see [build variants](BUILD-VARIANTS.md#station-slot-fix).
+The default build keeps the original behaviour.
+
 ## Corrections to the research notes
 
 The save-format note in `docs/info/` remains unchanged as supplied research.

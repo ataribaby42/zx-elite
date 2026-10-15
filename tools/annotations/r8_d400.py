@@ -191,8 +191,13 @@ bit 0 set) or x, away from the origin when s2 bit 1 is set, otherwise towards it
 (crossing zero for a high magnitude of 1).  Its orientation becomes Y = (0, 1, 0), the
 Z (nose) axis along the offset axis and X along the other horizontal axis; the nose
 points to + when the station's high byte is below the planet's (raw byte compare, sign
-bit included), else to -, which for positive coordinates (always for z) is towards the
-planet.  Then L_D7B4."""),
+bit included), else to -.  For positive coordinates (always for z) that is towards the
+planet.  For a negative planet x the raw compare is reversed, and so is the
+nose: the docking slot then faces directly away from the planet.
+Over all 2048 systems the offset is along z in galaxies 1, 3, 5 and 8 (all slots face
+the planet) and along x in galaxies 2, 4, 6 and 7, where 464 systems get the reversed
+slot.  Then L_D7B4.
+Evidence: tools/check_routines.py station/arrival-slot-direction."""),
     0xD7B4: (None, 'verified', """
 Arrival tail.
 Copy the galactic x/y bytes ChartCursorX -> CurrentSystemX and ChartCursorY ->
@@ -453,7 +458,11 @@ by the player's roll/pitch, then by the object's own +$1D/+$1E counters (bit 7 =
 continuous, bit 6 = sign, low nibble = remaining steps), update the speed and move the
 position along the vector at +9 (L_DD92).
 On removal L_EB65 releases the references to the slot given by ObjectLoopCounter, so
-callers outside the slot loop (L_77B0) depend on its current value."""),
+callers outside the slot loop (L_77B0) depend on its current value.
+A removed object skips the orientation step.  For the dormant station, which
+UpdateStationDormancy moves while it is far away, the position therefore follows the
+player's motion but the axes do not.
+Evidence: tools/check_routines.py station/dormant-orientation-frozen."""),
     0xDCF3: (None, 'verified', """
 Remove the object: energy +$22 = 0, then tail-jump to L_EB65."""),
     0xDD5D: (None, 'verified', """
@@ -485,7 +494,11 @@ Evidence: tools/check_routines.py maths/r8-motion-helpers (exact model)."""),
 Rotate one orientation vector by the roll and pitch angles.
 High bytes at IX+1/+3/+5 (x, y, z): z += y*(-pitch/2)/128, x += y*(-roll)/128,
 y += x*roll/128, y += z*(pitch/2)/128 (AddScaledSignMagnitude, updated values used at
-once); IX += 6, DE = 6."""),
+once); IX += 6, DE = 6.
+NOTE: these are the shear steps of ApplyPlayerMotion at the same scale, but pitch/2 is
+truncated.  At pitch 1 positions turn and the axes do not; an odd pitch turns the
+axes like the next lower even one.
+Evidence: tools/check_routines.py station/orientation-pitch-quantisation."""),
     0xDE5D: ('AddScaledSignMagnitude', 'verified', """
 A = D + s*|B|*|C|/128 for sign-magnitude bytes, s = sign of (A XOR B), saturated at 127.
 Evidence: tools/check_routines.py maths/rotation-helpers (within 1.25 of the model)."""),
@@ -730,7 +743,7 @@ COMMENTS = {
     0xD77E: 'z offset',
     0xD780: 'x offset: X axis z and Z axis x components',
     0xD786: 'X = (0, 0, 1), Z = (1, 0, 0)',
-    0xD78E: 'x high bytes compared raw (sign included)',
+    0xD78E: 'x high bytes compared raw (sign included): wrong for negative x',
     0xD791: 'station below: X axis z = -1',
     0xD793: 'otherwise Z axis x = -1',
     0xD799: 'z offset: X axis x and Z axis z components',

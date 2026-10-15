@@ -309,7 +309,8 @@ Unreferenced (no static, pointer or runtime reference) but complete routine:
 HL = high word of (A:C) * (D:E) built from four MultiplyUnsigned partial products
 (the low word accumulates in IX, which is restored).  Inherits the quarter-square
 error, so HL can be lower than the exact high word.
-Evidence: tools/check_routines.py (maths group) matches the partial-product model exactly."""),
+Evidence: tools/check_routines.py (maths group) matches the partial-product model exactly.
+stationslotfix=yes replaces these 68 bytes with StationSlotAlign."""),
     0xE8CF: ('DivideWordFraction', 'verified', """
 BC = (HL*65536 + A*256) / DE, HL = remainder; requires HL < DE (otherwise the
 quotient overflows and is wrong).  16 restoring-division steps; the sentinel 0 bit in

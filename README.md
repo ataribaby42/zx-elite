@@ -50,6 +50,7 @@ For command-line options, run `make.bat` directly. It forwards arguments to
 | `font` | `128`, `48`, `128fix`, `128fix_ecm_s` | `128` | Selects the font and instrument glyphs; see the descriptions below. |
 | `scannerpixelfix` | `no`, `yes` | `no` | `yes` preserves the scanner pixel overlapped by the ECM indicator, both when ECM is on and when it is off. |
 | `stationrandomlaunchfix` | `no`, `yes` | `no` | `yes` allows both Cobra and Python traders to launch from stations while preserving police Viper, rock hermit fighter and Thargon choices and RNG advancement. |
+| `stationslotfix` | `no`, `yes` | `no` | `yes` turns the station's docking slot towards the planet centre when the station appears after a hyperspace jump. In the original, turns made after the arrival leave the slot misaligned, and in 464 systems of galaxies 2, 4, 6 and 7 the slot faces directly away from the planet. Uses free bytes in the game image. |
 | `verify` | `yes`, `no` | `yes` | `yes` requires byte-for-byte identity with the original TAP. `no` allows modified game bytes; TAP structure, metadata, checksums and assembler memory bounds remain mandatory. |
 | `tapfile` | A plain filename ending in `.tap` | `elite-128k.tap` | Names the output file inside `release/`. No directory paths are accepted. Quote an argument containing spaces, such as `"tapfile=My Elite.tap"`. Internal TAP headers are unchanged. |
 
@@ -179,7 +180,9 @@ assembled payloads; game origin and entry are checked against the linker map.
 | `tools/check_graphics.py` | Targeted execution checks of font and cockpit routines |
 | `src/station-random-launch-fix.asm` | Optional station trader fix within the original 38-byte launch selector |
 | `tools/check_station_random_launch_fix.py` | Exhaustive station/police/hermit RNG tests and actual child allocation regressions in 48K memory |
-| `tools/check_build_options.py` | All 64 ship/laser/font/scanner-fix/station-launch-fix combinations in both verification modes and invalid TAP checks |
+| `src/station-slot-fix.asm` | Optional station docking-slot fix; three macros placed in free areas of the image |
+| `tools/check_station_slot_fix.py` | Station switch-on geometries, all 2,048 hyperspace arrivals, unchanged paths and optional 48K ROM-load runs |
+| `tools/check_build_options.py` | All 128 ship/laser/font/scanner-fix/station-launch-fix/station-slot-fix combinations in both verification modes and invalid TAP checks |
 | `tools/check_scanner_pixel_fix.py` | Exhaustive pixel preservation, indicator/missile comparison and 48K first-launch test |
 | `tools/check_laser_variant.py` | Actual laser/line rendering, endpoint randomisation and stack checks |
 | `tools/render_cockpit.py` | Monochrome and initial-attribute cockpit renderings |

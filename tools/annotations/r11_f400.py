@@ -373,7 +373,8 @@ Index = (5-E)*8 + D-1; LastKeyCode = KeyCharacterTable[index]; then OR the mask 
 KeyActionTable[index] into state byte KeyFlagsScreens + offset.  BC and AF preserved."""),
     0xFCED: (None, 'inferred', """
 19 zero bytes before the vector table; no static or runtime reader or writer.
-The research note proposes them as patch storage; they are kept as zeros."""),
+The research note proposes them as patch storage; they are kept as zeros.
+stationslotfix=yes uses them for StationSlotFinish."""),
     # ------------------------------------------------------------------ IM 2
     0xFE01: ('UpdateFlightControls', 'verified', """
 Called by InterruptHandler, on screens 0..3 only (CurrentScreenId < 4; otherwise the

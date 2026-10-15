@@ -250,9 +250,12 @@ LaunchFromStation later mirrors in z.
 Evidence: tools/check_routines.py maths/sun-relative-to-station (3000 cases)."""),
     0x7116: (None, 'verified', """
 One axis of MakeSunRelativeToStation: difference, double, keep the sign."""),
-    0x712C: (None, 'verified', """
-HL = word at IY+1 (sun), DE = word at IX+1 (station); continue in L_E8F0,
-which returns (HL - DE)/2 in sign-magnitude form."""),
+    0x712C: ('HalveCoordinateDifference', 'verified', """
+HL = word at IY+1, DE = word at IX+1: the middle and high bytes of two 24-bit
+sign-magnitude coordinates, i.e. coordinate/256 with the sign in bit 15.  Continue in
+L_E8F0, which returns (HL - DE)/2 in sign-magnitude form.  MakeSunRelativeToStation
+uses it for sun minus station (IY = sun, IX = station).
+Evidence: tools/check_routines.py maths/sun-relative-to-station."""),
     0x713B: ('HandleChartCursorKeys', 'verified', """
 Chart keys.  Only on screens 7 (galactic chart, handler 3) and 8 (short-range chart,
 handler 4) and only while L_A80A is clear (no hyperspace countdown or tunnel): take
@@ -515,7 +518,15 @@ So once the station slot has lost its energy (L_DCE0 frees far objects; energy 0
 means a free slot), it is kept off but still moved here, and it is switched on again
 when every coordinate word is below 256; HandleTorusJumpKey only jumps while the
 flag is set.
-Called by the in-flight main loop outside witchspace."""),
+Called by the in-flight main loop outside witchspace.
+NOTE: a dormant station is far away, so L_DCE0 removes it again before its
+orientation step.  Its position follows the player's roll and pitch, but its axes
+do not: the docking slot (the Z axis) stays fixed in the player's frame from the
+hyperspace arrival until the station is switched on, and every turn made in that
+time turns the slot away from the planet by the same amount.
+Evidence: tools/check_routines.py station/dormant-orientation-frozen.
+stationslotfix=yes replaces the flag store at the switch-on with a call that first
+points the slot at the planet centre (see docs/BUILD-VARIANTS.md)."""),
     0x77D4: ('CloakKeyDelay', 'verified', """
 Call counter of ToggleCloak: the key is examined on every second call."""),
     0x77D5: ('ToggleCloak', 'verified', """

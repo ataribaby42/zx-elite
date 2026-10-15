@@ -302,7 +302,21 @@ OPTIONAL_REGIONS = [
     (0xA660, 0xA706, 'SCANNER_PIXEL_FIX'),
     (0xECF2, 0xECFE, 'LASER_SINGLE'),
     (0xF44A, 0xF470, 'STATION_RANDOM_LAUNCH_FIX'),
+    (0x77CB, 0x77CE, 'STATION_SLOT_FIX'),
+    (0xAC56, 0xAC77, 'STATION_SLOT_FIX'),
+    (0xE88B, 0xE8CF, 'STATION_SLOT_FIX'),
+    (0xFCED, 0xFD00, 'STATION_SLOT_FIX'),
 ]
+# stationslotfix=yes: region start -> (macro or instruction, comment, limit constant).
+STATION_SLOT_PARTS = {
+    0x77CB: ('CALL StationSlotAlign', 'switch-on: point the slot at the planet first',
+             'StationSwitchOnStoreLimit'),
+    0xE88B: ('StationSlotAlignCode', None, 'StationSlotAlignLimit'),
+    0xAC56: ('StationSlotRoofCode', None, 'StationSlotRoofLimit'),
+    0xFCED: ('StationSlotFinishCode', None, 'StationSlotFinishLimit'),
+}
+STATION_SLOT_ENDS = {end: STATION_SLOT_PARTS[start][2]
+                     for start, end, option in OPTIONAL_REGIONS if option == 'STATION_SLOT_FIX'}
 # Labels defined by both the original code and its optional replacement.
 SHARED_OPTIONAL_LABELS = {0x716B, 0x7181, 0xA6D3}
 BRANCH = re.compile(r'^(JP|JR|CALL|DJNZ) (?:([A-Z]+),)?\$([0-9A-F]{4})$')
@@ -829,6 +843,9 @@ def image(data):
             lines += ['assert $-GameImage = CockpitIndicatorsLimit-$6048']
         if pc == 0xF470:
             emit_endif()
+        if pc in STATION_SLOT_ENDS:
+            emit_endif()
+            lines += [f'assert $-GameImage = {STATION_SLOT_ENDS[pc]}-GameLoadAddress']
         emit_header(pc)
         if pc == 0x716B:
             emit_if('SHIP_ADDER')
@@ -846,6 +863,13 @@ def image(data):
         if pc == 0xF44A:
             emit_if('STATION_RANDOM_LAUNCH_FIX')
             lines += ['    INCLUDE "station-random-launch-fix.asm"']
+            emit_else()
+        if pc in STATION_SLOT_PARTS:
+            start = STATION_SLOT_PARTS[pc][2].replace('Limit', 'Start')
+            lines.append(f'assert $-GameImage = {start}-GameLoadAddress')
+            emit_if('STATION_SLOT_FIX')
+            part, comment, _ = STATION_SLOT_PARTS[pc]
+            lines.append(code_line(part, comment) if comment else '    ' + part)
             emit_else()
         if pc == 0xF470:
             lines += ['    assert SelectParentLaunchType-GameImage = ParentLaunchSelectionStart-$6048',

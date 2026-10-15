@@ -74,7 +74,7 @@ ROM_IY = 0x5C3A                      # ROM system-variable pointer (SkoolKit's d
 FRESH_REGISTERS = dict(a=0, f=0, bc=0, de=0, hl=0, ix=0, iy=ROM_IY)   # a new Simulator's registers
 
 OPTION_SYMBOLS = ('SHIP_ADDER', 'LASER_SINGLE', 'FONT_48', 'FONT_128FIX', 'FONT_128FIX_ECM_S',
-                  'SCANNER_PIXEL_FIX', 'STATION_RANDOM_LAUNCH_FIX')
+                  'SCANNER_PIXEL_FIX', 'STATION_RANDOM_LAUNCH_FIX', 'STATION_SLOT_FIX')
 OUTPUT = ROOT / 'build/routine-checks/verification.json'
 
 # Object instance fields (offsets inside a 39-byte slot; tools/annotations, docs/SHIPS.md)
@@ -6612,6 +6612,205 @@ def check_p11_ship_tactics_energy(ctx):
                     cases += 1
     return cases
 # --- END P11 CHECKS ---
+
+# --- BEGIN STATION CHECKS ---
+# Orientation of the persistent station: where the docking slot (local Z axis) points.
+
+
+def station_vectors(m):
+    """Station nose (high bytes, -127..127), station position and planet position."""
+    ctx, station = m.ctx, m['InitialRuntimeState']
+    nose = [sm8(m.memory[station + ctx['InstanceAxisZ'] + 2 * i + 1]) for i in range(3)]
+    return (nose, [get24(m.memory, station + 3 * i) for i in range(3)],
+            [get24(m.memory, m['PlanetPosition'] + 3 * i) for i in range(3)])
+
+
+def vector_angle(u, v):
+    cosine = sum(a * b for a, b in zip(u, v)) / (math.hypot(*u) * math.hypot(*v))
+    return math.degrees(math.acos(max(-1.0, min(1.0, cosine))))
+
+
+def slot_error(m):
+    nose, station, planet = station_vectors(m)
+    return vector_angle(nose, [p - s for p, s in zip(planet, station)])
+
+
+def galaxy_selected_seeds(ctx, galaxy):
+    """SelectedSystemSeeds of the 256 systems of a galaxy (0..7), from the game's generator;
+    the galaxy seeds are rotated left once per galaxy as GalacticHyperspaceJump does."""
+    m = ctx.machine()
+    load_jameson(m)
+    seeds = [m.memory[ctx['GalaxySeeds'] + i] for i in range(6)]
+    for _ in range(galaxy):
+        seeds = [(b << 1 | b >> 7) & 255 for b in seeds]
+    m.poke('GalaxySeeds', *seeds)
+    m.call('LoadGalaxySeedsToGenerator', **ZERO_REGISTERS)
+    out = []
+    for _ in range(256):
+        m.call('DeriveSelectedSystemData', **ZERO_REGISTERS)
+        m.call('GenerateSystemName', **ZERO_REGISTERS)
+        out.append((m.text('GeneratedSystemName'), [m.memory[ctx['SelectedSystemSeeds'] + i] for i in range(6)]))
+    return out
+
+
+def arrival_positions_entry(ctx):
+    """The instruction after RandomiseMarket in ArriveInTargetSystem: LD B,$12 / XOR A /
+    LD HL,SunPosition, which clears the sun and planet and places the station."""
+    sun = ctx['SunPosition']
+    return ctx.find('ArriveInTargetSystem', 'L_D7B4', [0x06, 0x12, 0xAF, 0x21, sun & 255, sun >> 8])
+
+
+@check('station', 'arrival-slot-direction', ['ArriveInTargetSystem'], 'station-slot investigation',
+       'For all 2048 systems: the station is placed $18000 from the planet along z in galaxies 1, 3, 5 '
+       'and 8 and along x in galaxies 2, 4, 6 and 7.  Every z placement points the nose (docking slot) '
+       'at the planet.  For x the raw compare of sign-magnitude bytes reverses it for a negative planet '
+       'x: 464 systems (96, 128, 112 and 128 in galaxies 2, 4, 6 and 7), each exactly 180 degrees away.')
+def check_arrival_slot_direction(ctx):
+    entry = arrival_positions_entry(ctx)
+    m = ctx.machine()
+    away = {}
+    for galaxy in range(8):
+        for name, seeds in galaxy_selected_seeds(ctx, galaxy):
+            m.reset()
+            m.poke('SelectedSystemSeeds', *seeds)
+            m.call(entry, stop='L_D7B4', **ZERO_REGISTERS)
+            nose, station, planet = station_vectors(m)
+            offset = [p - s for p, s in zip(planet, station)]
+            expect(sorted(map(abs, offset)) == [0, 0, 0x18000], name, offset)
+            expect(offset[0 if galaxy in (1, 3, 5, 6) else 2] != 0, 'offset axis', galaxy, name)
+            error = slot_error(m)
+            expect(error < 1e-6 or abs(error - 180) < 1e-6, name, error)
+            if error > 90:
+                expect(offset[0] != 0 and planet[0] < 0, 'reversal needs a negative planet x', name)
+                away[galaxy + 1] = away.get(galaxy + 1, 0) + 1
+    expect(away == {2: 96, 4: 128, 6: 112, 7: 128}, away)
+    return 2048, dict(reversed_slots_by_galaxy=away)
+
+
+@check('station', 'dormant-orientation-frozen', ['UpdateStationDormancy', 'MoveObject'],
+       'station-slot investigation',
+       'After the arrival at DISO (galaxy 1, slot facing the planet) the station is dormant: '
+       '20 updates of MoveSunAndPlanet and UpdateStationDormancy at pitch 8 turn the station and '
+       'planet positions, but the station axes stay byte for byte the same, so the slot error grows '
+       'from 0 to 38 degrees.  Moved next to the player (all high bytes zero), the same pitch turns '
+       'the station axes as well.')
+def check_dormant_orientation_frozen(ctx):
+    station = ctx['InitialRuntimeState']
+    axes = slice(station + ctx['InstanceAxisZ'], station + ctx['InstanceAxisX'] + 6)
+    seeds = next(seeds for name, seeds in galaxy_selected_seeds(ctx, 0) if name == 'DISO')
+    m = ctx.machine()
+    m.poke('SelectedSystemSeeds', *seeds)
+    m.call(arrival_positions_entry(ctx), stop='L_D7B4', **ZERO_REGISTERS)
+    expect(m.byte('StationDormantFlag') == 0xFF and slot_error(m) < 1e-6, 'arrival')
+    before, frozen = station_vectors(m), m.memory[axes]
+    m.poke('PlayerSpeed', 0)
+    m.poke('PlayerPitch', 8)
+    m.poke('ObjectLoopCounter', 8)
+    for _ in range(20):
+        m.call('MoveSunAndPlanet', **ZERO_REGISTERS)
+        m.call('UpdateStationDormancy', **ZERO_REGISTERS)
+    after = station_vectors(m)
+    expect(m.byte('StationDormantFlag') == 0xFF and m.memory[axes] == frozen, 'axes frozen')
+    expect(after[1] != before[1] and after[2] != before[2], 'positions moved')
+    error = slot_error(m)
+    expect(round(error) == 38, error)
+    # Near the player MoveObject reaches its orientation step.
+    for i, value in enumerate((0x1000, -0x800, 0x6000)):
+        put24(m.memory, station + 3 * i, value)
+    m.call('UpdateStationDormancy', **ZERO_REGISTERS)
+    expect(m.memory[axes] != frozen and m.byte('StationDormantFlag') == 0, 'near: axes turn, switched on')
+    return 2, dict(slot_error_after_20_pitch_updates=round(error, 1))
+
+
+@check('station', 'orientation-pitch-quantisation', ['RotateVectorRollPitch', 'ApplyPlayerMotion'],
+       'station-slot investigation',
+       'RotateVectorRollPitch uses the shear steps of ApplyPlayerMotion at the same scale, but '
+       'truncates pitch/2.  For 32 updates: pitch 1 turns a position by 7.2 degrees and a unit axis '
+       'not at all; pitch 3 turns the axis by 14.5 degrees like pitch 2 while the position turns by '
+       '21.4; roll 1 turns both alike (14.5 and 14.1 degrees).')
+def check_orientation_pitch_quantisation(ctx):
+    vector, body = ctx.scratch, ctx['PlanetPosition']
+
+    def turn_axis(start, roll, pitch):
+        m = ctx.machine()
+        for i, value in enumerate(start):
+            m.poke(vector + 2 * i, 0, abs(value) | (0x80 if value < 0 else 0))
+        m.poke('RollRotationAngle', roll)
+        m.poke('PitchRotationAngle', pitch)
+        for _ in range(32):
+            m.call('RotateVectorRollPitch', ix=vector, **ZERO_REGISTERS)
+        return vector_angle(start, [sm8(m.byte(vector + 2 * i + 1)) for i in range(3)])
+
+    def turn_position(start, roll, pitch):
+        m = ctx.machine()
+        for i, value in enumerate(start):
+            put24(m.memory, body + 3 * i, value)
+        m.poke('PlayerRoll', roll)
+        m.poke('PlayerPitch', pitch)
+        m.poke('PlayerSpeed', 0)
+        for _ in range(32):
+            m.call('ApplyPlayerMotion', ix=body, **ZERO_REGISTERS)
+        return vector_angle(start, [get24(m.memory, body + 3 * i) for i in range(3)])
+
+    measured = {}
+    for name, roll, pitch, axis_start, body_start in (
+            ('pitch1', 0, 1, (0, 0, 127), (0, 0, 0x10000)), ('pitch2', 0, 2, (0, 0, 127), (0, 0, 0x10000)),
+            ('pitch3', 0, 3, (0, 0, 127), (0, 0, 0x10000)), ('roll1', 1, 0, (127, 0, 0), (0x10000, 0, 0))):
+        measured[name] = (round(turn_axis(axis_start, roll, pitch), 1),
+                          round(turn_position(body_start, roll, pitch), 1))
+    expect(measured == {'pitch1': (0.0, 7.2), 'pitch2': (14.5, 14.1), 'pitch3': (14.5, 21.4),
+                        'roll1': (14.5, 14.1)}, measured)
+    return 8, {name: dict(axis_degrees=a, position_degrees=p) for name, (a, p) in measured.items()}
+
+
+@check('station', 'roll-drift-keeps-slot', ['ApplyPlayerMotion', 'RotateVectorRollPitch', 'MoveObject',
+                                            'OrthogonaliseYVector', 'RenormaliseOrientationVector'],
+       'station-slot investigation',
+       'The roll-reversal drift does not turn an active station away from the planet: positions and '
+       'axes get the same shear steps.  From the launch layout (planet $18000 ahead, station just '
+       'behind with unit axes, active), 20 updates at pitch 8 and then the 1280 updates of '
+       'maths/roll-reversal-drift move the planet 2.29 times further from the view axis, while the '
+       'slot error only changes from 3.5 to 8.6 degrees (rounding of the 8-bit axes).')
+def check_roll_drift_keeps_slot(ctx):
+    """Each update is MoveSunAndPlanet, UpdateStationDormancy and the slot-0 part of UpdateObjects
+    from L_DB8B (MoveObject, OrthogonaliseYVector, RenormaliseOrientationVector x3) to L_DBA3."""
+    station, planet = ctx['InitialRuntimeState'], ctx['PlanetPosition']
+    m = ctx.machine()
+    m.clear(station, ctx['InstanceAxisX'] + 6)
+    m.poke(station + ctx['InstanceZ'], 0xF0)
+    m.poke(station + ctx['InstanceZ'] + 2, 0x80)
+    for axis_name, component in (('InstanceAxisZ', 2), ('InstanceAxisY', 1), ('InstanceAxisX', 0)):
+        m.poke(station + ctx[axis_name] + 2 * component + 1, 0x7F)
+    m.poke(station + ctx['InstanceEnergy'], 0xF0)
+    m.poke('StationDormantFlag', 0)
+    for i, value in enumerate((0, 0, 0x18000)):
+        put24(m.memory, planet + 3 * i, value)
+    m.poke('PlayerSpeed', 0)
+    m.poke('PlayerPitch', 0)
+    m.poke('ObjectLoopCounter', 8)
+    blueprint = m.word(station + INSTANCE_BLUEPRINT)
+
+    def update(roll=0, pitch=0):
+        m.poke('PlayerRoll', roll)
+        m.poke('PlayerPitch', pitch)
+        m.call('MoveSunAndPlanet', **ZERO_REGISTERS)
+        m.call('UpdateStationDormancy', **ZERO_REGISTERS)
+        m.call('L_DB8B', stop='L_DBA3', ix=station, iy=blueprint, **ZERO_REGISTERS)
+
+    for _ in range(20):
+        update(pitch=8)
+    before = slot_error(m)
+    off0 = math.hypot(*(get24(m.memory, planet + 3 * i) for i in range(2)))
+    for roll in alternating_roll_bytes(32, 20):
+        update(roll=roll)
+    after = slot_error(m)
+    off1 = math.hypot(*(get24(m.memory, planet + 3 * i) for i in range(2)))
+    expect(m.byte('StationDormantFlag') == 0, 'the station stays active')
+    measured = (round(before, 1), round(after, 1), round(off1 / off0, 2))
+    expect(measured == (3.5, 8.6, 2.29), measured)
+    return 1300, dict(slot_error_before=measured[0], slot_error_after=measured[1],
+                      planet_off_axis_growth=measured[2])
+# --- END STATION CHECKS ---
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])

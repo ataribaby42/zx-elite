@@ -16,7 +16,8 @@ Regeneration overwrites `src/game.asm` and the generated data includes, so
 lasting improvements belong in the annotation database, not in the
 generated files. The hand-maintained optional modules (`src/options.asm`,
 `src/scanner-pixel-fix.asm`, `src/station-random-launch-fix.asm`,
-`src/single-laser.asm`, `src/adder-startup.asm`) are never generated.
+`src/station-slot-fix.asm`, `src/single-laser.asm`, `src/adder-startup.asm`)
+are never generated.
 
 ## Reading the source
 

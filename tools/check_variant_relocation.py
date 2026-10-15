@@ -4,6 +4,8 @@ Normal game layout assertions remain intact. These fixtures deliberately move
 code, font sources, glyph storage and Adder geometry without editing the release.
 External startup/line-renderer calls are observed stubs; their full game routines
 are exercised separately by the graphics, laser and ROM-load regressions.
+Runs after a build with any options: the fixed screen constants come from a
+probe assembly of src/options.asm, not from the current game map.
 """
 import json
 import os
@@ -18,6 +20,30 @@ from skoolkit.simulator import Simulator
 from skoolkit.simutils import PC, SP, H, L, D, E, C
 
 
+HARDWARE = ('ScannerEcmOverlap', 'EncounterCircleTop', 'EncounterCircleBottom',
+            'EcmIndicatorTop', 'StationIndicatorTop', 'MissileDisplayCoordinates',
+            'SingleLaserStartCoordinates')
+
+
+def option_constants(assembler, directory):
+    """Values of HARDWARE as src/options.asm defines them.
+
+    The game map lists a constant only when the assembled code uses it, which
+    these do only with scannerpixelfix=yes or laser=single.  A probe that
+    includes options.asm and references each of them is assembled instead.
+    """
+    probe = directory/'option-constants.asm'
+    probe.write_text('    INCLUDE "options.asm"\n    org 0\n'
+                     + ''.join(f'    defw {key}\n' for key in HARDWARE), encoding='ascii')
+    command = [assembler, '-b', '-m', '-I=src', '-O='+directory.relative_to(ROOT).as_posix(),
+               '-o=option-constants.bin', probe.relative_to(ROOT).as_posix()]
+    result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
+    (directory/'option-constants.log').write_text(result.stdout+result.stderr)
+    assert result.returncode == 0, result.stdout+result.stderr
+    symbols = symbol_map(directory/'option-constants.map')
+    return {key: symbols[key] for key in HARDWARE}
+
+
 def main():
     directory = ROOT/'build/address-audit/relocation'
     directory.mkdir(parents=True, exist_ok=True)
@@ -27,16 +53,15 @@ def main():
     assembler = os.environ.get('Z80ASM') or shutil.which('z80asm.exe') or shutil.which('z88dk-z80asm') or shutil.which('z80asm')
     if not assembler:
         raise SystemExit('z88dk assembler not found')
+    # Every font include defines FontBitmapSize and every build uses it (FontRuntimeEnd).
     current = symbol_map(ROOT/'build/game.map')
-    hardware = ('ScannerEcmOverlap', 'EncounterCircleTop', 'EncounterCircleBottom',
-                'EcmIndicatorTop', 'StationIndicatorTop', 'MissileDisplayCoordinates',
-                'SingleLaserStartCoordinates')
+    hardware = option_constants(assembler, directory)
     reports = []
     for origin, padding in ((0x7000, 7), (0x8000, 31)):
         for font in ('128', '48', '128fix', '128fix_ecm_s'):
             name = f'{origin:04x}-font{font}'
             fixture = directory/f'{name}.asm'
-            directives = '\n'.join(f'defc {key} = {current[key]}' for key in hardware)
+            directives = '\n'.join(f'defc {key} = {value}' for key, value in hardware.items())
             font_file = 'font.asm' if font == '128' else f'font-{font}.asm'
             fixture.write_text(f'''{directives}
 defc GameLoadAddress = ${origin:04X}
