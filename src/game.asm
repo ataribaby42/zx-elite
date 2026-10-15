@@ -19491,8 +19491,15 @@ L_EC4E:
 ; abandoning ship.  Energy reaching zero (or borrowing) continues at L_EC8C (destruction
 ; and debris events).  All paths end in DrawLaser.
 ; NOTE: a fleeing ship (bit 7 set) never borrows, so a value below 14 wraps to $72+value.
+; The courage is then 114..127: the ship turns back towards the player at full
+; acceleration, still without firing (ApplySteeringVector returns before TryFireAiLaser
+; while bit 7 is set), and the abandon-ship test at L_F7B6 seldom passes.  A Python under
+; pulse fire flees at hit 9 and turns back at hits 10, 19, 28 ...
 ; Evidence: combat/r10-laser-hit-outcomes in tools/check_routines.py (every +$25 value,
-; flags, energies, all 19 blueprints).
+; flags, energies, all 19 blueprints); tools/check_ai_courage_fix.py (Python fight with
+; the real steering, and a 48K emulator fight).
+; aicouragefix=yes replaces $EC6A..$EC7C (src/ai-courage-fix.asm): the subtraction and
+; floor act on bits 0..6 only, so a fleeing ship keeps courage 6 or 7.
 ApplyPlayerLaserHit:
     SET 2,(IX+$21)                             ; $EC55: DD CB 21 D6  the target turns hostile
     LD HL,SoundEffectRequests                  ; $EC59: 21 7D 70  laser-hit sound request (bit 3)
@@ -19501,6 +19508,10 @@ ApplyPlayerLaserHit:
     JR NZ,DrawLaser                            ; $EC62: 20 70
     BIT 5,(IX+$20)                             ; $EC64: DD CB 20 6E  explosion stage: no damage
     JR NZ,DrawLaser                            ; $EC68: 20 6A
+assert $-GameImage = AiCourageHitStart-GameLoadAddress
+IF AI_COURAGE_FIX
+    INCLUDE "ai-courage-fix.asm"
+ELSE
     LD A,(IX+$25)                              ; $EC6A: DD 7E 25  AI threshold -14 (floor 6 + bit 0)
     LD B,A                                     ; $EC6D: 47
     SUB $0E                                    ; $EC6E: D6 0E
@@ -19512,6 +19523,8 @@ L_EC76:
     SLA B                                      ; $EC77: CB 20
     RRA                                        ; $EC79: 1F
     LD (IX+$25),A                              ; $EC7A: DD 77 25
+ENDIF
+assert $-GameImage = AiCourageHitLimit-GameLoadAddress
     LD A,(IX+$22)                              ; $EC7D: DD 7E 22  energy $FF: already destroyed
     CP $FF                                     ; $EC80: FE FF
     JR Z,DrawLaser                             ; $EC82: 28 50

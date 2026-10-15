@@ -34,8 +34,15 @@ flee when +$25 AND $7F < 8, and L_F7B6 compares +$25 with a random byte before
 abandoning ship.  Energy reaching zero (or borrowing) continues at L_EC8C (destruction
 and debris events).  All paths end in DrawLaser.
 NOTE: a fleeing ship (bit 7 set) never borrows, so a value below 14 wraps to $72+value.
+The courage is then 114..127: the ship turns back towards the player at full
+acceleration, still without firing (ApplySteeringVector returns before TryFireAiLaser
+while bit 7 is set), and the abandon-ship test at L_F7B6 seldom passes.  A Python under
+pulse fire flees at hit 9 and turns back at hits 10, 19, 28 ...
 Evidence: combat/r10-laser-hit-outcomes in tools/check_routines.py (every +$25 value,
-flags, energies, all 19 blueprints)."""),
+flags, energies, all 19 blueprints); tools/check_ai_courage_fix.py (Python fight with
+the real steering, and a 48K emulator fight).
+aicouragefix=yes replaces $EC6A..$EC7C (src/ai-courage-fix.asm): the subtraction and
+floor act on bits 0..6 only, so a fleeing ship keeps courage 6 or 7."""),
     0xEC8C: (None, 'verified', """
 Target destroyed: energy +$22 := $FF (later hits are ignored), set +$20 bit 4.
 The Asp marked with +$26 bit 6 by L_F62C, destroyed while MissionAspEncounterState is 1

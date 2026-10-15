@@ -283,7 +283,8 @@ For ship variants run `tools/check_build_options.py`,
 scenarios with `tools/run_runtime_scenarios.py`, always in 48K mode. The build
 option check deliberately leaves an Adder TAP with
 `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
-stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes` for testing.
+stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes` for
+testing.
 Rebuild the default Krait version before collecting reference reconstruction/runtime-code seeds.
 The Adder test compares 128 actual rendered frames with the original side-B
 model, in addition to checking all 19 object loaders and other ship geometry.
@@ -361,7 +362,7 @@ for codes `$20..$7A`, with the same symbols, source address and runtime copy.
 Do not copy 768 bytes into the active font: the extra 40 bytes would overlap
 the game image. Preserve the conditional include in source regeneration.
 The optional font requires explicit `verify=no`; no other PATCH128 changes
-are imported. Run the 512-combination build matrix, graphics tests and 48K emulator
+are imported. Run the 1024-combination build matrix, graphics tests and 48K emulator
 startup/screen checks after changing this option. Normal builds use ASM data
 only and never depend on the patch tape. The owner has requested permanent
 previews of both fonts in `docs/images/`; preserve the two named atlases above.
@@ -392,7 +393,7 @@ Police Viper, Thargon and special-mode Thargoid launches must remain intact.
 Run `tools/check_station_random_launch_fix.py` for both ship choices; include
 the preceding launch gates, all 65,536 seed states, and actual allocation
 with free/full slots. Preserve the include and assertions in regeneration.
-Use the 512-combination option matrix and 48K ROM-load/launch regression as well.
+Use the 1024-combination option matrix and 48K ROM-load/launch regression as well.
 
 `stationslotfix=no` preserves the original station orientation, including
 the two documented defects in `docs/FINDINGS.md`: a dormant station's axes do
@@ -415,7 +416,7 @@ other names they call. Preserve the four conditional blocks
 (`OPTION_PARTS` in `tools/bootstrap_sources.py`) in source regeneration.
 Run `tools/check_station_slot_fix.py --emulator` for both ship choices, each
 built with the default tapfile, `python tools/check_routines.py --only station`
-on the default build, and the 512-combination option matrix.
+on the default build, and the 1024-combination option matrix.
 
 `fuelfix=no` preserves the original fuel price and FU bar, which keep stale
 values after a tape load or a new commander (see `docs/FINDINGS.md`). The
@@ -437,7 +438,7 @@ purchase and the tape code unchanged. The macros use labels only; keep
 `tools/bootstrap_sources.py`; preserve them in source regeneration. Run
 `tools/check_fuel_fix.py --emulator` for both ship choices, each built with
 the default tapfile, `python tools/check_routines.py --only commander` on the
-default build, and the 512-combination option matrix.
+default build, and the 1024-combination option matrix.
 
 `hyperspacedockingfix=no` preserves the original latch, which disables
 docking after any H or G press, even a refused one, until the next arrival.
@@ -451,7 +452,20 @@ accepted jump must keep docking off from its countdown until the arrival
 tunnel ends. Run `tools/check_hyperspace_docking_fix.py --emulator` for both
 ship choices, each built with the default tapfile, plus
 `python tools/check_routines.py --only missions` on the default build and the
-512-combination option matrix.
+1024-combination option matrix.
+
+`aicouragefix=no` preserves the original courage arithmetic, in which a
+fleeing ship's courage wraps back to 114..127 when hit. The optional `yes`
+include in `src/ai-courage-fix.asm` must stay inside the original 19 bytes
+`$EC6A..$EC7C` of `ApplyPlayerLaserHit`, asserted with `AiCourageHitStart`
+and `AiCourageHitLimit`. Subtract 14 and apply the floor 6 (with the ECM
+bit) on bits 0..6 only and keep bit 7. For bytes below $80 (ships that are
+not fleeing, missile target codes), A, B and `+$25` must end exactly as in the
+original. Do not clear the fleeing bit or change the flee threshold, the
+steering or the abandon-ship test. Run `tools/check_ai_courage_fix.py
+--emulator` for both ship choices, each built with the default tapfile, plus
+`python tools/check_routines.py --only combat` on the default build and the
+1024-combination option matrix.
 
 - Source boundaries, offsets and lengths must be calculated by scripts or
   labels. No tool may silently truncate or pad a block.

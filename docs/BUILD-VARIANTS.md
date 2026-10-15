@@ -41,7 +41,8 @@ python tools/build.py --verify-only --verify no
 
 `ship` accepts `krait` (default) or `adder`; `laser` accepts `original` (default)
 or `single`. `font` accepts `128` (default), `48`, `128fix` or `128fix_ecm_s`. `scannerpixelfix`,
-`stationrandomlaunchfix`, `stationslotfix`, `fuelfix` and `hyperspacedockingfix` accept `no` (default) or `yes`.
+`stationrandomlaunchfix`, `stationslotfix`, `fuelfix`, `hyperspacedockingfix` and `aicouragefix` accept `no`
+(default) or `yes`.
 `verify` accepts `yes`
 (default) or `no`. A build does not change the saved BAT settings or remember
 its command-line overrides. No modification silently weakens verification: select
@@ -403,6 +404,77 @@ computers are fitted by a test-only poke, and the runs check the following:
 Build the option with the default tapfile for this mode. Reports are in
 `build/hyperspace-docking-fix-check/`.
 
+## AI courage fix
+
+```bat
+make.bat aicouragefix=yes verify=no
+python tools/check_ai_courage_fix.py
+python tools/check_ai_courage_fix.py --emulator
+```
+
+The equivalent Python option is `--aicouragefix yes`. The default `no` keeps
+the original bytes and behaviour.
+
+`InstanceAiState` (`+$25`) of an AI ship holds an ECM bit (bit 0), a courage
+counter in bits 1..6 and a fleeing bit (bit 7). The courage starts at 126
+($7E). Each damaging laser hit (`ApplyPlayerLaserHit`) is meant to lower it
+by 14, down to a floor of 6 that keeps the ECM bit, and to leave bit 7
+alone. In open space, without an active station, a hostile ship whose courage
+is below 8 flees: it sets bit 7, turns away and accelerates. While bit 7 is
+set, `ApplySteeringVector` returns before `TryFireAiLaser`, so the ship never
+fires.
+
+The original subtracts 14 from the whole byte. The floor therefore applies
+only while bit 7 is clear: a fleeing ship's byte is at least $80 and never
+borrows. A courage below 14 then wraps to 114..127. At its next AI step
+the ship turns back and charges the player at full acceleration, still
+without firing, and about nine hits later it flees again. A Python under
+pulse-laser fire flees at hit 9 and turns back at hits 10, 19, 28 and so on.
+
+The abandon-ship test also compares a random byte with the whole of `+$25`.
+A fleeing ship at the floor ($86) passes it about 48% of the time; after the
+wrap ($F2) it passes only about 5% of the time. The effect needs a ship that
+survives at least ten hits in open space:
+
+| Laser | Damage per hit | Ships that can show the effect |
+|---|---:|---|
+| pulse, beam | 15 | Python, Thargoid, rock hermit, Fer-de-Lance; Cobra Mk III and Asp Mk II only marginally |
+| military | 23 | Python and Thargoid |
+| mining | 50 | none |
+
+The fix replaces the 19 bytes `$EC6A..$EC7C` in place
+(`src/ai-courage-fix.asm`). It shifts the byte left, so that the fleeing bit
+drops out, subtracts 2 x 14, applies the floor 2 x 6 with the ECM bit and
+shifts back with the old bit 7. For bytes below $80, which covers every ship
+that is not fleeing and every missile target code, A, B and `+$25` end exactly
+as in the original. A frightened ship stays at courage 6 or 7 and keeps
+fleeing. Assembler assertions protect both boundaries
+(`AiCourageHitStart` and `AiCourageHitLimit` in `src/options.asm`). Nine bytes
+change and no memory is used.
+
+`tools/check_ai_courage_fix.py` runs the assembled image with the supplied
+48K ROM in SkoolKit's simulator. It compares it with a baseline that has the
+original 19 bytes restored from the reference tape, and checks the following:
+
+- only those bytes differ;
+- every `+$25` value with damage 15, 23 and 50, for a surviving and a
+  destroyed target, 1,536 cases. Below $80 RAM and registers match the
+  original; from $80 up only `+$25` differs;
+- 27 pulse hits on a hostile Python, with and without ECM, each followed by
+  the real `UpdateShipHostilityAndSteering` in open space. Both builds flee
+  at hit 9. The fixed ship then stays at courage 6 or 7, steers away with
+  acceleration 2 and never fires. The original turns back at hits 10 and 19.
+
+`--emulator` loads `release/elite-128k.tap` through the 48K ROM. After a
+launch, test-only pokes put a hostile Python, created by
+`InitialiseShipFromBlueprint`, straight ahead. They also make the station
+dormant far away, so that the AI decides by courage. The player then holds
+fire for 17 seconds. The fixed build ends with the Python fleeing at `$86`
+(courage 6) with full acceleration. The original build in the same run ends
+at `$E4`: fleeing, but with courage 100 after the wrap, and its course departs
+from the fixed one as it turns back. Build the option with the default
+tapfile for this mode. Reports are in `build/ai-courage-fix-check/`.
+
 ## What verification means
 
 Always checked, including `verify=no`:
@@ -661,7 +733,7 @@ uses three of the free areas listed above: `$E88B..$E8CE`, `$AC56..$AC76` and
 `$FCED..$FCFF`, 114 of their 120 bytes. `fuelfix=yes` fills three others
 completely: `$B31B..$B32A`, `$A89B..$A8A9` and `$9A3A..$9A45`, 43 bytes. Every
 other option leaves the free areas unchanged; `hyperspacedockingfix` changes
-two bytes in place. With both fixes 53 bytes remain free in 16 areas, the
+two bytes in place and `aicouragefix` nine within its original 19. With both fixes 53 bytes remain free in 16 areas, the
 largest 11 bytes (`$BDF5..$BDFF`).
 
 ### Rules for using free space
@@ -697,9 +769,9 @@ Use `make.bat ship=krait font=48 verify=no` for the Krait check and
 The inherited broader gameplay scenarios above remain available; they are
 not all required for a font-only data substitution.
 
-The option check builds all 512 `ship`/`laser`/`font`/`scannerpixelfix`/
-`stationrandomlaunchfix`/`stationslotfix`/`fuelfix`/`hyperspacedockingfix` combinations in both
-verification modes, expects
+The option check builds all 1,024 `ship`/`laser`/`font`/`scannerpixelfix`/
+`stationrandomlaunchfix`/`stationslotfix`/`fuelfix`/`hyperspacedockingfix`/`aicouragefix`
+combinations in both verification modes, expects
 strict verification of any modification to fail, checks stale-output
 removal and rejects damaged checksums, invalid metadata with a valid XOR, and
 truncated TAP data even with identity disabled. It also verifies the exact
@@ -707,10 +779,10 @@ ten-byte laser patch, exact font bytes from PATCH128 and absence of unrelated
 changes for each ship option. The scanner fix is limited to the original
 instrument region and its two missile-call operands; the station launch fix
 is limited to its original 38-byte selector, the station slot fix to its
-four areas, the fuel fix to its five and the docking fix to its one operand.
-It leaves Adder with `laser=single font=48 scannerpixelfix=yes
-stationrandomlaunchfix=yes stationslotfix=yes fuelfix=yes
-hyperspacedockingfix=yes` built.
+four areas, the fuel fix to its five, the docking fix to its one operand and
+the AI courage fix to its 19 bytes. It leaves Adder with `laser=single font=48
+scannerpixelfix=yes stationrandomlaunchfix=yes stationslotfix=yes fuelfix=yes
+hyperspacedockingfix=yes aicouragefix=yes` built.
 
 The ship check compares all other models with the original bytes, resolves
 every Adder vertex/edge face reference to the original normal, and executes
@@ -758,7 +830,7 @@ Maintained files for this feature:
 
 - `build.bat`, `make.bat`, `verify.bat`, `tools/build.py`;
 - `src/options.asm`, `src/adder-startup.asm`, `src/single-laser.asm`,
-  `src/station-slot-fix.asm`, `src/fuel-fix.asm`;
+  `src/station-slot-fix.asm`, `src/fuel-fix.asm`, `src/ai-courage-fix.asm`;
 - `src/data/font.asm`, `src/data/font-48.asm`, `tools/font_variant.py`;
 - `src/game.asm`, `src/data/ship-blueprints-and-tables.asm`;
 - `src/data/initial-runtime-state.asm`;
@@ -766,7 +838,7 @@ Maintained files for this feature:
 - `tools/bootstrap_sources.py`, `tools/analyze_ship_blueprints.py`;
 - `tools/check_build_options.py`, `tools/check_laser_variant.py`, `tools/check_ship_variant.py`,
   `tools/check_graphics.py`, `tools/check_station_slot_fix.py`, `tools/check_fuel_fix.py`,
-  `tools/check_hyperspace_docking_fix.py`, `tools/emulator_check.py`;
+  `tools/check_hyperspace_docking_fix.py`, `tools/check_ai_courage_fix.py`, `tools/emulator_check.py`;
 - `AGENTS.md`, `README.md`, `docs/SHIPS.md`, `docs/GRAPHICS.md`, this document.
 
 The bootstrap generator preserves these conditional hooks and regenerates

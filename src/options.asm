@@ -86,6 +86,16 @@ assert HYPERSPACE_DOCKING_FIX = 0 || HYPERSPACE_DOCKING_FIX = 1
 defc HyperspaceDockingCheckStart = $70BE
 defc HyperspaceDockingCheckLimit = $70C1
 
+IFNDEF AI_COURAGE_FIX
+    defc AI_COURAGE_FIX = 0
+ENDIF
+assert AI_COURAGE_FIX = 0 || AI_COURAGE_FIX = 1
+
+; Original fixed boundaries of the courage update in ApplyPlayerLaserHit that
+; aicouragefix=yes replaces in place (src/ai-courage-fix.asm).
+defc AiCourageHitStart = $EC6A
+defc AiCourageHitLimit = $EC7D
+
 ; Original fixed boundaries of the shared parent-ship launch selector.
 defc ParentLaunchSelectionStart = $F44A
 defc ParentLaunchSelectionLimit = $F470
