@@ -60,7 +60,7 @@ def verify(output=OUTPUT, exact=True):
     print('SHA256: '+sha(rebuilt))
     return report
 
-def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixelfix='no', stationrandomlaunchfix='no', tapfile=DEFAULT_TAPFILE, stationslotfix='no'):
+def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixelfix='no', stationrandomlaunchfix='no', tapfile=DEFAULT_TAPFILE, stationslotfix='no', fuelfix='no'):
     output = release_tap(tapfile)
     BUILD.mkdir(parents=True,exist_ok=True)
     output.parent.mkdir(parents=True,exist_ok=True)
@@ -82,6 +82,7 @@ def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixe
                  f'-DSCANNER_PIXEL_FIX={int(scannerpixelfix=="yes")}',
                  f'-DSTATION_RANDOM_LAUNCH_FIX={int(stationrandomlaunchfix=="yes")}',
                  f'-DSTATION_SLOT_FIX={int(stationslotfix=="yes")}',
+                 f'-DFUEL_FIX={int(fuelfix=="yes")}',
                  '-I=src','-I=src/data','-O=build',f'-o={name}.bin',f'src/{name}.asm']
         run=subprocess.run(command,cwd=ROOT,text=True,capture_output=True)
         (BUILD/f'{name}-assemble.log').write_text(run.stdout+run.stderr,encoding='utf-8')
@@ -123,6 +124,7 @@ def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixe
         report['scannerpixelfix']=scannerpixelfix
         report['stationrandomlaunchfix']=stationrandomlaunchfix
         report['stationslotfix']=stationslotfix
+        report['fuelfix']=fuelfix
         report['tapfile']=tapfile
         candidate.replace(output)
         (BUILD/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
@@ -140,11 +142,12 @@ def main():
     p.add_argument('--scannerpixelfix',choices=['no','yes'],default='no',help='preserve the scanner pixel overlapped by the ECM indicator (default: no)')
     p.add_argument('--stationrandomlaunchfix',choices=['no','yes'],default='no',help='allow both Cobra and Python station traders without changing police launches (default: no)')
     p.add_argument('--stationslotfix',choices=['no','yes'],default='no',help='point the station docking slot at the planet when the station is switched on (default: no)')
+    p.add_argument('--fuelfix',choices=['no','yes'],default='no',help='recompute the fuel price and the FU gauge from the current fuel, also after a tape load (default: no)')
     p.add_argument('--verify',choices=['yes','no'],default='yes',help='exact original-byte comparison (default: yes); structural checks always run')
     # Also accept make.bat ship=adder laser=single verify=no.
     arguments=[]
     for value in sys.argv[1:]:
-        if value.startswith(('ship=','laser=','font=','scannerpixelfix=','stationrandomlaunchfix=','stationslotfix=','verify=','tapfile=')):
+        if value.startswith(('ship=','laser=','font=','scannerpixelfix=','stationrandomlaunchfix=','stationslotfix=','fuelfix=','verify=','tapfile=')):
             key,setting=value.split('=',1)
             arguments += ['--'+key,setting]
         else:
@@ -152,7 +155,7 @@ def main():
     args=p.parse_args(arguments)
     try:
         if args.verify_only: verify(output=release_tap(args.tapfile),exact=args.verify=='yes')
-        else: assemble(args.ship,args.verify=='yes',args.laser,args.font,args.scannerpixelfix,args.stationrandomlaunchfix,args.tapfile,args.stationslotfix)
+        else: assemble(args.ship,args.verify=='yes',args.laser,args.font,args.scannerpixelfix,args.stationrandomlaunchfix,args.tapfile,args.stationslotfix,args.fuelfix)
     except (OSError,ValueError,KeyError,subprocess.SubprocessError) as ex:
         (BUILD/'verification.json').unlink(missing_ok=True)
         print('ERROR: '+str(ex),file=sys.stderr);return 1

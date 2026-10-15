@@ -88,6 +88,24 @@ changes from 3.5 to 8.6 degrees.
 is switched on; see [build variants](BUILD-VARIANTS.md#station-slot-fix).
 The default build keeps the original behaviour.
 
+### Found in the fuel-price investigation
+
+The fuel price and the FU bar are derived from the fuel level, but neither
+is part of the saved commander record, and nothing recomputes them when a
+record is loaded. The checks are in `tools/check_routines.py`, group
+`commander`. Both effects were confirmed in ZX Spectrum 48K emulator runs, in
+which a test-only poke of `FuelLevel` stood for a loaded commander with
+3.4 light years.
+
+| Address | Routine | Finding |
+|---|---|---|
+| `$9237` | `FuelPrice` | The fuel price byte, entry 0 of `EquipmentPriceTable`, lies in the game image. Only three places write it: a normal jump stores 2 x economy + (70 - fuel) tenths of a credit, a galactic jump stores the old galaxy number + 1 whatever the fuel, and a fuel purchase stores 0. After a reset and reload of the game the tape value 0 remains, so a loaded commander with 3.4 light years sees fuel at 0.0 on the equipment screen and can fill the tank for nothing (`commander/fuel-price-not-restored`). A load without a reset keeps the price of the previous commander, and fuel scooped after a jump is still charged; both follow from the instructions. |
+| `$704A` | `FuelGauge` | The FU bar value is rewritten only by `SetFuelLevel`: a jump, fuel scooping or a purchase. After a tape load or a new commander the bar keeps the previous value, for example full (160) for a loaded commander with 3.4 light years, until the next jump. `PrepareShipForLaunch` does not refresh it (`commander/fuel-gauge-not-restored`). |
+
+`fuelfix=yes` recomputes both from `FuelLevel`; see
+[build variants](BUILD-VARIANTS.md#fuel-fix). The default build keeps the
+original behaviour.
+
 ## Corrections to the research notes
 
 The save-format note in `docs/info/` remains unchanged as supplied research.

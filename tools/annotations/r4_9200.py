@@ -48,10 +48,17 @@ L_B7AF as the high part), bytes 1..2 = remaining price in tenths of a credit
 1000.0 Cr.  All 13 fixed prices equal the manual's equipment list.
 Evidence: L_B53F loads HL with this table and prints one entry per item
 (L_B597..L_B5A3); L_B70A also indexes it; runtime: docked-equipment."""),
-    0x9237: (None, 'verified', """
+    0x9237: ('FuelPrice', 'verified', """
 Low byte of the FUEL price word (entry 0, tenths of a credit).  The only
-runtime-written price byte: cleared at $B608 after buying fuel and set at
-$D632/$D675.  The high byte $9238 is never written."""),
+runtime-written price byte: cleared at $B608 after buying fuel, set to
+2*economy + (70 - fuel) by a normal jump ($D675) and to the old galaxy number + 1
+by a galactic jump ($D632).  The high byte $9238 is never written.
+NOTE: the byte is not part of the saved commander record and nothing recomputes it
+from FuelLevel.  A tape load keeps the previous price, so after a reset and reload
+fuel costs 0.0 whatever the loaded fuel; scooping fuel or a new commander leaves it
+stale as well.
+Evidence: tools/check_routines.py commander/fuel-price-not-restored.
+fuelfix=yes recomputes it whenever the equipment list is shown (FuelPriceUpdate)."""),
 
     # ---------------------------------------------------------- energy bomb
     0x9260: ('UseEnergyBomb', 'verified', """
@@ -199,7 +206,9 @@ fragments, apparently left over from a dictionary build) are never used."""),
     0x9A3A: (None, 'inferred', """
 12 bytes after DustPlotList ($9A3A..$9A45) with no static or runtime access
 in any recorded 48K scenario.  Their text-like content continues the leftover
-dictionary fragment of the plot list's initial bytes.  Plausibly unused."""),
+dictionary fragment of the plot list's initial bytes.  Plausibly unused.
+fuelfix=yes uses them for FuelPriceStore and FuelGaugeUpdate, which falls into
+PrepareShipForLaunch."""),
 
     # ------------------------------------------------- launch / gauges
     0x9A46: ('PrepareShipForLaunch', 'verified', """

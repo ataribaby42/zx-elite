@@ -283,7 +283,7 @@ For ship variants run `tools/check_build_options.py`,
 scenarios with `tools/run_runtime_scenarios.py`, always in 48K mode. The build
 option check deliberately leaves an Adder TAP with
 `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
-stationslotfix=yes` for testing.
+stationslotfix=yes fuelfix=yes` for testing.
 Rebuild the default Krait version before collecting reference reconstruction/runtime-code seeds.
 The Adder test compares 128 actual rendered frames with the original side-B
 model, in addition to checking all 19 object loaders and other ship geometry.
@@ -361,7 +361,7 @@ for codes `$20..$7A`, with the same symbols, source address and runtime copy.
 Do not copy 768 bytes into the active font: the extra 40 bytes would overlap
 the game image. Preserve the conditional include in source regeneration.
 The optional font requires explicit `verify=no`; no other PATCH128 changes
-are imported. Run the 128-combination build matrix, graphics tests and 48K emulator
+are imported. Run the 256-combination build matrix, graphics tests and 48K emulator
 startup/screen checks after changing this option. Normal builds use ASM data
 only and never depend on the patch tape. The owner has requested permanent
 previews of both fonts in `docs/images/`; preserve the two named atlases above.
@@ -392,7 +392,7 @@ Police Viper, Thargon and special-mode Thargoid launches must remain intact.
 Run `tools/check_station_random_launch_fix.py` for both ship choices; include
 the preceding launch gates, all 65,536 seed states, and actual allocation
 with free/full slots. Preserve the include and assertions in regeneration.
-Use the 128-combination option matrix and 48K ROM-load/launch regression as well.
+Use the 256-combination option matrix and 48K ROM-load/launch regression as well.
 
 `stationslotfix=no` preserves the original station orientation, including
 the two documented defects in `docs/FINDINGS.md`: a dormant station's axes do
@@ -412,10 +412,32 @@ unrotated. Leave the arrival code, `MoveObject` and active-station updates
 unchanged; every path that does not switch the station on must match the
 original. The macros use labels only; keep `HalveCoordinateDifference` and the
 other names they call. Preserve the four conditional blocks
-(`STATION_SLOT_PARTS` in `tools/bootstrap_sources.py`) in source regeneration.
+(`OPTION_PARTS` in `tools/bootstrap_sources.py`) in source regeneration.
 Run `tools/check_station_slot_fix.py --emulator` for both ship choices, each
 built with the default tapfile, `python tools/check_routines.py --only station`
-on the default build, and the 128-combination option matrix.
+on the default build, and the 256-combination option matrix.
+
+`fuelfix=no` preserves the original fuel price and FU bar, which keep stale
+values after a tape load or a new commander (see `docs/FINDINGS.md`). The
+optional `yes` macros in `src/fuel-fix.asm` replace only two calls,
+`CALL PrepareShipForLaunch` in `LaunchFromStation` (`$7B85..$7B87`) and
+`CALL BeginTradeScreen` in `EquipShipScreen` (`$B53F..$B541`), and three free
+areas: `$B31B..$B32A`, `$A89B..$A8A9` and `$9A3A..$9A45`. With the option on,
+those areas are no longer free. Keep each part at its original length, both
+boundaries asserted with the limits in `src/options.asm`, the fall-through of
+`FuelGaugeUpdate` into `PrepareShipForLaunch` asserted, and no extra RAM.
+Compute the price where it is shown, from `FuelLevel`, `CurrentGovernment`
+and the current system's s0 high byte. Use the original jump formula
+(2 x economy + 70 - fuel tenths, 0 for a full tank); a normal jump must keep
+giving the price the original stores. Refresh the FU bar through
+`StoreFuelLevel`, which does not cap `FuelLevel`. Leave the jumps, the
+purchase and the tape code unchanged. The macros use labels only; keep
+`FuelPrice`, `StoreFuelLevel` and the other names they use. The four parts of
+`stationslotfix` and the five of `fuelfix` are listed in `OPTION_PARTS` in
+`tools/bootstrap_sources.py`; preserve them in source regeneration. Run
+`tools/check_fuel_fix.py --emulator` for both ship choices, each built with
+the default tapfile, `python tools/check_routines.py --only commander` on the
+default build, and the 256-combination option matrix.
 
 - Source boundaries, offsets and lengths must be calculated by scripts or
   labels. No tool may silently truncate or pad a block.

@@ -1,4 +1,4 @@
-REM make.bat ship=krait laser=original font=128 scannerpixelfix=no stationrandomlaunchfix=no stationslotfix=no verify=yes tapfile=elite-128k.tap 
+REM make.bat ship=krait laser=original font=128 scannerpixelfix=no stationrandomlaunchfix=no stationslotfix=no fuelfix=no verify=yes tapfile=elite-128k.tap 
 
 call make.bat verify=yes tapfile=elite-128k.tap
 

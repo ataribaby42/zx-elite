@@ -87,7 +87,12 @@ damage (L_DA18), L_A65A recharges it; L_9A46 fills it ($A0) at launch."""),
     0x7048: ('AftShield', 'verified', """
 Aft shield strength, 0..160, drawn as the AS bar (damage from L_DA19)."""),
     0x704A: ('FuelGauge', 'verified', """
-FU bar value, written by L_D873 from the commander's fuel (L_A844)."""),
+FU bar value, written by L_D873 from the commander's fuel (L_A844).
+NOTE: not part of the saved commander record.  Only a jump, fuel scooping or a fuel
+purchase rewrite it, so after a tape load or a new commander the FU bar keeps the
+previous fuel level until then.
+Evidence: tools/check_routines.py commander/fuel-gauge-not-restored.
+fuelfix=yes recomputes it at every launch (FuelGaugeUpdate)."""),
     0x704C: ('CabinTemperature', 'verified', """
 CT bar value.  L_88E1 sets it from the distance to the sun when close to it;
 UpdateExpandingSun increments it every frame; cleared at launch and after
@@ -703,7 +708,9 @@ shields/energy (L_9A46), ArmExpandingSun; planet ahead at z = $0180, sun z
 mirrored, station slot 0 just behind the ship (z fraction $F0, negative,
 unit orientation, energy $F0); clear other slots; draw gauges; then the
 64-frame tunnel (17 in the first call, then 36 + 11 calls, the last 11 also
-moving and drawing sun and planet).  Falls into ResetFlightInputs."""),
+moving and drawing sun and planet).  Falls into ResetFlightInputs.
+fuelfix=yes calls FuelGaugeUpdate instead of L_9A46: it sets the FU bar value from
+L_A844 and falls into L_9A46."""),
     0x7BFF: ('ResetFlightInputs', 'verified', """
 Clear the interrupt input bytes L_FF08..L_FF0C and set L_FF0D (high byte of
 SpeedControl) to 12, so the next ReadFlightControls gives speed 12 with no roll or

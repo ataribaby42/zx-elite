@@ -173,7 +173,12 @@ AftShield:
     defb $00                                                                              ; $7048 .
     defb $00                                                                              ; $7049 .  drawn copy of FuelGauge
 
-; VERIFIED: FU bar value, written by L_D873 from the commander's fuel (FuelLevel).
+; VERIFIED: FU bar value, written by StoreFuelLevel from the commander's fuel (FuelLevel).
+; NOTE: not part of the saved commander record.  Only a jump, fuel scooping or a fuel
+; purchase rewrite it, so after a tape load or a new commander the FU bar keeps the
+; previous fuel level until then.
+; Evidence: tools/check_routines.py commander/fuel-gauge-not-restored.
+; fuelfix=yes recomputes it at every launch (FuelGaugeUpdate).
 FuelGauge:
     defb $A0                                                                              ; $704A .
     defb $00                                                                              ; $704B .  drawn copy of CabinTemperature
@@ -2527,6 +2532,8 @@ L_7B43:
 ; unit orientation, energy $F0); clear other slots; draw gauges; then the
 ; 64-frame tunnel (17 in the first call, then 36 + 11 calls, the last 11 also
 ; moving and drawing sun and planet).  Falls into ResetFlightInputs.
+; fuelfix=yes calls FuelGaugeUpdate instead of PrepareShipForLaunch: it sets the FU bar value from
+; FuelLevel and falls into PrepareShipForLaunch.
 LaunchFromStation:
     LD A,$04                                   ; $7B68: 3E 04  FlightCondition: green
     LD (FlightCondition),A                     ; $7B6A: 32 62 70
@@ -2539,7 +2546,13 @@ LaunchFromStation:
     LD A,FinishLaunchTunnelLoop-(TunnelExitOffset+1) ; $7B7D: 3E 32  TunnelExitOffset -> FinishLaunchTunnelLoop
     LD (TunnelExitOffset),A                    ; $7B7F: 32 38 7A
     CALL RestoreCockpitIfFullScreen            ; $7B82: CD 1C 74
+assert $-GameImage = FuelLaunchHookStart-GameLoadAddress
+IF FUEL_FIX
+    CALL FuelGaugeUpdate                       ; FU bar value from FuelLevel, then PrepareShipForLaunch
+ELSE
     CALL PrepareShipForLaunch                  ; $7B85: CD 46 9A  shields, energy, gauge values
+ENDIF
+assert $-GameImage = FuelLaunchHookLimit-GameLoadAddress
     CALL ArmExpandingSun                       ; $7B88: CD 1F 78
     LD HL,PlanetPosition                       ; $7B8B: 21 6E 70
     LD B,$07                                   ; $7B8E: 06 07
@@ -7463,9 +7476,16 @@ EquipmentPriceTable:
     defb $00                                                                              ; $9236 .
 
 ; VERIFIED: Low byte of the FUEL price word (entry 0, tenths of a credit).  The only
-; runtime-written price byte: cleared at $B608 after buying fuel and set at
-; $D632/$D675.  The high byte $9238 is never written.
-L_9237:
+; runtime-written price byte: cleared at $B608 after buying fuel, set to
+; 2*economy + (70 - fuel) by a normal jump ($D675) and to the old galaxy number + 1
+; by a galactic jump ($D632).  The high byte $9238 is never written.
+; NOTE: the byte is not part of the saved commander record and nothing recomputes it
+; from FuelLevel.  A tape load keeps the previous price, so after a reset and reload
+; fuel costs 0.0 whatever the loaded fuel; scooping fuel or a new commander leaves it
+; stale as well.
+; Evidence: tools/check_routines.py commander/fuel-price-not-restored.
+; fuelfix=yes recomputes it whenever the equipment list is shown (FuelPriceUpdate).
+FuelPrice:
     defb $00,$00                                                                          ; $9237 ..
 L_9239:
     defb $00,$2C,$01                                                                      ; $9239 .,.  MISSILE: 30.0 Cr
@@ -7830,8 +7850,16 @@ DustPlotList:
 ; INFERRED: 12 bytes after DustPlotList ($9A3A..$9A45) with no static or runtime access
 ; in any recorded 48K scenario.  Their text-like content continues the leftover
 ; dictionary fragment of the plot list's initial bytes.  Plausibly unused.
+; fuelfix=yes uses them for FuelPriceStore and FuelGaugeUpdate, which falls into
+; PrepareShipForLaunch.
 L_9A3A:
+assert $-GameImage = FuelStorePartStart-GameLoadAddress
+IF FUEL_FIX
+    FuelStoreCode
+ELSE
     defb $91,$99,$B9,$00,$FB,$4D,$55,$4E,$9D,$54,$00,$43                                  ; $9A3A .....MUN.T.C
+ENDIF
+assert $-GameImage = FuelStorePartLimit-GameLoadAddress
 
 ; ============================================================================
 ; Launch reset and instrument block colours
@@ -9848,7 +9876,13 @@ MissileTarget:
     defb $00                                                                              ; $A89A .
 
 ; VERIFIED: Dormant vector: JP ScoopCargoItem (see L_A897).
+; fuelfix=yes replaces $A89B..$A8A9 (these vectors and the fragment after them) with
+; FuelEconomy.
 L_A89B:
+assert $-GameImage = FuelEconomyPartStart-GameLoadAddress
+IF FUEL_FIX
+    FuelEconomyCode
+ELSE
     JP ScoopCargoItem                          ; $A89B: C3 B7 A8  dormant vector: ScoopCargoItem
 
 ; VERIFIED: Dormant vector: JP AwardBounty (see L_A897).
@@ -9866,6 +9900,8 @@ L_A8A4:
 ; VERIFIED: Dormant vector: JP DamageEquipmentOrCargo (see L_A897).
 L_A8A7:
     JP DamageEquipmentOrCargo                  ; $A8A7: C3 F0 A5  dormant vector: DamageEquipmentOrCargo
+ENDIF
+assert $-GameImage = FuelEconomyPartLimit-GameLoadAddress
 
 ; VERIFIED: Scooped item $FF (the canister of the special Asp): set CommanderFlags bit 6 (cloaking
 ; device), add 256 to the combat score and post token CLOAKING DEVICE in the scooped-cargo
@@ -11809,7 +11845,12 @@ L_B318:
 ; with A (LD HL,$5800, two CALLs to the 256-byte loop at L_B324, then the loop
 ; itself).  Decoded as code because both internal CALL operands point exactly
 ; at the loop; no CALL/JP/pointer in the image targets $B31B.
+; fuelfix=yes replaces these 16 bytes with FuelPriceUpdate.
 L_B31B:
+assert $-GameImage = FuelPricePartStart-GameLoadAddress
+IF FUEL_FIX
+    FuelPriceCode
+ELSE
     LD HL,$5800                                ; $B31B: 21 00 58
     CALL L_B324                                ; $B31E: CD 24 B3
     CALL L_B324                                ; $B321: CD 24 B3
@@ -11820,6 +11861,8 @@ L_B326:
     INC HL                                     ; $B327: 23
     DJNZ L_B326                                ; $B328: 10 FC
     RET                                        ; $B32A: C9
+ENDIF
+assert $-GameImage = FuelPricePartLimit-GameLoadAddress
 
 ; VERIFIED: InputQuantity: delete after the first digit - erase it, undo the attempt
 ; (RestoreTradeState) and restart the number.
@@ -12214,10 +12257,19 @@ ResetCommodityPointers:
 ; VERIFIED: Docked "equip ship" key handler (JP from $A7E0): title "EQUIP SHIP", then
 ; list EquipmentItemCount items (tech level CurrentTechLevel + 3, or all 14 from 9 up)
 ; with number, name (token $69+n) and price from the table at EquipmentPriceTable.
-; Fuel (item 1) is not listed while NovaMissionActive is nonzero.
+; Fuel (item 1) is not listed while NovaMissionActive is nonzero.  Its price is FuelPrice as the last
+; jump or purchase left it (see there).
 ; Evidence: docked-equipment, buy-* and equip-tech10 traces.
+; fuelfix=yes calls FuelPriceUpdate instead of BeginTradeScreen: it recomputes FuelPrice
+; and continues in BeginTradeScreen.
 EquipShipScreen:
+assert $-GameImage = FuelPriceHookStart-GameLoadAddress
+IF FUEL_FIX
+    CALL FuelPriceUpdate                       ; fuel price from FuelLevel, then BeginTradeScreen
+ELSE
     CALL BeginTradeScreen                      ; $B53F: CD 9F B4
+ENDIF
+assert $-GameImage = FuelPriceHookLimit-GameLoadAddress
     CALL PrintInlineToken                      ; $B542: CD 99 BA  title in capitals
     defb $06                                   ; $B545: 06  PrintInlineToken argument: "{caps}"
     LD A,$CF                                   ; $B546: 3E CF  token: "EQUIP"
@@ -12331,7 +12383,7 @@ L_B5F7:
     AND A                                      ; $B604: A7
     JR NZ,BuyEquipmentItem                     ; $B605: 20 AD  NovaMissionActive set: refused, the fuel price is not refunded
     XOR A                                      ; $B607: AF
-    LD (L_9237),A                              ; $B608: 32 37 92  fuel price low byte := 0 (its high byte is always 0)
+    LD (FuelPrice),A                           ; $B608: 32 37 92  fuel price low byte := 0 (its high byte is always 0)
     CALL ShowCashAfterTrade                    ; $B60B: CD 95 B3
     LD A,$46                                   ; $B60E: 3E 46  fill the tank: 70 = 7.0 light years
     CALL SetFuelLevel                          ; $B610: CD 6D D8
@@ -15392,7 +15444,7 @@ ExecuteHyperspaceJump:
 
 ; VERIFIED: Clear the mission-3 state (InvasionMissionState); if mission 1 is active (NovaMissionActive) clear NovaMissionActive
 ; and ExpandingSunActive; clear GalacticHyperdriveFitted (always, also when forced by mission 1).
-; L_9237 = old galaxy + 1, CurrentGalaxy = (galaxy + 1) AND 7, rotate every byte of the
+; FuelPrice = old galaxy + 1, CurrentGalaxy = (galaxy + 1) AND 7, rotate every byte of the
 ; three galaxy seed words at GalaxySeeds left by one bit, clear PlayerLegalScore, select
 ; the system nearest the chart cursor in the new galaxy (SnapCursorToNearestSystem), then
 ; ArriveInTargetSystem.  No fuel is used.
@@ -15409,7 +15461,7 @@ L_D62B:
     LD (GalacticHyperdriveFitted),A            ; $D62B: 32 4F A8  galactic hyperdrive used up (A = 0)
     LD A,(CurrentGalaxy)                       ; $D62E: 3A 27 A8
     INC A                                      ; $D631: 3C
-    LD (L_9237),A                              ; $D632: 32 37 92  fuel price byte = old galaxy + 1
+    LD (FuelPrice),A                           ; $D632: 32 37 92  fuel price byte = old galaxy + 1
     AND $07                                    ; $D635: E6 07  eight galaxies
     LD (CurrentGalaxy),A                       ; $D637: 32 27 A8
     LD HL,GalaxySeeds                          ; $D63A: 21 52 A8  three galaxy seed words
@@ -15436,7 +15488,7 @@ RotateSeedWordLeft:
 
 ; VERIFIED: While mission 1 is active (NovaMissionActive) every jump is a galactic jump.  Otherwise
 ; fuel = fuel - distance (low byte of SelectedSystemDistance) via SetFuelLevel,
-; L_9237 = 2*SelectedSystemEconomy + (70 - new fuel), PlayerLegalScore halved.
+; FuelPrice = 2*SelectedSystemEconomy + (70 - new fuel), PlayerLegalScore halved.
 ; Bit 6 of ControlOptions, or a byte of $F9 at AuxRandomSeed, selects
 ; EnterHyperspaceMisjump; otherwise ArriveInTargetSystem.
 NormalHyperspaceJump:
@@ -15455,7 +15507,7 @@ NormalHyperspaceJump:
     LD A,(SelectedSystemEconomy)               ; $D670: 3A 4B AC  target economy
     ADD A,A                                    ; $D673: 87
     ADD A,B                                    ; $D674: 80
-    LD (L_9237),A                              ; $D675: 32 37 92  fuel price byte = 2*economy + 70 - fuel
+    LD (FuelPrice),A                           ; $D675: 32 37 92  fuel price byte = 2*economy + 70 - fuel
     LD HL,PlayerLegalScore                     ; $D678: 21 21 A8
     SRL (HL)                                   ; $D67B: CB 3E  legal score halved by every normal jump
     LD A,(ControlOptions)                      ; $D67D: 3A 14 FC
@@ -15823,9 +15875,14 @@ TriggerFuelLeak:
 ; Evidence: tools/check_routines.py numbers/fuel-and-seed-helpers (all A).
 SetFuelLevel:
     CP $47                                     ; $D86D: FE 47  70 = 7.0 light years
-    JR C,L_D873                                ; $D86F: 38 02
+    JR C,StoreFuelLevel                        ; $D86F: 38 02
     LD A,$46                                   ; $D871: 3E 46  cap at 70
-L_D873:
+
+; VERIFIED: SetFuelLevel after its limit: FuelLevel = A, any value, and the FU bar value
+; FuelGauge = 2*A + (2*A >> 3).  Clobbers A, B, F.
+; Evidence: tools/check_routines.py numbers/fuel-and-seed-helpers (A up to 70 reaches it
+; through the JR C).
+StoreFuelLevel:
     LD (FuelLevel),A                           ; $D873: 32 44 A8
     ADD A,A                                    ; $D876: 87
     LD B,A                                     ; $D877: 47  B = 2*fuel
@@ -23418,6 +23475,7 @@ defc L_91C8 = SoundRequestIndex
 defc L_91D2 = ChartDiscGlyphs
 defc L_91F2 = CommodityTable
 defc L_9236 = EquipmentPriceTable
+defc L_9237 = FuelPrice
 defc L_9260 = UseEnergyBomb
 defc L_9280 = FlashViewAttributes
 defc L_9287 = FillViewAttributes
@@ -23881,6 +23939,7 @@ defc L_D813 = PirateBoardingCompare
 defc L_D814 = FinishHyperspaceArrival
 defc L_D862 = TriggerFuelLeak
 defc L_D86D = SetFuelLevel
+defc L_D873 = StoreFuelLevel
 defc L_D883 = CrosshairSize
 defc L_D884 = CrosshairTopLimit
 defc L_D885 = CrosshairBottomLimit

@@ -45,23 +45,6 @@ MAX_NOMINAL_ERROR = 1.0                         # from $10000 up (the arrival di
 IY_SENTINEL = 0x5A3C
 
 
-class ImageContext(cr.Context):
-    """check_routines.Context for an arbitrary image of the current build."""
-
-    def __init__(self, symbols, image):
-        self.symbols = symbols
-        self.image = bytes(image)
-        self.rom = (ROOT / 'assets/zxspectrum48k.rom').read_bytes()
-        assert len(self.rom) == cr.ROM_SIZE
-        base = symbols['GameImage']
-        memory = list(self.rom) + [0] * (cr.RAM_TOP - cr.ROM_SIZE)
-        memory[base:base + len(image)] = image
-        self.pristine = tuple(memory)
-        self.test_stack = symbols['FontRuntime'] - 0x80
-        self.upper_stack = cr.RAM_TOP - 0x10
-        self.scratch = self.test_stack + 0x10
-
-
 def sm8(value):
     return -(value & 0x7F) if value & 0x80 else value
 
@@ -122,8 +105,8 @@ class Checker:
         for start, end in self.parts:
             baseline[start - self.base:end - self.base] = original[start - self.base:end - self.base]
         self.baseline = bytes(baseline)
-        self.fixed = ImageContext(s, self.image)
-        self.original = ImageContext(s, self.baseline)
+        self.fixed = cr.ImageContext(s, self.image)
+        self.original = cr.ImageContext(s, self.baseline)
         self.station = s['InitialRuntimeState']
         self.planet = s['PlanetPosition']
         self.sun = s['SunPosition']

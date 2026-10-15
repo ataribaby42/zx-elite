@@ -55,6 +55,27 @@ IF STATION_SLOT_FIX
     INCLUDE "station-slot-fix.asm"
 ENDIF
 
+IFNDEF FUEL_FIX
+    defc FUEL_FIX = 0
+ENDIF
+assert FUEL_FIX = 0 || FUEL_FIX = 1
+
+; Original fixed boundaries of the five areas that fuelfix=yes replaces: two calls
+; and three free areas of the image.
+defc FuelLaunchHookStart = $7B85                ; CALL PrepareShipForLaunch in LaunchFromStation
+defc FuelLaunchHookLimit = $7B88
+defc FuelPriceHookStart = $B53F                 ; CALL BeginTradeScreen in EquipShipScreen
+defc FuelPriceHookLimit = $B542
+defc FuelPricePartStart = $B31B
+defc FuelPricePartLimit = $B32B
+defc FuelEconomyPartStart = $A89B
+defc FuelEconomyPartLimit = $A8AA
+defc FuelStorePartStart = $9A3A
+defc FuelStorePartLimit = $9A46
+IF FUEL_FIX
+    INCLUDE "fuel-fix.asm"
+ENDIF
+
 ; Original fixed boundaries of the shared parent-ship launch selector.
 defc ParentLaunchSelectionStart = $F44A
 defc ParentLaunchSelectionLimit = $F470

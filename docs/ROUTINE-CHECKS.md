@@ -363,6 +363,20 @@ tool, `tools/check_station_slot_fix.py` (see
 | `orientation-pitch-quantisation` | `RotateVectorRollPitch`, `ApplyPlayerMotion` | 8 | Axes get the shear steps of `ApplyPlayerMotion` at the same scale, but with pitch/2 truncated. Over 32 updates, pitch 1 turns a position by 7.2 degrees and a unit axis not at all. Pitch 3 turns the axis by 14.5 degrees like pitch 2, while the position turns by 21.4. Roll 1 turns both alike, by 14.5 and 14.1 degrees. |
 | `roll-drift-keeps-slot` | `ApplyPlayerMotion`, `RotateVectorRollPitch`, `MoveObject`, `OrthogonaliseYVector`, `RenormaliseOrientationVector` | 1,300 | The roll-reversal drift does not turn an active station away from the planet. Start from the launch layout: planet $18000 ahead, station just behind with unit axes and active. Then 20 updates at pitch 8 and the 1,280 alternating-roll updates of `maths/roll-reversal-drift` move the planet 2.29 times further from the view axis. The slot error only changes from 3.5 to 8.6 degrees. Each update runs `MoveSunAndPlanet`, `UpdateStationDormancy` and the slot-0 part of `UpdateObjects` from `L_DB8B` to `L_DBA3`. |
 
+## Checks added in the fuel-price investigation
+
+These checks back the fuel findings in
+[findings](FINDINGS.md#found-in-the-fuel-price-investigation). They run on the
+default build. The optional repair has its own tool, `tools/check_fuel_fix.py`
+(see [build variants](BUILD-VARIANTS.md#fuel-fix)).
+
+### `commander` (fuel-price investigation)
+
+| Check | Routines | Cases | Claim supported |
+|---|---|---:|---|
+| `fuel-price-not-restored` | `EquipShipScreen`, `GetEquipmentPriceEntry`, `NormalHyperspaceJump`, `GalacticHyperspaceJump` | 10 | `FuelPrice` (entry 0 of `EquipmentPriceTable`) lies in the game image, not in the commander record. After loading the game its tape value is 0, so a loaded record with 3.4 light years still gets fuel entry 0.0. Only three places write it. `NormalHyperspaceJump` stores 2 x economy + 70 - fuel, which is 4.6 Cr for economy 5 with 3.4 light years left. `GalacticHyperspaceJump` stores the old galaxy number + 1 for galaxies 0..7 and leaves the fuel unchanged. The fuel purchase stores 0. |
+| `fuel-gauge-not-restored` | `FuelGauge`, `PrepareShipForLaunch`, `StoreFuelLevel` | 2 | `FuelGauge`, the FU bar value, is not in the commander record either. Its tape value 160 (full) stays when a loaded record holds 3.4 light years, also through `PrepareShipForLaunch` at the launch. `StoreFuelLevel`, the end of `SetFuelLevel`, gives 76 and leaves `FuelLevel` as it is. |
+
 ## Differences from the former ad-hoc tests
 
 - Random sample sizes are smaller where the former scripts used tens or

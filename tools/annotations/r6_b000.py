@@ -176,7 +176,8 @@ Evidence: docked-market trace; decoded tokens."""),
 Dormant routine, never referenced: fill the 768 attribute bytes from $5800
 with A (LD HL,$5800, two CALLs to the 256-byte loop at L_B324, then the loop
 itself).  Decoded as code because both internal CALL operands point exactly
-at the loop; no CALL/JP/pointer in the image targets $B31B."""),
+at the loop; no CALL/JP/pointer in the image targets $B31B.
+fuelfix=yes replaces these 16 bytes with FuelPriceUpdate."""),
     0xB32B: (None, 'verified', """
 InputQuantity: delete after the first digit - erase it, undo the attempt
 (RestoreTradeState) and restart the number."""),
@@ -278,8 +279,11 @@ the price words (both are pre-incremented per commodity) and L_AF30 = 0."""),
 Docked "equip ship" key handler (JP from $A7E0): title "EQUIP SHIP", then
 list EquipmentItemCount items (tech level L_A85E + 3, or all 14 from 9 up)
 with number, name (token $69+n) and price from the table at L_9236.
-Fuel (item 1) is not listed while L_A843 is nonzero.
-Evidence: docked-equipment, buy-* and equip-tech10 traces."""),
+Fuel (item 1) is not listed while L_A843 is nonzero.  Its price is L_9237 as the last
+jump or purchase left it (see there).
+Evidence: docked-equipment, buy-* and equip-tech10 traces.
+fuelfix=yes calls FuelPriceUpdate instead of BeginTradeScreen: it recomputes L_9237
+and continues in BeginTradeScreen."""),
     0xB5B4: ('BuyEquipmentItem', 'verified', """
 Prompt "ITEM? ", read the number (InputQuantity with AcceptQuantity) and buy
 it: pay the price (SubtractCashHigh, SubtractCash; "CASH?" on failure),

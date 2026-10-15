@@ -41,7 +41,7 @@ python tools/build.py --verify-only --verify no
 
 `ship` accepts `krait` (default) or `adder`; `laser` accepts `original` (default)
 or `single`. `font` accepts `128` (default), `48`, `128fix` or `128fix_ecm_s`. `scannerpixelfix`,
-`stationrandomlaunchfix` and `stationslotfix` accept `no` (default) or `yes`. `verify` accepts `yes`
+`stationrandomlaunchfix`, `stationslotfix` and `fuelfix` accept `no` (default) or `yes`. `verify` accepts `yes`
 (default) or `no`. A build does not change the saved BAT settings or remember
 its command-line overrides. No modification silently weakens verification: select
 `verify=no` explicitly. Modified builds with `verify=yes` correctly fail the
@@ -243,6 +243,90 @@ changed from 59.5 to 0.52 degrees at Diso, and from 180.0 to 0.02 degrees at
 LEMAED. The combined Adder, single-laser, `font=48` build with all three fixes
 gave 64.3 to 0.84 and 180.0 to 0.00 degrees. Build the option with the default
 tapfile for this mode. Reports are in `build/station-slot-fix-check/`.
+
+## Fuel fix
+
+```bat
+make.bat fuelfix=yes verify=no
+python tools/check_fuel_fix.py
+python tools/check_fuel_fix.py --emulator
+```
+
+The equivalent Python option is `--fuelfix yes`. The default `no` keeps the
+original bytes and behaviour.
+
+In the original game the fuel price (`FuelPrice`, entry 0 of
+`EquipmentPriceTable`) and the FU bar value (`FuelGauge`) are not part of the
+saved commander record, and nothing recomputes them when a record is loaded.
+After saving with 3.4 light years, resetting, reloading the game and loading
+the commander, the equipment screen offers fuel at 0.0 and the FU bar shows a
+full tank. See [findings](FINDINGS.md#found-in-the-fuel-price-investigation).
+
+The fix recomputes both from `FuelLevel` at the moments they are used:
+
+- `EquipShipScreen` calls `FuelPriceUpdate` instead of `BeginTradeScreen`. It
+  stores 0 for a full tank, otherwise 2 x economy + (70 - fuel) tenths of a
+  credit, and continues in `BeginTradeScreen`. This is the formula of the
+  original normal jump. The economy is that of the system the ship is docked
+  at, formed as `DeriveSelectedSystemData` does it: s0 high byte AND 7, with
+  bit 1 set for governments 0 and 1.
+- `LaunchFromStation` calls `FuelGaugeUpdate` instead of
+  `PrepareShipForLaunch`. It sets the FU bar value through `StoreFuelLevel`,
+  the end of `SetFuelLevel`, which leaves `FuelLevel` unchanged, and falls
+  into `PrepareShipForLaunch`.
+
+In the normal case, docked after a jump without scooping, the price is the
+one the original shows. The fix also corrects the other stale cases:
+- a load without a reset;
+- a new commander after the game is over;
+- fuel scooped after a jump;
+- the galactic jump, which originally stores the old galaxy number + 1 as the
+  price.
+
+A full tank always costs 0.0. A record with more than 7.0 light years, which
+the game itself never creates, gets a meaningless price; the original shows
+whatever price is left over in that case.
+
+The two hooked calls keep their three bytes. The 43 bytes of new code fill
+three areas listed as [persistently free](#persistently-free-bytes-in-the-image),
+none of them used by another option:
+
+| Area | Original contents | New contents |
+|---|---|---|
+| `$B31B..$B32A` (16 B) | Dormant attribute-fill routine | `FuelPriceUpdate`, 16 B |
+| `$A89B..$A8A9` (15 B) | Dormant `JP` vectors and a fragment | `FuelEconomy`, 15 B |
+| `$9A3A..$9A45` (12 B) | Unused bytes after `DustPlotList` | `FuelPriceStore` and `FuelGaugeUpdate`, 12 B, falling into `PrepareShipForLaunch` |
+
+`src/fuel-fix.asm` defines the three parts as macros, and `src/game.asm`
+expands each one in place of the original bytes. Assembler assertions protect
+both boundaries of all five areas, using the original limits in
+`src/options.asm`. Further assertions check the fall-through into
+`PrepareShipForLaunch` and that `FuelLevel`, `CurrentGovernment` and the
+current system's s0 high byte share one page. No other byte changes, 44 bytes
+in total, and no RAM is added.
+
+`tools/check_fuel_fix.py` runs the assembled image with the supplied 48K ROM
+in SkoolKit's simulator. It compares it with a baseline whose five areas are
+restored from the reference tape, and checks the following:
+
+- only the five areas differ;
+- the price for every fuel level 0..70, government 0..7 and s0 high byte, a
+  total of 145,408 cases;
+- after a normal jump into each of the 2,048 systems, the same fuel and price
+  as the original jump;
+- for every fuel byte 0..255, the same RAM after `FuelGaugeUpdate` as after
+  `StoreFuelLevel` and the original `PrepareShipForLaunch`. `FuelLevel` is
+  kept, so it is not capped at 70.
+
+`--emulator` loads `release/elite-128k.tap` through the 48K ROM. A test-only
+poke of `FuelLevel` stands for a loaded commander with 3.4 light years:
+
+- the equipment screen lists fuel at 4.6;
+- buying it costs 4.6, fills the tank and lists 0.0;
+- after a launch the FU bar value is 76 instead of 160.
+
+The original under the same poke lists 0.0 and keeps 160. Build the option
+with the default tapfile for this mode. Reports are in `build/fuel-fix-check/`.
 
 ## What verification means
 
@@ -499,9 +583,10 @@ choice reuse only their own original regions and need no extra memory. With
 ship and table region before `$7000` then has no spare capacity, and the
 one-time start-up runs in the start-up-only area above. `stationslotfix=yes`
 uses three of the free areas listed above: `$E88B..$E8CE`, `$AC56..$AC76` and
-`$FCED..$FCFF`, 114 of their 120 bytes. Every other option leaves the free
-areas unchanged. Without `stationslotfix` the remaining free capacity is 216
-bytes; with it, 96 bytes are left in the other 19 areas, the largest 16 bytes.
+`$FCED..$FCFF`, 114 of their 120 bytes. `fuelfix=yes` fills three others
+completely: `$B31B..$B32A`, `$A89B..$A8A9` and `$9A3A..$9A45`, 43 bytes. Every
+other option leaves the free areas unchanged. With both fixes 53 bytes remain
+free in 16 areas, the largest 11 bytes (`$BDF5..$BDFF`).
 
 ### Rules for using free space
 
@@ -536,17 +621,18 @@ Use `make.bat ship=krait font=48 verify=no` for the Krait check and
 The inherited broader gameplay scenarios above remain available; they are
 not all required for a font-only data substitution.
 
-The option check builds all 128 `ship`/`laser`/`font`/`scannerpixelfix`/
-`stationrandomlaunchfix`/`stationslotfix` combinations in both verification modes, expects
+The option check builds all 256 `ship`/`laser`/`font`/`scannerpixelfix`/
+`stationrandomlaunchfix`/`stationslotfix`/`fuelfix` combinations in both verification modes, expects
 strict verification of any modification to fail, checks stale-output
 removal and rejects damaged checksums, invalid metadata with a valid XOR, and
 truncated TAP data even with identity disabled. It also verifies the exact
 ten-byte laser patch, exact font bytes from PATCH128 and absence of unrelated
 changes for each ship option. The scanner fix is limited to the original
 instrument region and its two missile-call operands; the station launch fix
-is limited to its original 38-byte selector, and the station slot fix to its
-four areas. It leaves Adder with `laser=single font=48 scannerpixelfix=yes
-stationrandomlaunchfix=yes stationslotfix=yes` built.
+is limited to its original 38-byte selector, the station slot fix to its
+four areas and the fuel fix to its five. It leaves Adder with `laser=single
+font=48 scannerpixelfix=yes stationrandomlaunchfix=yes stationslotfix=yes
+fuelfix=yes` built.
 
 The ship check compares all other models with the original bytes, resolves
 every Adder vertex/edge face reference to the original normal, and executes
@@ -594,14 +680,15 @@ Maintained files for this feature:
 
 - `build.bat`, `make.bat`, `verify.bat`, `tools/build.py`;
 - `src/options.asm`, `src/adder-startup.asm`, `src/single-laser.asm`,
-  `src/station-slot-fix.asm`;
+  `src/station-slot-fix.asm`, `src/fuel-fix.asm`;
 - `src/data/font.asm`, `src/data/font-48.asm`, `tools/font_variant.py`;
 - `src/game.asm`, `src/data/ship-blueprints-and-tables.asm`;
 - `src/data/initial-runtime-state.asm`;
 - `src/data/adder.asm`, `adder-original.asm`, `text-dispatch-first.asm`, `text-dispatch-second.asm`;
 - `tools/bootstrap_sources.py`, `tools/analyze_ship_blueprints.py`;
 - `tools/check_build_options.py`, `tools/check_laser_variant.py`, `tools/check_ship_variant.py`,
-  `tools/check_graphics.py`, `tools/check_station_slot_fix.py`, `tools/emulator_check.py`;
+  `tools/check_graphics.py`, `tools/check_station_slot_fix.py`, `tools/check_fuel_fix.py`,
+  `tools/emulator_check.py`;
 - `AGENTS.md`, `README.md`, `docs/SHIPS.md`, `docs/GRAPHICS.md`, this document.
 
 The bootstrap generator preserves these conditional hooks and regenerates

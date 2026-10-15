@@ -74,7 +74,8 @@ ROM_IY = 0x5C3A                      # ROM system-variable pointer (SkoolKit's d
 FRESH_REGISTERS = dict(a=0, f=0, bc=0, de=0, hl=0, ix=0, iy=ROM_IY)   # a new Simulator's registers
 
 OPTION_SYMBOLS = ('SHIP_ADDER', 'LASER_SINGLE', 'FONT_48', 'FONT_128FIX', 'FONT_128FIX_ECM_S',
-                  'SCANNER_PIXEL_FIX', 'STATION_RANDOM_LAUNCH_FIX', 'STATION_SLOT_FIX')
+                  'SCANNER_PIXEL_FIX', 'STATION_RANDOM_LAUNCH_FIX', 'STATION_SLOT_FIX',
+                  'FUEL_FIX')
 OUTPUT = ROOT / 'build/routine-checks/verification.json'
 
 # Object instance fields (offsets inside a 39-byte slot; tools/annotations, docs/SHIPS.md)
@@ -193,6 +194,26 @@ class Context:
     def machine(self):
         return Machine(self)
 
+
+
+class ImageContext(Context):
+    """Context for any image of the current build, used by the checks of optional fixes.
+
+    It skips Context's default-build assertions; those checks compare the image with
+    their own baselines instead."""
+
+    def __init__(self, symbols, image):
+        self.symbols = symbols
+        self.image = bytes(image)
+        self.rom = (ROOT / 'assets/zxspectrum48k.rom').read_bytes()
+        assert len(self.rom) == ROM_SIZE
+        base = symbols['GameImage']
+        memory = list(self.rom) + [0] * (RAM_TOP - ROM_SIZE)
+        memory[base:base + len(image)] = image
+        self.pristine = tuple(memory)
+        self.test_stack = symbols['FontRuntime'] - 0x80
+        self.upper_stack = RAM_TOP - 0x10
+        self.scratch = self.test_stack + 0x10
 
 REGISTER_INDEX = dict(a=A, f=F, b=B, c=C, d=D, e=E, h=H, l=L)
 
@@ -6811,6 +6832,64 @@ def check_roll_drift_keeps_slot(ctx):
     return 1300, dict(slot_error_before=measured[0], slot_error_after=measured[1],
                       planet_off_axis_growth=measured[2])
 # --- END STATION CHECKS ---
+
+# --- BEGIN FUEL CHECKS ---
+# Fuel-derived values outside the saved commander record.
+
+
+@check('commander', 'fuel-price-not-restored', ['EquipShipScreen', 'GetEquipmentPriceEntry',
+                                                'NormalHyperspaceJump', 'GalacticHyperspaceJump'],
+       'fuel-price investigation',
+       'FuelPrice (entry 0 of EquipmentPriceTable) lies in the game image, not in the commander '
+       'record.  After loading the game its tape value is 0, so a loaded record with 3.4 light years '
+       'still gets fuel entry 0.0.  Only NormalHyperspaceJump (2*economy + 70 - fuel: 4.6 Cr for '
+       'economy 5 and 3.4 light years left), GalacticHyperspaceJump (old galaxy + 1 for galaxies '
+       '0..7, fuel unchanged) and the fuel purchase (0) write it.')
+def check_fuel_price_not_restored(ctx):
+    m = ctx.machine()
+    load_jameson(m)
+    m.poke('FuelLevel', 34)                         # a loaded record: 3.4 light years
+    expect(m.byte('FuelPrice') == 0, 'tape value')
+    m.call('GetEquipmentPriceEntry', a=1, f=0, bc=0, de=0, hl=0)
+    entry = m.pair('hl')
+    expect(entry == ctx['EquipmentPriceTable'] and m.memory[entry:entry + 3] == [0, 0, 0], 'fuel entry 0.0')
+    cases = 1
+    m.reset()
+    load_jameson(m)
+    m.poke('SelectedSystemDistance', 36)
+    m.poke('SelectedSystemEconomy', 5)
+    m.poke('AuxRandomSeed', 0)                      # no mis-jump
+    m.call('NormalHyperspaceJump', stop='ArriveInTargetSystem', **ZERO_REGISTERS)
+    expect((m.byte('FuelLevel'), m.byte('FuelPrice')) == (34, 46), 'normal jump',
+           m.byte('FuelLevel'), m.byte('FuelPrice'))
+    cases += 1
+    for galaxy in range(8):
+        m.reset()
+        load_jameson(m)
+        m.poke('FuelLevel', 34)
+        m.poke('CurrentGalaxy', galaxy)
+        m.call('GalacticHyperspaceJump', stop='SnapCursorToNearestSystem', **ZERO_REGISTERS)
+        expect((m.byte('FuelLevel'), m.byte('FuelPrice')) == (34, galaxy + 1), 'galactic jump', galaxy)
+        cases += 1
+    return cases
+
+
+@check('commander', 'fuel-gauge-not-restored', ['FuelGauge', 'PrepareShipForLaunch', 'StoreFuelLevel'],
+       'fuel-price investigation',
+       'FuelGauge (the FU bar value) is not in the commander record either.  Its tape value 160 '
+       '(full) stays when a loaded record holds 3.4 light years, also through PrepareShipForLaunch at '
+       'the launch.  StoreFuelLevel, the end of SetFuelLevel, gives 76 and leaves FuelLevel as it is.')
+def check_fuel_gauge_not_restored(ctx):
+    m = ctx.machine()
+    load_jameson(m)
+    m.poke('FuelLevel', 34)
+    expect(m.byte('FuelGauge') == 160, 'tape value')
+    m.call('PrepareShipForLaunch', halt=True, **ZERO_REGISTERS)
+    expect(m.byte('FuelGauge') == 160 and m.byte('FuelLevel') == 34, 'launch keeps it')
+    m.call('StoreFuelLevel', a=34, f=0, bc=0, de=0, hl=0)
+    expect((m.byte('FuelGauge'), m.byte('FuelLevel')) == (76, 34), m.byte('FuelGauge'))
+    return 2
+# --- END FUEL CHECKS ---
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])

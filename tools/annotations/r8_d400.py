@@ -256,6 +256,11 @@ Callers: mission 1 trigger, damage path DamageEquipmentOrCargo."""),
 FuelLevel = min(A, 70) in tenths of a light year; FU bar FuelGauge =
 2*fuel + (2*fuel >> 3) (70 -> 157).  Clobbers A, B, F.
 Evidence: tools/check_routines.py numbers/fuel-and-seed-helpers (all A)."""),
+    0xD873: ('StoreFuelLevel', 'verified', """
+SetFuelLevel after its limit: FuelLevel = A, any value, and the FU bar value
+FuelGauge = 2*A + (2*A >> 3).  Clobbers A, B, F.
+Evidence: tools/check_routines.py numbers/fuel-and-seed-helpers (A up to 70 reaches it
+through the JR C)."""),
     # ------------------------------------------------------------------ crosshair
     0xD883: ('CrosshairSize', 'verified', """
 Arm length of the XOR crosshair in pixels: $18 for the short-range chart centre mark,

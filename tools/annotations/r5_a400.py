@@ -1181,7 +1181,9 @@ CargoPointer + 1: if that cargo quantity is zero return carry set; otherwise
 print the commodity name, the quantity at column 13 and its unit; carry clear."""),
     # ------------------------------------------------------------------ dormant vectors
     0xA89B: (None, 'verified', """
-Dormant vector: JP ScoopCargoItem (see L_A897)."""),
+Dormant vector: JP ScoopCargoItem (see L_A897).
+fuelfix=yes replaces $A89B..$A8A9 (these vectors and the fragment after them) with
+FuelEconomy."""),
     0xA89E: (None, 'verified', """
 Dormant vector: JP AwardBounty (see L_A897)."""),
     0xA8A1: (None, 'verified', """
