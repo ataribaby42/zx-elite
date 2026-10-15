@@ -54,6 +54,8 @@ For command-line options, run `make.bat` directly. It forwards arguments to
 | `fuelfix` | `no`, `yes` | `no` | `yes` recomputes the fuel price on the equipment screen and the FU fuel bar at launch from the current fuel. In the original both keep old values after loading a saved commander: after a reset and reload, fuel costs 0.0 and the FU bar shows a full tank whatever the loaded fuel. The price follows the original formula: twice the system's economy number plus the missing tenths of a light year, in tenths of a credit, and 0 for a full tank. Uses free bytes in the game image. |
 | `hyperspacedockingfix` | `no`, `yes` | `no` | `yes` lets you dock again after a refused H or G press. In the original any press, even one the game refuses (while docked, G alone, no galactic hyperdrive, the current system, out of range), prevents docking with the station or the docking computer until the next hyperspace arrival. With `yes` only an accepted jump does so, from its countdown to the end of the arrival tunnel. Changes two bytes in place. |
 | `aicouragefix` | `no`, `yes` | `no` | `yes` keeps a fleeing AI ship frightened. In the original each laser hit lowers a ship's courage, and after about nine hits a tough ship (Python, Thargoid, rock hermit, Fer-de-Lance) flees and stops firing; the next hit wraps its courage back to nearly full, so it turns round and charges at you, still without firing, and alternates like this every nine hits. It also rarely ejects its escape capsule. With `yes` the courage stays at its minimum and the ship keeps fleeing. Replaces 19 bytes in place. |
+| `scannerblipfix` | `no`, `yes` | `no` | `yes` corrects two scanner contact quirks. In the original a contact exactly 4 pixels left or right of the centre line is drawn one pixel row too low (right) or too high (left), so contacts hop by a pixel as they cross that column. An upward stick is stopped at the top of the scanner only in the centre column; in the others it reaches the bottom line of the 3D view, where the frame line mostly hides it. With `yes` every contact keeps its row and every stick stops at the scanner. Changes bytes in place. |
+| `stardustfix` | `no`, `yes` | `no` | `yes` keeps stardust off the view frame and outside it. In the original a stardust particle at height zero with a negative sign is drawn on the bottom frame line instead of the centre line, erasing a pixel of the line; at launch about two of the 16 particles start this way and slide along the line. Particles at the far right reach the right frame line, and while pitching particles also reach the left one and the area outside the frame. With `yes` such a particle is drawn on the centre line, and pixels on or outside the frame are not drawn. Rewrites the dust pixel routine in its own 69 bytes. |
 | `verify` | `yes`, `no` | `yes` | `yes` requires byte-for-byte identity with the original TAP. `no` allows modified game bytes; TAP structure, metadata, checksums and assembler memory bounds remain mandatory. |
 | `tapfile` | A plain filename ending in `.tap` | `elite-128k.tap` | Names the output file inside `release/`. No directory paths are accepted. Quote an argument containing spaces, such as `"tapfile=My Elite.tap"`. Internal TAP headers are unchanged. |
 
@@ -68,7 +70,7 @@ Font choices:
 
 All four fonts contain 91 glyphs (728 bytes) and use the same startup copy and
 character renderer. Normal builds assemble the selected font source without
-reading `PATCH128.TAP`. The font, scanner, station, fuel, docking and AI courage fixes require no extra RAM.
+reading `PATCH128.TAP`. The font, scanner, station, fuel, docking, AI courage, scanner contact and stardust fixes require no extra RAM.
 
 Any game modification requires explicit `verify=no`; changing only `tapfile`
 still permits exact verification. The build verifies its output automatically.
@@ -190,7 +192,11 @@ assembled payloads; game origin and entry are checked against the linker map.
 | `tools/check_hyperspace_docking_fix.py` | Docking decisions, every refused H/G press, an accepted jump and optional 48K ROM-load runs |
 | `src/ai-courage-fix.asm` | Optional AI courage fix within the original 19 bytes of the laser-hit routine |
 | `tools/check_ai_courage_fix.py` | Every hit value, a Python fight with the real AI steering and an optional 48K ROM-load fight |
-| `tools/check_build_options.py` | All 1,024 ship/laser/font/scanner-fix/station-launch-fix/station-slot-fix/fuel-fix/hyperspace-docking-fix/AI-courage-fix combinations in both verification modes and invalid TAP checks |
+| `src/scanner-blip-fix.asm` | Optional scanner contact fix; three macros replacing original bytes in place |
+| `tools/check_scanner_blip_fix.py` | A contact-geometry model checked against the original and the fixed scanner for about 8,000 positions, and an optional 48K ROM-load run |
+| `src/stardust-fix.asm` | Optional stardust fix; one macro replacing the dust pixel routine in place |
+| `tools/check_stardust_fix.py` | The dust pixel routine for every plotted input, launch and flight dust passes against the original, and optional 48K ROM-load runs |
+| `tools/check_build_options.py` | Every option value alone, disjoint option areas, a pairwise covering array of combinations plus every option on at once, in both verification modes, and invalid TAP checks; `--full` builds all 2,048 combinations |
 | `tools/check_scanner_pixel_fix.py` | Exhaustive pixel preservation, indicator/missile comparison and 48K first-launch test |
 | `tools/check_laser_variant.py` | Actual laser/line rendering, endpoint randomisation and stack checks |
 | `tools/render_cockpit.py` | Monochrome and initial-attribute cockpit renderings |

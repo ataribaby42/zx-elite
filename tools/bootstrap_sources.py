@@ -313,6 +313,10 @@ OPTIONAL_REGIONS = [
     (0x9A3A, 0x9A46, 'FUEL_FIX'),
     (0x70BE, 0x70C1, 'HYPERSPACE_DOCKING_FIX'),
     (0xEC6A, 0xEC7D, 'AI_COURAGE_FIX'),
+    (0x8CE0, 0x8CF3, 'SCANNER_BLIP_FIX'),
+    (0x8D0B, 0x8D0D, 'SCANNER_BLIP_FIX'),
+    (0x8DCC, 0x8DDE, 'SCANNER_BLIP_FIX'),
+    (0xA2EF, 0xA334, 'STARDUST_FIX'),
 ]
 # Options made of several parts: region start -> (macro or instruction, comment, limit
 # constant in src/options.asm; the start constant has Start in place of Limit).
@@ -332,6 +336,10 @@ OPTION_PARTS = {
     0x70BE: ('LD A,(JumpTunnelMode)', 'accepted jump (countdown or tunnel): no docking',
              'HyperspaceDockingCheckLimit'),
     0xEC6A: ('INCLUDE "ai-courage-fix.asm"', None, 'AiCourageHitLimit'),
+    0x8CE0: ('ScannerBlipStepCode', None, 'ScannerBlipStepLimit'),
+    0x8D0B: ('ScannerBlipCentreCode', None, 'ScannerBlipCentreLimit'),
+    0x8DCC: ('ScannerBlipGuardCode', None, 'ScannerBlipGuardLimit'),
+    0xA2EF: ('StardustPixelCode', None, 'StardustPixelLimit'),
 }
 OPTION_PART_REGIONS = {start: (end, option) for start, end, option in OPTIONAL_REGIONS
                        if start in OPTION_PARTS}

@@ -96,6 +96,36 @@ assert AI_COURAGE_FIX = 0 || AI_COURAGE_FIX = 1
 defc AiCourageHitStart = $EC6A
 defc AiCourageHitLimit = $EC7D
 
+IFNDEF SCANNER_BLIP_FIX
+    defc SCANNER_BLIP_FIX = 0
+ENDIF
+assert SCANNER_BLIP_FIX = 0 || SCANNER_BLIP_FIX = 1
+
+; Original fixed boundaries of the three parts of DrawScannerContacts that
+; scannerblipfix=yes replaces in place (src/scanner-blip-fix.asm).
+defc ScannerBlipStepStart = $8CE0
+defc ScannerBlipStepLimit = $8CF3
+defc ScannerBlipCentreStart = $8D0B
+defc ScannerBlipCentreLimit = $8D0D
+defc ScannerBlipGuardStart = $8DCC
+defc ScannerBlipGuardLimit = $8DDE
+IF SCANNER_BLIP_FIX
+    INCLUDE "scanner-blip-fix.asm"
+ENDIF
+
+IFNDEF STARDUST_FIX
+    defc STARDUST_FIX = 0
+ENDIF
+assert STARDUST_FIX = 0 || STARDUST_FIX = 1
+
+; Original fixed boundaries of GetDustPixelAddress, which stardustfix=yes replaces
+; in place (src/stardust-fix.asm).
+defc StardustPixelStart = $A2EF
+defc StardustPixelLimit = $A334
+IF STARDUST_FIX
+    INCLUDE "stardust-fix.asm"
+ENDIF
+
 ; Original fixed boundaries of the shared parent-ship launch selector.
 defc ParentLaunchSelectionStart = $F44A
 defc ParentLaunchSelectionLimit = $F470

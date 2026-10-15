@@ -41,8 +41,8 @@ python tools/build.py --verify-only --verify no
 
 `ship` accepts `krait` (default) or `adder`; `laser` accepts `original` (default)
 or `single`. `font` accepts `128` (default), `48`, `128fix` or `128fix_ecm_s`. `scannerpixelfix`,
-`stationrandomlaunchfix`, `stationslotfix`, `fuelfix`, `hyperspacedockingfix` and `aicouragefix` accept `no`
-(default) or `yes`.
+`stationrandomlaunchfix`, `stationslotfix`, `fuelfix`, `hyperspacedockingfix`, `aicouragefix`,
+`scannerblipfix` and `stardustfix` accept `no` (default) or `yes`.
 `verify` accepts `yes`
 (default) or `no`. A build does not change the saved BAT settings or remember
 its command-line overrides. No modification silently weakens verification: select
@@ -475,6 +475,147 @@ at `$E4`: fleeing, but with courage 100 after the wrap, and its course departs
 from the fixed one as it turns back. Build the option with the default
 tapfile for this mode. Reports are in `build/ai-courage-fix-check/`.
 
+## Scanner contact fix
+
+```bat
+make.bat scannerblipfix=yes verify=no
+python tools/check_scanner_blip_fix.py
+python tools/check_scanner_blip_fix.py --emulator
+```
+
+The equivalent Python option is `--scannerblipfix yes`. The default `no`
+keeps the original bytes and behaviour.
+
+`DrawScannerContacts` draws each ship or the station as a contact on the
+scanner. A contact has a vertical stick in pixel column 123 + dx when x is
+positive, or 124 - dx when it is negative, where dx = `ScannerDotX` AND $7F.
+The stick starts at base row 165, which `ScannerDotZ` moves up or down, and
+ends in a three-pixel dash. The original has two quirks:
+
+- From dx = 4 on, the code first steps ceil((dx - 4) / 8) screen bytes with
+  a `DJNZ` loop. For dx = 4 that count is 0, so the loop runs 256 times and
+  the whole contact lands one pixel row lower (x > 0) or higher (x < 0). A
+  contact therefore hops by one row while it crosses that column. This is
+  plainly visible.
+- An upward stick that leaves character row 0 of the bottom third would
+  enter the 3D view. `L_8DCC` stops it there, without its dash, only when
+  `L = $0F`, character column 15. In the other columns it reaches screen row
+  127, which is the bottom line of the view frame (all pixels set in the 48K
+  flight runs). The extra stick pixel and dash are therefore mostly hidden.
+
+The fix replaces three parts of `DrawScannerContacts` in place
+(`src/scanner-blip-fix.asm`):
+
+| Area | Original | Fixed |
+|---|---|---|
+| `$8CE0..$8CF2` (19 B) | dx - 4; dx < 4 stays in the centre byte; byte count with a conditional `INC B` | dx - 5; dx < 5 stays in the centre byte; byte count (dx - 5) / 8 + 1, the same as before for dx >= 5; two `NOP`s pad the area |
+| `$8D0B..$8D0C` (2 B) | `ADD A,8`: pixel dx + 4 | `ADD A,9` on dx - 5: the same pixel dx + 4 |
+| `$8DCC..$8DDD` (18 B) | stop the upward stick only at `L = $0F` | stop it whenever the previous character row would be outside the bottom third; three unreachable padding bytes |
+
+`ScannerDotInCentreByte` (`$8D0B`) and `NextScannerContact` (`$8D7E`) are
+the verified names the fix refers to. Assembler assertions protect the
+boundaries of all three parts (`ScannerBlip...Start` and `...Limit` in
+`src/options.asm`). The changes touch 32 bytes and use no memory.
+
+`tools/check_scanner_blip_fix.py` runs `DrawScannerContacts` with the
+supplied 48K ROM in SkoolKit's simulator, for the assembled image and for a
+baseline whose three parts are restored from the reference tape. A model of
+the contact geometry covers the column, base row, stick, dash, both stick
+stops and the final clearing of rows 128..134. The model checks the
+following for 8,442 object positions (7,614 contacts), which include every dx
+and the tallest sticks:
+
+- the original matches the model exactly with its two quirks: 630 contacts at
+  dx = 4, and 68 upward sticks that reach row 127 and only that row;
+- the fixed image matches it exactly without them, and never draws above row
+  128;
+- the values `DrawScannerContacts` stores (`ScannerDotX`, `ScannerStickHeight`,
+  `ScannerDotZ`) and whether a contact is drawn are the same in both images.
+
+`--emulator` loads `release/elite-128k.tap` through the 48K ROM. After a
+launch, a test-only poke places a cargo canister at dx = 4, and the real main
+loop draws it with the replaced code. Build the option with the default
+tapfile for this mode. Reports are in `build/scanner-blip-fix-check/`.
+
+## Stardust fix
+
+```bat
+make.bat stardustfix=yes verify=no
+python tools/check_stardust_fix.py
+python tools/check_stardust_fix.py --emulator
+```
+
+The equivalent Python option is `--stardustfix yes`. The default `no` keeps
+the original bytes and behaviour.
+
+`ClearViewBuffer` draws the view frame into the view buffer every frame: rows
+0 and 127 and the side pixels in columns 8 and 247. `GetDustPixelAddress`
+maps a stardust particle to column $80 +/- X and row $3F -/+ Y, and
+`XorPlotDustList` XORs the pixel into the buffer. A particle on the frame
+therefore erases a frame pixel. The original reaches the frame, or the area
+outside it, in two ways:
+
+- It selects the lower half of the buffer from the Y sign alone. A particle
+  with Y = 0 and the sign bit set (negative zero) lands on row 127, the
+  bottom frame line, instead of row 63. `SeedLaunchDust` creates the launch
+  particles with |X|, |Y| <= 3 and a random sign, so about one in eight starts
+  at negative zero, about two per launch. With Y = 0 the depth motion keeps
+  the row, and the particle slides along the bottom line until it leaves the
+  view. Respawns and the pitch step also produce negative zero in flight.
+- `StoreAndPlotDust` plots every particle with |Y| < 63 but does not limit X.
+  The depth motion keeps |X| <= 119, so X = +119 lands on column 247, the
+  right frame pixel. The pitch step keeps |X| <= 127, which also reaches
+  column 8 and the columns outside the frame (1..7 and 248..255).
+
+A 48K snapshot reported by the owner (not kept in the repository) shows
+both: a particle at X = +49, Y = -0 has erased the bottom frame line in column
+177. Running it on in the simulator for 300 frames with its roll and pitch
+drew particles on the side frame lines or outside the frame in 24 frames.
+
+The fix replaces `GetDustPixelAddress` (`$A2EF..$A333`, 69 bytes) in place
+with the macro in `src/stardust-fix.asm`:
+
+- It computes row - 64 as -1 - Y (signed Y), which has the same line and
+  character-row bits as the row. The lower half is selected only for a
+  negative Y that is not zero. Negative zero is therefore drawn on row 63,
+  like positive zero.
+- It returns the pixel mask 0 for a column outside 9..246
+  (`DustViewFirstColumn`..`DustViewLastColumn`), so `XorPlotDustList` leaves
+  the frame and the area outside it unchanged.
+
+Every other particle gets the same address and mask as before. The particle
+records, their motion and the random numbers do not change. The routine
+returns row - 64 in H instead of the row; `StoreAndPlotDust`, its only caller,
+uses only DE and C. The new code is 68 bytes, followed by one unreachable
+padding byte. Assembler assertions protect both boundaries
+(`StardustPixelStart` and `StardustPixelLimit` in `src/options.asm`).
+
+`tools/check_stardust_fix.py` compares the assembled image with a baseline
+whose routine is restored from the reference tape, using the supplied 48K ROM
+in SkoolKit's simulator:
+
+- `ClearViewBuffer` draws exactly the frame described above, so the interior
+  is columns 9..246;
+- `GetDustPixelAddress` for every X 0..127 and Y 0..62 (the range that
+  `StoreAndPlotDust` plots) with all four sign combinations, 32,256 inputs: the
+  original matches a pixel model with negative zero on row 127, and the fixed
+  routine matches it with negative zero on row 63 and mask 0 outside the
+  interior. DE, C, A, B and L are otherwise the original ones;
+- 96 launches (`SeedLaunchDust` at the launch speed) and 80 random flight
+  sequences in all four views with random speed, roll and pitch, 1,792 dust
+  passes in total: both images get the same records, random state and
+  routine inputs, every plotted pixel matches the model, and each pass XORed
+  into a freshly cleared view leaves the frame and the area outside it
+  unchanged in the fixed image. The original damages them in 969 of the
+  1,152 launch passes and 251 of the 640 flight passes.
+
+`--emulator` loads `release/elite-128k.tap` through the 48K ROM and launches.
+A test-only poke then sets all 16 particles to negative zero. A second run
+also restores the original routine with a test-only poke. The original's
+final screen has holes in the bottom frame line, the fixed one none, while
+particles at negative zero remain. Build the option with the default tapfile
+for this mode. Reports are in `build/stardust-fix-check/`.
+
 ## What verification means
 
 Always checked, including `verify=no`:
@@ -733,7 +874,10 @@ uses three of the free areas listed above: `$E88B..$E8CE`, `$AC56..$AC76` and
 `$FCED..$FCFF`, 114 of their 120 bytes. `fuelfix=yes` fills three others
 completely: `$B31B..$B32A`, `$A89B..$A8A9` and `$9A3A..$9A45`, 43 bytes. Every
 other option leaves the free areas unchanged; `hyperspacedockingfix` changes
-two bytes in place and `aicouragefix` nine within its original 19. With both fixes 53 bytes remain free in 16 areas, the
+two bytes in place, `aicouragefix` nine within its original 19 and
+`scannerblipfix` 32 within three parts of the scanner routine and
+`stardustfix` 57 within the 69 bytes of the dust pixel routine. With both
+the station slot and fuel fixes 53 bytes remain free in 16 areas, the
 largest 11 bytes (`$BDF5..$BDFF`).
 
 ### Rules for using free space
@@ -769,20 +913,44 @@ Use `make.bat ship=krait font=48 verify=no` for the Krait check and
 The inherited broader gameplay scenarios above remain available; they are
 not all required for a font-only data substitution.
 
-The option check builds all 1,024 `ship`/`laser`/`font`/`scannerpixelfix`/
-`stationrandomlaunchfix`/`stationslotfix`/`fuelfix`/`hyperspacedockingfix`/`aicouragefix`
-combinations in both verification modes, expects
-strict verification of any modification to fail, checks stale-output
-removal and rejects damaged checksums, invalid metadata with a valid XOR, and
-truncated TAP data even with identity disabled. It also verifies the exact
-ten-byte laser patch, exact font bytes from PATCH128 and absence of unrelated
-changes for each ship option. The scanner fix is limited to the original
-instrument region and its two missile-call operands; the station launch fix
-is limited to its original 38-byte selector, the station slot fix to its
-four areas, the fuel fix to its five, the docking fix to its one operand and
-the AI courage fix to its 19 bytes. It leaves Adder with `laser=single font=48
-scannerpixelfix=yes stationrandomlaunchfix=yes stationslotfix=yes fuelfix=yes
-hyperspacedockingfix=yes aicouragefix=yes` built.
+The option check (`tools/check_build_options.py`) runs in about 20 seconds
+(76 builds). It checks the following:
+
+- The default build reproduces the reference tape.
+- Every non-default value alone builds in both verification modes. The strict
+  build must fail and leave no release or PASS report. The relaxed build may
+  change only the areas its option declares:
+  - the laser's ten bytes, compared with the owner's patch note;
+  - the font, compared with the bytes of `PATCH128.TAP`;
+  - the scanner fix: the instrument region and its two missile-call operands;
+  - the station launch fix: its 38-byte selector;
+  - the station slot fix: its four areas;
+  - the fuel fix: its five areas;
+  - the docking fix: its one operand;
+  - the AI courage fix: its 19 bytes;
+  - the scanner contact fix: its three parts;
+  - the stardust fix: its 69 bytes.
+- These areas, together with every byte `ship=adder` changes, are pairwise
+  disjoint. That is what makes the options composable.
+- Combinations are built in both modes:
+  - a greedy covering array in which every pair of values of two options is
+    built together at least once (260 pairs in 13 combinations), so two includes
+    that clash on a symbol or an assertion fail there;
+  - every option on at once for each ship and non-default font.
+
+  Each relaxed build must equal the reference, or the Adder build, with the
+  selected options' bytes overlaid.
+- Invalid values of every option are rejected, as is strict `--verify-only`.
+  Damaged checksums, invalid metadata with a valid XOR and truncated TAP data
+  are rejected even with identity disabled.
+
+`python tools/check_build_options.py --full` builds the complete product of
+all values instead of the selected combinations: 4,096 combinations, about 40
+minutes. Use it after changing the build machinery itself. Either mode leaves
+Adder with `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
+stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
+scannerblipfix=yes stardustfix=yes` built. A new option must be added to `OPTIONS`, and a new
+fix's areas to `FIX_PARTS`, in that tool.
 
 The ship check compares all other models with the original bytes, resolves
 every Adder vertex/edge face reference to the original normal, and executes
@@ -830,7 +998,8 @@ Maintained files for this feature:
 
 - `build.bat`, `make.bat`, `verify.bat`, `tools/build.py`;
 - `src/options.asm`, `src/adder-startup.asm`, `src/single-laser.asm`,
-  `src/station-slot-fix.asm`, `src/fuel-fix.asm`, `src/ai-courage-fix.asm`;
+  `src/station-slot-fix.asm`, `src/fuel-fix.asm`, `src/ai-courage-fix.asm`,
+  `src/scanner-blip-fix.asm`, `src/stardust-fix.asm`;
 - `src/data/font.asm`, `src/data/font-48.asm`, `tools/font_variant.py`;
 - `src/game.asm`, `src/data/ship-blueprints-and-tables.asm`;
 - `src/data/initial-runtime-state.asm`;
@@ -838,7 +1007,8 @@ Maintained files for this feature:
 - `tools/bootstrap_sources.py`, `tools/analyze_ship_blueprints.py`;
 - `tools/check_build_options.py`, `tools/check_laser_variant.py`, `tools/check_ship_variant.py`,
   `tools/check_graphics.py`, `tools/check_station_slot_fix.py`, `tools/check_fuel_fix.py`,
-  `tools/check_hyperspace_docking_fix.py`, `tools/check_ai_courage_fix.py`, `tools/emulator_check.py`;
+  `tools/check_hyperspace_docking_fix.py`, `tools/check_ai_courage_fix.py`,
+  `tools/check_scanner_blip_fix.py`, `tools/check_stardust_fix.py`, `tools/emulator_check.py`;
 - `AGENTS.md`, `README.md`, `docs/SHIPS.md`, `docs/GRAPHICS.md`, this document.
 
 The bootstrap generator preserves these conditional hooks and regenerates
@@ -857,8 +1027,8 @@ The equivalent Python option is `--font 128fix`. This selects
 `font-48.asm`. All other glyphs, labels, the 728-byte size and startup copy
 remain unchanged. Normal builds need only assembler source. Source regeneration
 preserves this variant. The default remains `font=128` and byte-identical.
-`tools/check_build_options.py` now covers 128 combinations, including all four
-fonts; `tools/check_graphics.py` checks the hybrid bytes and executes all glyphs.
+`tools/check_build_options.py` covers all four fonts alone and in combination;
+`tools/check_graphics.py` checks the hybrid bytes and executes all glyphs.
 
 ### Status Indicator and smaller ECM/S font (`font=128fix_ecm_s`)
 

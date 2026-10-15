@@ -6106,10 +6106,10 @@ ShiftBCRight1:
     RR C                                       ; $8C23: CB 19
     RET                                        ; $8C25: C9
 
-; VERIFIED: JP L_8D7E: next slot of DrawScannerContacts (in reach of the JRs above).
+; VERIFIED: JP NextScannerContact: next slot of DrawScannerContacts (in reach of the JRs above).
 ; Evidence: control flow.
 L_8C26:
-    JP L_8D7E                                  ; $8C26: C3 7E 8D
+    JP NextScannerContact                      ; $8C26: C3 7E 8D
 
 ; VERIFIED: Repaint the scanner: restore the saved background (RestoreScannerBackground); return
 ; at once when LastActiveObjectEnergy is zero (no active slot); otherwise call SetConditionYellowForShips (condition colour),
@@ -6124,8 +6124,11 @@ L_8C26:
 ; stick column and the two pixels to its left.  Quirk: dx = 4 leaves the byte count B = 0,
 ; so the byte-step loop runs 256 times and the contact lands one pixel row lower (x > 0) or
 ; higher (x < 0) than intended.  An upward stick is stopped at the top of the bottom third
-; only in column 15 (L_8DCC); in other columns the dash can land on screen row 127.  A
+; only in column 15 (L_8DCC); in other columns the dash can land on screen row 127.  That
+; row holds the bottom line of the view frame, so the extra pixels are rarely visible.  A
 ; downward stick stops at the bottom of the screen (L_8DBA).
+; scannerblipfix=yes (src/scanner-blip-fix.asm) replaces $8CE0..$8CF2, the operand at
+; $8D0C and L_8DCC: dx = 4 stays in the centre byte, and every column stops the stick.
 ; Clobbers: all main registers, IX.
 ; Evidence: tools/check_routines.py scanner/scanner-contacts (objects at +/-x, +/-y, +/-z and
 ; out of range), scanner/p3-scanner-geometry (dx 0..13 both signs, tallest sticks);
@@ -6220,9 +6223,13 @@ L_8CD5:
     LD HL,$558F                                ; $8CD8: 21 8F 55  scanner centre on screen
     LD A,(ScannerDotX)                         ; $8CDB: 3A 10 8C
     AND $7F                                    ; $8CDE: E6 7F  dx = horizontal offset in pixels
+assert $-GameImage = ScannerBlipStepStart-GameLoadAddress
+IF SCANNER_BLIP_FIX
+    ScannerBlipStepCode
+ELSE
     SUB $04                                    ; $8CE0: D6 04  dx - 4
     LD C,A                                     ; $8CE2: 4F
-    JP C,L_8D0B                                ; $8CE3: DA 0B 8D  dx < 4: stays in the centre byte
+    JP C,ScannerDotInCentreByte                ; $8CE3: DA 0B 8D  dx < 4: stays in the centre byte
     RRA                                        ; $8CE6: 1F  whole bytes: (dx-4)/8
     RRA                                        ; $8CE7: 1F
     RRA                                        ; $8CE8: 1F
@@ -6233,6 +6240,8 @@ L_8CD5:
     LD C,A                                     ; $8CEF: 4F
     JR Z,L_8CF3                                ; $8CF0: 28 01
     INC B                                      ; $8CF2: 04  partial byte: one more
+ENDIF
+assert $-GameImage = ScannerBlipStepLimit-GameLoadAddress
 L_8CF3:
     LD A,(ScannerDotX)                         ; $8CF3: 3A 10 8C
     AND $80                                    ; $8CF6: E6 80
@@ -6252,8 +6261,18 @@ L_8D06:
     RRA                                        ; $8D06: 1F
     DJNZ L_8D06                                ; $8D07: 10 FD
     JR L_8D26                                  ; $8D09: 18 1B
-L_8D0B:
+
+; VERIFIED: dx 0..3 (dx - 4 borrowed): C = dx + 4, the pixel of the stick within the centre byte
+; $558F; continue with the positive (L_8CFD) or negative (L_8D1A) mask.
+; Evidence: tools/check_routines.py scanner/p3-scanner-geometry (dx 0..3, both signs).
+ScannerDotInCentreByte:
+assert $-GameImage = ScannerBlipCentreStart-GameLoadAddress
+IF SCANNER_BLIP_FIX
+    ScannerBlipCentreCode
+ELSE
     ADD A,$08                                  ; $8D0B: C6 08  C = dx + 4: pixel stays in the centre byte
+ENDIF
+assert $-GameImage = ScannerBlipCentreLimit-GameLoadAddress
     LD C,A                                     ; $8D0D: 4F
     LD A,(ScannerDotX)                         ; $8D0E: 3A 10 8C
     AND $80                                    ; $8D11: E6 80
@@ -6339,7 +6358,7 @@ L_8D71:
 
 ; VERIFIED: Advance DrawScannerContacts to the next 39-byte slot, or finish at L_8D8F.
 ; Evidence: instruction semantics.
-L_8D7E:
+NextScannerContact:
     LD A,(ScannerSlotCounter)                  ; $8D7E: 3A 13 8C
     DEC A                                      ; $8D81: 3D
     JR Z,L_8D8F                                ; $8D82: 28 0B
@@ -6372,7 +6391,7 @@ L_8DA2:
     LD A,(HL)                                  ; $8DA8: 7E
     OR $80                                     ; $8DA9: F6 80
     LD (HL),A                                  ; $8DAB: 77
-    JR L_8D7E                                  ; $8DAC: 18 D0
+    JR NextScannerContact                      ; $8DAC: 18 D0
 L_8DAE:
     DEC L                                      ; $8DAE: 2D  left byte bit 0 plus bits 7..6 here
     LD A,(HL)                                  ; $8DAF: 7E
@@ -6382,10 +6401,10 @@ L_8DAE:
     LD A,(HL)                                  ; $8DB4: 7E
     OR $C0                                     ; $8DB5: F6 C0
     LD (HL),A                                  ; $8DB7: 77
-    JR L_8D7E                                  ; $8DB8: 18 C4
+    JR NextScannerContact                      ; $8DB8: 18 C4
 
 ; VERIFIED: Stick moving down: FixScreenRowDown, but when the address passes the bottom of the
-; bitmap (H = $58) drop the return address and continue with the next slot (L_8D7E), so
+; bitmap (H = $58) drop the return address and continue with the next slot (NextScannerContact), so
 ; the contact gets no dash.
 ; Evidence: instruction semantics; tools/check_routines.py scanner/p3-scanner-geometry.
 L_8DBA:
@@ -6397,7 +6416,7 @@ L_8DBA:
     CP H                                       ; $8DC2: BC
     RET NZ                                     ; $8DC3: C0
     POP AF                                     ; $8DC4: F1  drop the return address: next slot
-    JR L_8D7E                                  ; $8DC5: 18 B7
+    JR NextScannerContact                      ; $8DC5: 18 B7
 L_8DC7:
     LD A,H                                     ; $8DC7: 7C
     SUB $08                                    ; $8DC8: D6 08
@@ -6409,11 +6428,15 @@ L_8DC7:
 ; in any other column the stick continues into the middle third.
 ; Evidence: instruction semantics; tools/check_routines.py scanner/p3-scanner-geometry.
 L_8DCC:
+assert $-GameImage = ScannerBlipGuardStart-GameLoadAddress
+IF SCANNER_BLIP_FIX
+    ScannerBlipGuardCode
+ELSE
     LD A,L                                     ; $8DCC: 7D
     CP $0F                                     ; $8DCD: FE 0F  character row 0, column 15 only
     JR NZ,L_8DD5                               ; $8DCF: 20 04
     POP AF                                     ; $8DD1: F1  drop the return address: next slot
-    JP L_8D7E                                  ; $8DD2: C3 7E 8D
+    JP NextScannerContact                      ; $8DD2: C3 7E 8D
 L_8DD5:
     SUB $20                                    ; $8DD5: D6 20  previous character row
     LD L,A                                     ; $8DD7: 6F
@@ -6422,6 +6445,8 @@ L_8DD5:
     ADD A,$08                                  ; $8DDA: C6 08
     LD H,A                                     ; $8DDC: 67
     RET                                        ; $8DDD: C9
+ENDIF
+assert $-GameImage = ScannerBlipGuardLimit-GameLoadAddress
 
 ; VERIFIED: If LastNonStationObjectEnergy is non-zero and FlightCondition is neither $63 nor 2, set FlightCondition = 6 (yellow).
 ; LastNonStationObjectEnergy is set by UpdateObjects when an active slot has bit 2 of its role byte (+$26)
@@ -8764,9 +8789,17 @@ L_A2E8:
 ; in the 256x128 view bitmap buffer (Spectrum screen layout, lower half
 ; selected by the Y sign), C = A = pixel mask.  Clobbers: B (0), H = row,
 ; L = column.
-; Quirk: a negative zero Y maps to row 127 instead of 63.
-; Evidence: dust model test compares every plotted pixel.
+; Quirks: a negative zero Y maps to row 127 (the bottom frame line) instead
+; of 63, and X is not limited to the view, so X = +119 lands on the right
+; frame pixel (column 247) and pitched particles reach column 8 and the area
+; outside the frame.  stardustfix=yes repairs both (src/stardust-fix.asm).
+; Evidence: dust model test compares every plotted pixel;
+; tools/check_stardust_fix.py.
 GetDustPixelAddress:
+assert $-GameImage = StardustPixelStart-GameLoadAddress
+IF STARDUST_FIX
+    StardustPixelCode
+ELSE
     LD D,ViewBitmapBuffer >> 8                 ; $A2EF: 16 C0  high byte of the view bitmap buffer
     LD A,(DustFlags)                           ; $A2F1: 3A 07 9A
     LD B,A                                     ; $A2F4: 47  B = sign flags
@@ -8819,6 +8852,8 @@ L_A32F:
     DJNZ L_A32F                                ; $A330: 10 FD
     LD C,A                                     ; $A332: 4F
     RET                                        ; $A333: C9
+ENDIF
+assert $-GameImage = StardustPixelLimit-GameLoadAddress
 
 ; VERIFIED: Re-create the current particle with the dust random generator AdvanceRandomHL (state
 ; in HL, saved in AuxRandomSeed), writing bytes 0..2 of the record at
@@ -23440,6 +23475,8 @@ defc L_8C19 = ShiftBCRight3
 defc L_8C1D = ShiftBCRight2
 defc L_8C21 = ShiftBCRight1
 defc L_8C29 = DrawScannerContacts
+defc L_8D0B = ScannerDotInCentreByte
+defc L_8D7E = NextScannerContact
 defc L_8DDE = SetConditionYellowForShips
 defc L_8DF2 = SaveScannerBackground
 defc L_8E1D = RestoreScannerBackground

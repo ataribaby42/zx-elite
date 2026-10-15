@@ -317,8 +317,11 @@ x is negative, base row 165 moved up (z > 0) or down by ScannerDotZ; the dash co
 stick column and the two pixels to its left.  Quirk: dx = 4 leaves the byte count B = 0,
 so the byte-step loop runs 256 times and the contact lands one pixel row lower (x > 0) or
 higher (x < 0) than intended.  An upward stick is stopped at the top of the bottom third
-only in column 15 (L_8DCC); in other columns the dash can land on screen row 127.  A
+only in column 15 (L_8DCC); in other columns the dash can land on screen row 127.  That
+row holds the bottom line of the view frame, so the extra pixels are rarely visible.  A
 downward stick stops at the bottom of the screen (L_8DBA).
+scannerblipfix=yes (src/scanner-blip-fix.asm) replaces $8CE0..$8CF2, the operand at
+$8D0C and L_8DCC: dx = 4 stays in the centre byte, and every column stops the stick.
 Clobbers: all main registers, IX.
 Evidence: tools/check_routines.py scanner/scanner-contacts (objects at +/-x, +/-y, +/-z and
 out of range), scanner/p3-scanner-geometry (dx 0..13 both signs, tallest sticks);
@@ -326,7 +329,11 @@ runtime: flight."""),
     0x8C3D: (None, 'verified', """
 Per-slot body of DrawScannerContacts (IX = slot).
 Evidence: control flow."""),
-    0x8D7E: (None, 'verified', """
+    0x8D0B: ('ScannerDotInCentreByte', 'verified', """
+dx 0..3 (dx - 4 borrowed): C = dx + 4, the pixel of the stick within the centre byte
+$558F; continue with the positive (L_8CFD) or negative (L_8D1A) mask.
+Evidence: tools/check_routines.py scanner/p3-scanner-geometry (dx 0..3, both signs)."""),
+    0x8D7E: ('NextScannerContact', 'verified', """
 Advance DrawScannerContacts to the next 39-byte slot, or finish at L_8D8F.
 Evidence: instruction semantics."""),
     0x8DBA: (None, 'verified', """

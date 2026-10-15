@@ -366,8 +366,12 @@ $80 +/- DustX, row $3F -/+ DustY (positive Y up).  Output: DE = address
 in the 256x128 view bitmap buffer (Spectrum screen layout, lower half
 selected by the Y sign), C = A = pixel mask.  Clobbers: B (0), H = row,
 L = column.
-Quirk: a negative zero Y maps to row 127 instead of 63.
-Evidence: dust model test compares every plotted pixel."""),
+Quirks: a negative zero Y maps to row 127 (the bottom frame line) instead
+of 63, and X is not limited to the view, so X = +119 lands on the right
+frame pixel (column 247) and pitched particles reach column 8 and the area
+outside the frame.  stardustfix=yes repairs both (src/stardust-fix.asm).
+Evidence: dust model test compares every plotted pixel;
+tools/check_stardust_fix.py."""),
     0xA334: ('RespawnDust', 'verified', """
 Re-create the current particle with the dust random generator L_A465 (state
 in HL, saved in L_7063), writing bytes 0..2 of the record at

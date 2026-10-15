@@ -123,7 +123,11 @@ download from entering Git; builds use the separately installed assembler.
    `REM make.bat ...` example line at the top of `build.bat`. That REM line is
    the only part of `build.bat` to change for a new option; keep its trailing
    space and CRLF line endings. Change the owner's other `build.bat` lines only
-   when asked.
+   when asked. Add the option to `OPTIONS` in `tools/check_build_options.py`, and
+   a fix's replaced areas (Start/Limit constants) to its `FIX_PARTS`. That check
+   builds every value alone, proves that the options' areas are disjoint and
+   builds a pairwise covering array of combinations; `--full`, every combination,
+   is only needed after changing the build machinery itself.
 4. Package TAP blocks deterministically. Validate Spectrum header fields,
    payload lengths, checksums, total size and SHA-256.
 5. When building the default reconstruction, run `verify.bat`. Success requires structural
@@ -283,8 +287,8 @@ For ship variants run `tools/check_build_options.py`,
 scenarios with `tools/run_runtime_scenarios.py`, always in 48K mode. The build
 option check deliberately leaves an Adder TAP with
 `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
-stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes` for
-testing.
+stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
+scannerblipfix=yes stardustfix=yes` for testing.
 Rebuild the default Krait version before collecting reference reconstruction/runtime-code seeds.
 The Adder test compares 128 actual rendered frames with the original side-B
 model, in addition to checking all 19 object loaders and other ship geometry.
@@ -362,7 +366,7 @@ for codes `$20..$7A`, with the same symbols, source address and runtime copy.
 Do not copy 768 bytes into the active font: the extra 40 bytes would overlap
 the game image. Preserve the conditional include in source regeneration.
 The optional font requires explicit `verify=no`; no other PATCH128 changes
-are imported. Run the 1024-combination build matrix, graphics tests and 48K emulator
+are imported. Run the option check (`tools/check_build_options.py`), graphics tests and 48K emulator
 startup/screen checks after changing this option. Normal builds use ASM data
 only and never depend on the patch tape. The owner has requested permanent
 previews of both fonts in `docs/images/`; preserve the two named atlases above.
@@ -393,7 +397,7 @@ Police Viper, Thargon and special-mode Thargoid launches must remain intact.
 Run `tools/check_station_random_launch_fix.py` for both ship choices; include
 the preceding launch gates, all 65,536 seed states, and actual allocation
 with free/full slots. Preserve the include and assertions in regeneration.
-Use the 1024-combination option matrix and 48K ROM-load/launch regression as well.
+Use the option check and 48K ROM-load/launch regression as well.
 
 `stationslotfix=no` preserves the original station orientation, including
 the two documented defects in `docs/FINDINGS.md`: a dormant station's axes do
@@ -416,7 +420,7 @@ other names they call. Preserve the four conditional blocks
 (`OPTION_PARTS` in `tools/bootstrap_sources.py`) in source regeneration.
 Run `tools/check_station_slot_fix.py --emulator` for both ship choices, each
 built with the default tapfile, `python tools/check_routines.py --only station`
-on the default build, and the 1024-combination option matrix.
+on the default build, and the option check.
 
 `fuelfix=no` preserves the original fuel price and FU bar, which keep stale
 values after a tape load or a new commander (see `docs/FINDINGS.md`). The
@@ -438,7 +442,7 @@ purchase and the tape code unchanged. The macros use labels only; keep
 `tools/bootstrap_sources.py`; preserve them in source regeneration. Run
 `tools/check_fuel_fix.py --emulator` for both ship choices, each built with
 the default tapfile, `python tools/check_routines.py --only commander` on the
-default build, and the 1024-combination option matrix.
+default build, and the option check.
 
 `hyperspacedockingfix=no` preserves the original latch, which disables
 docking after any H or G press, even a refused one, until the next arrival.
@@ -452,7 +456,7 @@ accepted jump must keep docking off from its countdown until the arrival
 tunnel ends. Run `tools/check_hyperspace_docking_fix.py --emulator` for both
 ship choices, each built with the default tapfile, plus
 `python tools/check_routines.py --only missions` on the default build and the
-1024-combination option matrix.
+option check.
 
 `aicouragefix=no` preserves the original courage arithmetic, in which a
 fleeing ship's courage wraps back to 114..127 when hit. The optional `yes`
@@ -465,7 +469,36 @@ original. Do not clear the fleeing bit or change the flee threshold, the
 steering or the abandon-ship test. Run `tools/check_ai_courage_fix.py
 --emulator` for both ship choices, each built with the default tapfile, plus
 `python tools/check_routines.py --only combat` on the default build and the
-1024-combination option matrix.
+option check.
+
+`scannerblipfix=no` preserves the original scanner contacts: a contact at
+dx = 4 drawn one row off, and upward sticks stopped at the scanner only in
+character column 15. The optional `yes` macros in `src/scanner-blip-fix.asm`
+replace only `$8CE0..$8CF2`, the operand at `$8D0B..$8D0C` and `L_8DCC`
+(`$8DCC..$8DDD`), each asserted with its `ScannerBlip...Start`/`Limit`
+constants. Keep the byte count for dx >= 5 and the pixel numbering exactly as
+the original computes them, keep `ScannerDotX`, `ScannerStickHeight` and
+`ScannerDotZ` unchanged, and keep the downward stop and the final clearing of
+rows 128..134. The macros refer to the verified names `ScannerDotInCentreByte`
+and `NextScannerContact`. Run `tools/check_scanner_blip_fix.py --emulator` for
+both ship choices, each built with the default tapfile, plus
+`python tools/check_routines.py --only scanner` on the default build and the
+option check.
+
+`stardustfix=no` preserves the original stardust pixels: a particle at
+negative zero Y on row 127 (the bottom frame line), and X not limited to the
+frame interior. The optional `yes` macro in `src/stardust-fix.asm` replaces
+only `GetDustPixelAddress` (`$A2EF..$A333`), asserted with
+`StardustPixelStart`/`StardustPixelLimit`; the routine label stays outside the
+conditional block for its caller. Select the buffer half from the row, not the
+sign, and return mask 0 for columns outside
+`DustViewFirstColumn`..`DustViewLastColumn` (the frame drawn by
+`ClearViewBuffer`). Keep DE, C and A of every other input, and leave the
+particle records, their motion, the respawns and the random state unchanged:
+change where a particle is drawn, never where it is. Run
+`tools/check_stardust_fix.py --emulator` for both ship choices, each built
+with the default tapfile, plus `python tools/check_routines.py --only dust` on
+the default build and the option check.
 
 - Source boundaries, offsets and lengths must be calculated by scripts or
   labels. No tool may silently truncate or pad a block.
