@@ -2,7 +2,7 @@
 
 ZX Spectrum Elite 128k source reconstruction
 
-## 15.10.2029 V1.2
+## 15.10.2026 V1.2
 
 - Station slot fix; docking slot faces the planet when the station appears
 - Fuel fix; correct fuel price and FU bar after loading a commander
@@ -13,12 +13,12 @@ ZX Spectrum Elite 128k source reconstruction
 - Missile target fix; a missile explodes when its target disappears
 - Text full stop fix; full stop no longer lost at the end of a justified line
 
-## 8.10.2029 V1.1
+## 8.10.2026 V1.1
 
 - Added all font variations
 - Added all original laser variations
 
-## 20.9.2029 V1.0
+## 20.9.2026 V1.0
 
 - Single beam laser option.
 - Scanner pixel fix
