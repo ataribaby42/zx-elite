@@ -76,6 +76,16 @@ IF FUEL_FIX
     INCLUDE "fuel-fix.asm"
 ENDIF
 
+IFNDEF HYPERSPACE_DOCKING_FIX
+    defc HYPERSPACE_DOCKING_FIX = 0
+ENDIF
+assert HYPERSPACE_DOCKING_FIX = 0 || HYPERSPACE_DOCKING_FIX = 1
+
+; Original fixed boundaries of the instruction that hyperspacedockingfix=yes replaces:
+; CheckDocking's LD A,(HyperspaceKeyLatch) becomes LD A,(JumpTunnelMode).
+defc HyperspaceDockingCheckStart = $70BE
+defc HyperspaceDockingCheckLimit = $70C1
+
 ; Original fixed boundaries of the shared parent-ship launch selector.
 defc ParentLaunchSelectionStart = $F44A
 defc ParentLaunchSelectionLimit = $F470

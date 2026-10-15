@@ -37,7 +37,7 @@ or, where marked, follows from the instructions alone.
 
 | Address | Routine | Finding |
 |---|---|---|
-| `$7C39` | `HyperspaceKeyLatch` | `CheckHyperspaceKeys` sets the latch before it tests anything else, so even a refused H or G press sets it. Until the next hyperspace arrival or game over, neither station contact nor the docking computer can dock the ship. Confirmed by `missions/p2-hyperspace-key-latch` and by a 48K emulator run. |
+| `$7C39` | `HyperspaceKeyLatch` | `CheckHyperspaceKeys` sets the latch before it tests anything else, so even a refused H or G press sets it. Until the next hyperspace arrival or game over, neither station contact nor the docking computer can dock the ship. Confirmed by `missions/p2-hyperspace-key-latch` and by a 48K emulator run. `hyperspacedockingfix=yes` repairs it; see [build variants](BUILD-VARIANTS.md#hyperspace-docking-fix). |
 | `$BCFC` | `BufferJustifiedCharacter` | A non-space character arriving as the 31st character of a justified line is stored after the 30 printed characters and lost. In real text this hits the final full stop of 72 of the 2,048 planet descriptions, those whose last line is exactly 30 characters wide. For example, SOCELAGE ends with "noted for Its Exotic Goat Meat" and no full stop (`text/justified-full-stop-loss`, `text/description-full-stop-loss`). |
 | `$BDC6` | `FindPreviousSpace` | A justified line without any space would loop forever (follows from the instructions). |
 | `$B5B4` | `BuyEquipmentItem` | Buying fuel while the nova mission is active takes the price and gives no fuel (`economy/p6-equipment-purchase`). |

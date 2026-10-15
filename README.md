@@ -52,6 +52,7 @@ For command-line options, run `make.bat` directly. It forwards arguments to
 | `stationrandomlaunchfix` | `no`, `yes` | `no` | `yes` allows both Cobra and Python traders to launch from stations while preserving police Viper, rock hermit fighter and Thargon choices and RNG advancement. |
 | `stationslotfix` | `no`, `yes` | `no` | `yes` turns the station's docking slot towards the planet centre when the station appears after a hyperspace jump. In the original, turns made after the arrival leave the slot misaligned, and in 464 systems of galaxies 2, 4, 6 and 7 the slot faces directly away from the planet. Uses free bytes in the game image. |
 | `fuelfix` | `no`, `yes` | `no` | `yes` recomputes the fuel price on the equipment screen and the FU fuel bar at launch from the current fuel. In the original both keep old values after loading a saved commander: after a reset and reload, fuel costs 0.0 and the FU bar shows a full tank whatever the loaded fuel. The price follows the original formula: twice the system's economy number plus the missing tenths of a light year, in tenths of a credit, and 0 for a full tank. Uses free bytes in the game image. |
+| `hyperspacedockingfix` | `no`, `yes` | `no` | `yes` lets you dock again after a refused H or G press. In the original any press, even one the game refuses (while docked, G alone, no galactic hyperdrive, the current system, out of range), prevents docking with the station or the docking computer until the next hyperspace arrival. With `yes` only an accepted jump does so, from its countdown to the end of the arrival tunnel. Changes two bytes in place. |
 | `verify` | `yes`, `no` | `yes` | `yes` requires byte-for-byte identity with the original TAP. `no` allows modified game bytes; TAP structure, metadata, checksums and assembler memory bounds remain mandatory. |
 | `tapfile` | A plain filename ending in `.tap` | `elite-128k.tap` | Names the output file inside `release/`. No directory paths are accepted. Quote an argument containing spaces, such as `"tapfile=My Elite.tap"`. Internal TAP headers are unchanged. |
 
@@ -66,7 +67,7 @@ Font choices:
 
 All four fonts contain 91 glyphs (728 bytes) and use the same startup copy and
 character renderer. Normal builds assemble the selected font source without
-reading `PATCH128.TAP`. The font, scanner, station and fuel fixes require no extra RAM.
+reading `PATCH128.TAP`. The font, scanner, station, fuel and docking fixes require no extra RAM.
 
 Any game modification requires explicit `verify=no`; changing only `tapfile`
 still permits exact verification. The build verifies its output automatically.
@@ -185,7 +186,8 @@ assembled payloads; game origin and entry are checked against the linker map.
 | `tools/check_station_slot_fix.py` | Station switch-on geometries, all 2,048 hyperspace arrivals, unchanged paths and optional 48K ROM-load runs |
 | `src/fuel-fix.asm` | Optional fuel price and FU gauge fix; three macros placed in free areas of the image |
 | `tools/check_fuel_fix.py` | Exhaustive fuel-price formula, agreement with the original after all 2,048 jumps, FU gauge and optional 48K ROM-load runs |
-| `tools/check_build_options.py` | All 256 ship/laser/font/scanner-fix/station-launch-fix/station-slot-fix/fuel-fix combinations in both verification modes and invalid TAP checks |
+| `tools/check_hyperspace_docking_fix.py` | Docking decisions, every refused H/G press, an accepted jump and optional 48K ROM-load runs |
+| `tools/check_build_options.py` | All 512 ship/laser/font/scanner-fix/station-launch-fix/station-slot-fix/fuel-fix/hyperspace-docking-fix combinations in both verification modes and invalid TAP checks |
 | `tools/check_scanner_pixel_fix.py` | Exhaustive pixel preservation, indicator/missile comparison and 48K first-launch test |
 | `tools/check_laser_variant.py` | Actual laser/line rendering, endpoint randomisation and stack checks |
 | `tools/render_cockpit.py` | Monochrome and initial-attribute cockpit renderings |

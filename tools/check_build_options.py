@@ -1,4 +1,4 @@
-"""Exercise all build options; leave Adder/single/48K and all four fixes built."""
+"""Exercise all build options; leave Adder/single/48K and all five fixes built."""
 from itertools import product
 import json
 import subprocess
@@ -43,6 +43,11 @@ def main():
     fuel_ranges = [(fuel_symbols[f'{part}Start'], fuel_symbols[f'{part}Limit'])
                    for part in ('FuelLaunchHook', 'FuelPriceHook', 'FuelPricePart', 'FuelEconomyPart', 'FuelStorePart')]
     assert fuel_ranges == [(0x7B85, 0x7B88), (0xB53F, 0xB542), (0xB31B, 0xB32B), (0xA89B, 0xA8AA), (0x9A3A, 0x9A46)]
+    run('hyperspace-docking-fix-baseline', 'hyperspacedockingfix=yes', 'verify=no')
+    docking_image = parse(RELEASE_TAP.read_bytes())[5].payload
+    docking_symbols = symbol_map(ROOT/'build/game.map')
+    docking_range = (docking_symbols['HyperspaceDockingCheckStart'], docking_symbols['HyperspaceDockingCheckLimit'])
+    assert docking_range == (0x70BE, 0x70C1)
     # Only the instrument region and its two existing call/jump references
     # may move. These are original-image landmarks, not hand-linked targets.
     scanner_base = scanner_symbols['GameImage']
@@ -54,19 +59,19 @@ def main():
         assert scanner_image[offset+1:offset+3] == scanner_symbols[target].to_bytes(2, 'little')
         scanner_changes.append((address+1, address+3))
     combinations=[]
-    for ship, laser, font, scanner, station, slot, fuel in product(('krait','adder'), ('original','single'), ('128fix_ecm_s','128fix','128','48'), ('no','yes'), ('no','yes'), ('no','yes'), ('no','yes')):
-        name=f'{ship}-{laser}-font{font}-scanner{scanner}-station{station}-slot{slot}-fuel{fuel}'
-        exact=(ship,laser,font,scanner,station,slot,fuel)==('krait','original','128','no','no','no','no')
+    for ship, laser, font, scanner, station, slot, fuel, docking in product(('krait','adder'), ('original','single'), ('128fix_ecm_s','128fix','128','48'), ('no','yes'), ('no','yes'), ('no','yes'), ('no','yes'), ('no','yes')):
+        name=f'{ship}-{laser}-font{font}-scanner{scanner}-station{station}-slot{slot}-fuel{fuel}-docking{docking}'
+        exact=(ship,laser,font,scanner,station,slot,fuel,docking)==('krait','original','128','no','no','no','no','no')
         result=run(name+'-exact',f'ship={ship}',f'laser={laser}',f'font={font}',
                    f'scannerpixelfix={scanner}', f'stationrandomlaunchfix={station}', f'stationslotfix={slot}',
-                   f'fuelfix={fuel}', 'verify=yes',success=exact)
+                   f'fuelfix={fuel}', f'hyperspacedockingfix={docking}', 'verify=yes',success=exact)
         if not exact:
             assert 'Binary identity FAILED' in result.stderr
             assert not RELEASE_TAP.exists(), 'Failed build left a stale release'
             assert not (ROOT/'build/verification.json').exists()
         run(name+'-relaxed','--ship',ship,'--laser',laser,'--font',font,
             '--scannerpixelfix',scanner,'--stationrandomlaunchfix',station,'--stationslotfix',slot,
-            '--fuelfix',fuel,'--verify','no')
+            '--fuelfix',fuel,'--hyperspacedockingfix',docking,'--verify','no')
         symbols=symbol_map(ROOT/'build/game.map')
         # Independently reproduce only the selected changes in each ship's
         # baseline. Font bytes must match the supplied TAP, not an ASM fixture.
@@ -93,17 +98,21 @@ def main():
         if fuel=='yes':
             for start, end in fuel_ranges:
                 payload[start-symbols['GameImage']:end-symbols['GameImage']] = fuel_image[start-fuel_symbols['GameImage']:end-fuel_symbols['GameImage']]
+        if docking=='yes':
+            start, end = docking_range
+            payload[start-symbols['GameImage']:end-symbols['GameImage']] = docking_image[start-docking_symbols['GameImage']:end-docking_symbols['GameImage']]
         expected=b''.join(frame(b.flag,bytes(payload) if i==5 else b.payload) for i,b in enumerate(blocks))
         assert RELEASE_TAP.read_bytes()==expected, f'{name}: unrelated bytes changed'
         metadata=json.loads((ROOT/'build/verification.json').read_text())
-        assert (metadata['ship'],metadata['laser'],metadata['font'],metadata['scannerpixelfix'],metadata['stationrandomlaunchfix'],metadata['stationslotfix'],metadata['fuelfix'])==(ship,laser,font,scanner,station,slot,fuel)
-        combinations.append(dict(ship=ship,laser=laser,font=font,scannerpixelfix=scanner,stationrandomlaunchfix=station,stationslotfix=slot,fuelfix=fuel,strict_accepted=exact,
+        assert (metadata['ship'],metadata['laser'],metadata['font'],metadata['scannerpixelfix'],metadata['stationrandomlaunchfix'],metadata['stationslotfix'],metadata['fuelfix'],metadata['hyperspacedockingfix'])==(ship,laser,font,scanner,station,slot,fuel,docking)
+        combinations.append(dict(ship=ship,laser=laser,font=font,scannerpixelfix=scanner,stationrandomlaunchfix=station,stationslotfix=slot,fuelfix=fuel,hyperspacedockingfix=docking,strict_accepted=exact,
                                  relaxed_sha256=sha(expected)))
     run('invalid-font','font=47',success=False)
     run('invalid-scanner-fix','scannerpixelfix=maybe',success=False)
     run('invalid-station-launch-fix','stationrandomlaunchfix=maybe',success=False)
     run('invalid-station-slot-fix','stationslotfix=maybe',success=False)
     run('invalid-fuel-fix','fuelfix=maybe',success=False)
+    run('invalid-hyperspace-docking-fix','hyperspacedockingfix=maybe',success=False)
     good=RELEASE_TAP.read_bytes()
     failed=run('verify-exact-rejected','--verify-only',success=False)
     assert 'Binary identity FAILED' in failed.stderr
@@ -127,8 +136,8 @@ def main():
             path.unlink()
     run('verify-relaxed','--verify-only','verify=no')
     assert RELEASE_TAP.read_bytes()==good
-    assert len(combinations)==256
-    report.write_text(json.dumps(dict(passed=True,all_256_combinations=True,combinations=combinations,
+    assert len(combinations)==512
+    report.write_text(json.dumps(dict(passed=True,all_512_combinations=True,combinations=combinations,
         strict_adder_rejected=True,corrupt_tapes_rejected_without_identity=True,
         single_laser_exact_patch=True,strict_single_laser_rejected=True,
         patch_font_matches_source_tape=True,strict_font48_rejected=True,
@@ -136,8 +145,9 @@ def main():
         station_launch_fix_changes_scoped=True,final_stationrandomlaunchfix='yes',
         station_slot_fix_changes_scoped=True,final_stationslotfix='yes',
         fuel_fix_changes_scoped=True,final_fuelfix='yes',
+        hyperspace_docking_fix_changes_scoped=True,final_hyperspacedockingfix='yes',
         final_ship='adder',final_laser='single',final_font='48',final_tape_sha256=sha(good)),indent=2)+'\n',encoding='utf-8')
-    print('PASS: all 256 ship/laser/font/scannerpixelfix/stationrandomlaunchfix/stationslotfix/fuelfix combinations in both verification modes, scoped patches, stale-output handling, corrupt TAP rejection.')
+    print('PASS: all 512 ship/laser/font/scannerpixelfix/stationrandomlaunchfix/stationslotfix/fuelfix/hyperspacedockingfix combinations in both verification modes, scoped patches, stale-output handling, corrupt TAP rejection.')
 
 
 if __name__=='__main__':

@@ -75,7 +75,9 @@ Cleared only on arrival (FinishHyperspaceArrival) and by the game-over restart a
 So a refused hyperspace key press disables docking until the next jump.
 Evidence: tools/check_routines.py missions/p2-hyperspace-key-latch; 48K emulator run
 (docking computer key ignored after H was pressed with the current system selected,
-honoured without the H press)."""),
+honoured without the H press).
+hyperspacedockingfix=yes leaves the latch as it is but makes CheckDocking test
+L_A80A instead, which only an accepted jump sets."""),
     0x7C3A: ('CircleOffsetY', 'verified', """
 Circle parameter: vertical distance of the centre from the centre row of the area
 (row 64 in the view, row 96 for DrawScreenCircle); CircleFlags bit 1 gives the side.

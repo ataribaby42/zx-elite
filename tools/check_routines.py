@@ -75,7 +75,7 @@ FRESH_REGISTERS = dict(a=0, f=0, bc=0, de=0, hl=0, ix=0, iy=ROM_IY)   # a new Si
 
 OPTION_SYMBOLS = ('SHIP_ADDER', 'LASER_SINGLE', 'FONT_48', 'FONT_128FIX', 'FONT_128FIX_ECM_S',
                   'SCANNER_PIXEL_FIX', 'STATION_RANDOM_LAUNCH_FIX', 'STATION_SLOT_FIX',
-                  'FUEL_FIX')
+                  'FUEL_FIX', 'HYPERSPACE_DOCKING_FIX')
 OUTPUT = ROOT / 'build/routine-checks/verification.json'
 
 # Object instance fields (offsets inside a 39-byte slot; tools/annotations, docs/SHIPS.md)

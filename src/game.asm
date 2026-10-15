@@ -430,8 +430,16 @@ L_70AB:
 ; present, docking computers are fitted (DockingComputerFitted), the ship is in flight,
 ; JumpTunnelMode is clear (no hyperspace countdown: CheckHyperspaceKeys sets 1 or 2 for normal or
 ; galactic hyperspace) and the station is not hostile (byte +$21 bit 2).
+; hyperspacedockingfix=yes returns on JumpTunnelMode instead of HyperspaceKeyLatch: only an accepted jump,
+; from its countdown to the end of the arrival tunnel, then prevents docking.
 CheckDocking:
+assert $-GameImage = HyperspaceDockingCheckStart-GameLoadAddress
+IF HYPERSPACE_DOCKING_FIX
+    LD A,(JumpTunnelMode)                      ; accepted jump (countdown or tunnel): no docking
+ELSE
     LD A,(HyperspaceKeyLatch)                  ; $70BE: 3A 39 7C  any hyperspace key press since the last arrival: no docking
+ENDIF
+assert $-GameImage = HyperspaceDockingCheckLimit-GameLoadAddress
     AND A                                      ; $70C1: A7
     RET NZ                                     ; $70C2: C0
     LD A,(DockingContactFlag)                  ; $70C3: 3A 15 DA  station slot contact (L_EB0C)
@@ -2696,6 +2704,8 @@ CopyCommanderTemplate:
 ; Evidence: tools/check_routines.py missions/p2-hyperspace-key-latch; 48K emulator run
 ; (docking computer key ignored after H was pressed with the current system selected,
 ; honoured without the H press).
+; hyperspacedockingfix=yes leaves the latch as it is but makes CheckDocking test
+; JumpTunnelMode instead, which only an accepted jump sets.
 HyperspaceKeyLatch:
     defb $00                                                                              ; $7C39 .
 

@@ -41,7 +41,8 @@ python tools/build.py --verify-only --verify no
 
 `ship` accepts `krait` (default) or `adder`; `laser` accepts `original` (default)
 or `single`. `font` accepts `128` (default), `48`, `128fix` or `128fix_ecm_s`. `scannerpixelfix`,
-`stationrandomlaunchfix`, `stationslotfix` and `fuelfix` accept `no` (default) or `yes`. `verify` accepts `yes`
+`stationrandomlaunchfix`, `stationslotfix`, `fuelfix` and `hyperspacedockingfix` accept `no` (default) or `yes`.
+`verify` accepts `yes`
 (default) or `no`. A build does not change the saved BAT settings or remember
 its command-line overrides. No modification silently weakens verification: select
 `verify=no` explicitly. Modified builds with `verify=yes` correctly fail the
@@ -328,6 +329,80 @@ poke of `FuelLevel` stands for a loaded commander with 3.4 light years:
 The original under the same poke lists 0.0 and keeps 160. Build the option
 with the default tapfile for this mode. Reports are in `build/fuel-fix-check/`.
 
+## Hyperspace docking fix
+
+```bat
+make.bat hyperspacedockingfix=yes verify=no
+python tools/check_hyperspace_docking_fix.py
+python tools/check_hyperspace_docking_fix.py --emulator
+```
+
+The equivalent Python option is `--hyperspacedockingfix yes`. The default
+`no` keeps the original bytes and behaviour.
+
+In the original game `CheckHyperspaceKeys` sets `HyperspaceKeyLatch` as soon
+as it consumes an H or G press, before it tests anything else. While the latch
+is set, `CheckDocking` returns at once, so neither station contact nor the
+docking computer docks the ship. Only a hyperspace arrival or the game-over
+restart clears it. A press that the game refuses therefore disables docking
+until the next jump. Refused presses include:
+
+- H or G while docked;
+- G alone;
+- G and H without a galactic hyperdrive;
+- H with the current system selected;
+- H with a target out of range.
+
+See [findings](FINDINGS.md#found-in-the-second-annotation-pass).
+
+The fix changes the operand of the first instruction of `CheckDocking`, so
+that it reads `JumpTunnelMode` instead of the latch. Only an accepted jump sets
+`JumpTunnelMode`, at the same moment as the latch: 1 for a normal jump and 2
+for a galactic one. The end of the arrival tunnel (`FinishHyperspaceTunnel`)
+clears it. An accepted jump therefore still prevents docking from its
+countdown onwards, while a refused press no longer does.
+
+The window now lasts until the end of the arrival tunnel, not until the
+arrival itself. In that interval the docking computer is refused anyway,
+because `CheckDockingComputerKey` also tests `JumpTunnelMode`. The station is
+far away and dormant, so no new contact can occur, and witchspace never calls
+`CheckDocking`. The only difference concerns a contact flag left over from
+touching the station during a countdown. The original docks with it at the
+arrival, the fix after the arrival tunnel. The latch is still written but no
+longer read.
+
+Only the two operand bytes at `$70BF..$70C0` change. Assembler assertions
+protect the boundaries of the instruction (`HyperspaceDockingCheckStart` and
+`HyperspaceDockingCheckLimit` in `src/options.asm`). The source generator
+emits the alternative instruction itself, so no extra source file is needed.
+No memory is used.
+
+`tools/check_hyperspace_docking_fix.py` runs the assembled image with the
+supplied 48K ROM in SkoolKit's simulator. It compares it with a baseline that
+has the original instruction restored from the reference tape, and checks
+the following:
+
+- only the operand differs;
+- `CheckDocking` for each latch value, `JumpTunnelMode` value and docking
+  path (contact or docking computer);
+- each of six refused presses followed by station contact. The fixed image
+  docks and the original does not. A press during a running countdown still
+  blocks docking in both;
+- an accepted jump blocks docking from the acceptance until its arrival
+  tunnel ends.
+
+`--emulator` loads `release/elite-128k.tap` through the 48K ROM. Docking
+computers are fitted by a test-only poke, and the runs check the following:
+
+- H pressed while docked, a launch and the key C dock the ship; the
+  original stays in flight;
+- the same without H docks in both;
+- C pressed during an accepted countdown to Diso does not dock, and the jump
+  arrives at Diso.
+
+Build the option with the default tapfile for this mode. Reports are in
+`build/hyperspace-docking-fix-check/`.
+
 ## What verification means
 
 Always checked, including `verify=no`:
@@ -585,8 +660,9 @@ one-time start-up runs in the start-up-only area above. `stationslotfix=yes`
 uses three of the free areas listed above: `$E88B..$E8CE`, `$AC56..$AC76` and
 `$FCED..$FCFF`, 114 of their 120 bytes. `fuelfix=yes` fills three others
 completely: `$B31B..$B32A`, `$A89B..$A8A9` and `$9A3A..$9A45`, 43 bytes. Every
-other option leaves the free areas unchanged. With both fixes 53 bytes remain
-free in 16 areas, the largest 11 bytes (`$BDF5..$BDFF`).
+other option leaves the free areas unchanged; `hyperspacedockingfix` changes
+two bytes in place. With both fixes 53 bytes remain free in 16 areas, the
+largest 11 bytes (`$BDF5..$BDFF`).
 
 ### Rules for using free space
 
@@ -621,8 +697,9 @@ Use `make.bat ship=krait font=48 verify=no` for the Krait check and
 The inherited broader gameplay scenarios above remain available; they are
 not all required for a font-only data substitution.
 
-The option check builds all 256 `ship`/`laser`/`font`/`scannerpixelfix`/
-`stationrandomlaunchfix`/`stationslotfix`/`fuelfix` combinations in both verification modes, expects
+The option check builds all 512 `ship`/`laser`/`font`/`scannerpixelfix`/
+`stationrandomlaunchfix`/`stationslotfix`/`fuelfix`/`hyperspacedockingfix` combinations in both
+verification modes, expects
 strict verification of any modification to fail, checks stale-output
 removal and rejects damaged checksums, invalid metadata with a valid XOR, and
 truncated TAP data even with identity disabled. It also verifies the exact
@@ -630,9 +707,10 @@ ten-byte laser patch, exact font bytes from PATCH128 and absence of unrelated
 changes for each ship option. The scanner fix is limited to the original
 instrument region and its two missile-call operands; the station launch fix
 is limited to its original 38-byte selector, the station slot fix to its
-four areas and the fuel fix to its five. It leaves Adder with `laser=single
-font=48 scannerpixelfix=yes stationrandomlaunchfix=yes stationslotfix=yes
-fuelfix=yes` built.
+four areas, the fuel fix to its five and the docking fix to its one operand.
+It leaves Adder with `laser=single font=48 scannerpixelfix=yes
+stationrandomlaunchfix=yes stationslotfix=yes fuelfix=yes
+hyperspacedockingfix=yes` built.
 
 The ship check compares all other models with the original bytes, resolves
 every Adder vertex/edge face reference to the original normal, and executes
@@ -688,7 +766,7 @@ Maintained files for this feature:
 - `tools/bootstrap_sources.py`, `tools/analyze_ship_blueprints.py`;
 - `tools/check_build_options.py`, `tools/check_laser_variant.py`, `tools/check_ship_variant.py`,
   `tools/check_graphics.py`, `tools/check_station_slot_fix.py`, `tools/check_fuel_fix.py`,
-  `tools/emulator_check.py`;
+  `tools/check_hyperspace_docking_fix.py`, `tools/emulator_check.py`;
 - `AGENTS.md`, `README.md`, `docs/SHIPS.md`, `docs/GRAPHICS.md`, this document.
 
 The bootstrap generator preserves these conditional hooks and regenerates

@@ -227,7 +227,9 @@ is set, clear it and dock (DockWithStation).  Otherwise read and clear key
 bit 7 of L_FC11 and dock with the docking computer if the station is
 present, docking computers are fitted (L_A84E), the ship is in flight,
 L_A80A is clear (no hyperspace countdown: L_D574 sets 1 or 2 for normal or
-galactic hyperspace) and the station is not hostile (byte +$21 bit 2)."""),
+galactic hyperspace) and the station is not hostile (byte +$21 bit 2).
+hyperspacedockingfix=yes returns on L_A80A instead of L_7C39: only an accepted jump,
+from its countdown to the end of the arrival tunnel, then prevents docking."""),
     0x70CF: ('CheckDockingComputerKey', 'verified', """
 Docking-computer key path of CheckDocking: read and clear bit 7 of KeyFlagsCombat
 (key C).  Docking needs StationPresent, DockingComputerFitted, FlightCondition
