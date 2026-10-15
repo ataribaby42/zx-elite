@@ -116,6 +116,14 @@ download from entering Git; builds use the separately installed assembler.
    any REM examples). Build failures must propagate and leave no stale release.
    Document allowed values in the project documentation. Run `make.bat`
    directly when passing options on the command line.
+   Every new build option must also be described in the root `README.md`
+   table under `### All build options` (allowed values, default and
+   description), with its new source and check files listed in the README's
+   source-layout table. Add the option with its default value to the
+   `REM make.bat ...` example line at the top of `build.bat`. That REM line is
+   the only part of `build.bat` to change for a new option; keep its trailing
+   space and CRLF line endings. Change the owner's other `build.bat` lines only
+   when asked.
 4. Package TAP blocks deterministically. Validate Spectrum header fields,
    payload lengths, checksums, total size and SHA-256.
 5. When building the default reconstruction, run `verify.bat`. Success requires structural
