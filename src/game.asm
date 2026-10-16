@@ -6144,9 +6144,18 @@ DrawScannerContacts:
     LD IX,InitialRuntimeState                  ; $8C39: DD 21 48 60  slot 0 (the station) first
 
 ; VERIFIED: Per-slot body of DrawScannerContacts (IX = slot).
+; iffunit=yes calls IffScannerContactEnergy instead of loading the energy: with the
+; I.F.F. unit fitted it returns 0 for a threat in the dark half of the blink, so the
+; slot is skipped like an empty one (src/iff-unit.asm).
 ; Evidence: control flow.
 L_8C3D:
+assert $-GameImage = IffScannerHookStart-GameLoadAddress
+IF IFF_UNIT
+    CALL IffScannerContactEnergy               ; energy, or 0 for a threat in the dark half of the blink
+ELSE
     LD A,(IX+$22)                              ; $8C3D: DD 7E 22  energy 0: empty slot
+ENDIF
+assert $-GameImage = IffScannerHookLimit-GameLoadAddress
     AND A                                      ; $8C40: A7
     JR Z,L_8C26                                ; $8C41: 28 E3  next slot
     LD A,(IX+$01)                              ; $8C43: DD 7E 01
@@ -7446,9 +7455,16 @@ SoundRequestIndex:
 
 ; INFERRED: Three JP instructions to UseEnergyBomb, FlashViewAttributes and FillViewAttributes (all executed routines).  No
 ; static reference, pointer or runtime access to this block was found; kept as code so that
-; the targets relocate.  Possibly an unused vector block.
+; the targets relocate.  Possibly an unused vector block.  iffunit=yes points the
+; first entry at IffBlinkTick, since UseEnergyBomb no longer exists.
 L_91C9:
+assert $-GameImage = IffBombVectorStart-GameLoadAddress
+IF IFF_UNIT
+    JP IffBlinkTick                            ; no energy bomb: the vector only advances the blink clock
+ELSE
     JP UseEnergyBomb                           ; $91C9: C3 60 92
+ENDIF
+assert $-GameImage = IffBombVectorLimit-GameLoadAddress
 L_91CC:
     JP FlashViewAttributes                     ; $91CC: C3 80 92
 L_91CF:
@@ -7555,6 +7571,12 @@ L_9239:
 ; Evidence: called once per cockpit-view flight frame from UpdateCockpitSystems; runtime:
 ; ecm-bomb-pod scenario (bomb fitted by test poke, W key as in the manual)
 ; executes $926C; tools/check_routines.py missions/p4-energy-bomb-use.
+; iffunit=yes removes the energy bomb: IffScannerCode (src/iff-unit.asm) takes these
+; 32 bytes and the label exists only without the option.
+assert $-GameImage = IffScannerCodeStart-GameLoadAddress
+IF IFF_UNIT
+    IffScannerCode
+ELSE
 UseEnergyBomb:
     LD A,(KeyFlagsCombat)                      ; $9260: 3A 11 FC
     BIT 5,A                                    ; $9263: CB 6F  key flag bit 5 (W key: energy bomb)
@@ -7575,6 +7597,8 @@ L_9279:
     DEC C                                      ; $927C: 0D
     JR NZ,L_9279                               ; $927D: 20 FA
     RET                                        ; $927F: C9
+ENDIF
+assert $-GameImage = IffScannerCodeLimit-GameLoadAddress
 
 ; VERIFIED: One flash step: colour the view window with attribute $28 (cyan paper, black
 ; ink) through the L_9291 entry, so only the NovaMissionActive mask applies, then with $0F
@@ -9258,6 +9282,7 @@ SetConditionGreen:
 ; indicators, run UpdateMissileControl, UpdateEscapePod and UseEnergyBomb, clear
 ; the one-shot key bits 1, 2, 3, 5 and 6 (T, F, U, W, Q) of KeyFlagsCombat, then continue
 ; at UpdateEnergyAndShields.  Caller: L_72FD.
+; iffunit=yes calls IffBlinkTick instead of UseEnergyBomb (src/iff-unit.asm).
 UpdateCockpitSystems:
     LD A,(CurrentScreenId)                     ; $A559: 3A 41 70
     CP $04                                     ; $A55C: FE 04  cockpit views 0..3 only
@@ -9265,7 +9290,13 @@ UpdateCockpitSystems:
     CALL DrawCockpitIndicators                 ; $A55F: CD 60 A6
     CALL UpdateMissileControl                  ; $A562: CD 06 A7
     CALL UpdateEscapePod                       ; $A565: CD 7B A7
+assert $-GameImage = IffBlinkHookStart-GameLoadAddress
+IF IFF_UNIT
+    CALL IffBlinkTick                          ; advance the I.F.F. blink clock
+ELSE
     CALL UseEnergyBomb                         ; $A568: CD 60 92
+ENDIF
+assert $-GameImage = IffBlinkHookLimit-GameLoadAddress
     LD HL,KeyFlagsCombat                       ; $A56B: 21 11 FC
     LD A,(HL)                                  ; $A56E: 7E
     AND $91                                    ; $A56F: E6 91  keep fire, E and C (bits 0, 4, 7); drop T, F, U, W, Q
@@ -16320,6 +16351,7 @@ TorusJumpInhibitFlag:
 ; clears this byte.
 ; NOTE: IY still holds the previously processed slot's blueprint at that test, so the
 ; slot after a Thargoid is spared and the Thargoid is not.
+; iffunit=yes removes the energy bomb; nothing reads or writes this byte then.
 ; Evidence: tools/check_routines.py missions/energy-bomb-exemption.
 EnergyBombPending:
     defb $00                                                                              ; $DA10 .
@@ -16409,6 +16441,8 @@ ObjectLoopCounter:
 ;   encounter) unless the station is present, WitchspaceFlag is set or EncounterShipCount >= 4.
 ; - Clear the per-update variables, recount EncounterShipCount, then update all 8 slots
 ;   (L_DA9A); afterwards clear EnergyBombPending and maybe SharedHostilityAlert.
+; iffunit=yes (src/iff-unit.asm) removes the energy bomb test ($DAC1) and the clearing of
+; EnergyBombPending ($DBC8); EnergyBombPending is then unused.
 ; Clobbers all registers including IX and IY.
 UpdateObjects:
     LD A,(InvasionMissionState)                ; $DA1D: 3A 71 A8  mission-3 state
@@ -16494,6 +16528,10 @@ L_DAB2:
     LD A,$01                                   ; $DABC: 3E 01
     LD (TorusJumpInhibitFlag),A                ; $DABE: 32 0F DA
 L_DAC1:
+assert $-GameImage = IffShipCodeStart-GameLoadAddress
+IF IFF_UNIT
+    IffShipCode
+ELSE
     LD A,(EnergyBombPending)                   ; $DAC1: 3A 10 DA  energy bomb pending?
     AND A                                      ; $DAC4: A7
     JR Z,UpdateSharedHostility                 ; $DAC5: 28 11
@@ -16503,6 +16541,8 @@ L_DAC1:
     CP $27                                     ; $DAD0: FE 27  maximum speed 39: Thargoid
     JR Z,UpdateSharedHostility                 ; $DAD2: 28 04
     SET 4,(IX+$20)                             ; $DAD4: DD CB 20 E6  start the explosion
+ENDIF
+assert $-GameImage = IffShipCodeLimit-GameLoadAddress
 
 ; VERIFIED: Per-instance update block; IX points at the current ship.
 ; If it is hostile and has behaviour bits $20/$40, raise SharedHostilityAlert.
@@ -16635,13 +16675,18 @@ L_DBA3:
     RES 4,(IX+$20)                             ; $DBBA: DD CB 20 A6
 
 ; VERIFIED: Next slot (IX += InstanceSize).  After slot 7 clear EnergyBombPending; clear
-; SharedHostilityAlert when TorusJumpInhibitFlag is zero.
+; SharedHostilityAlert when TorusJumpInhibitFlag is zero.  iffunit=yes keeps only the
+; second step (IffObjectsTailCode).
 L_DBBE:
     POP AF                                     ; $DBBE: F1  A = counter of this slot
     LD DE,InstanceSize                         ; $DBBF: 11 27 00
     ADD IX,DE                                  ; $DBC2: DD 19
     DEC A                                      ; $DBC4: 3D
     JP NZ,L_DA9A                               ; $DBC5: C2 9A DA  more slots
+assert $-GameImage = IffObjectsTailStart-GameLoadAddress
+IF IFF_UNIT
+    IffObjectsTailCode
+ELSE
     XOR A                                      ; $DBC8: AF
     LD (EnergyBombPending),A                   ; $DBC9: 32 10 DA  bomb applied to every slot
     LD A,(TorusJumpInhibitFlag)                ; $DBCC: 3A 0F DA
@@ -16649,6 +16694,8 @@ L_DBBE:
     RET NZ                                     ; $DBD0: C0  ships present: keep the shared alert
     LD (SharedHostilityAlert),A                ; $DBD1: 32 14 DA  none: clear the shared alert
     RET                                        ; $DBD4: C9
+ENDIF
+assert $-GameImage = IffObjectsTailLimit-GameLoadAddress
 
 ; ============================================================================
 ; Vector and object-motion arithmetic
@@ -23037,7 +23084,8 @@ InterruptSavedStack:
     defw $0000                                                                            ; $FF56
 
 ; VERIFIED: 40 two-byte entries in KeyCharacterTable order: state-byte offset from KeyFlagsScreens
-; (0..7) and the bit mask ORed in by RecordKeyPress.  Z and V have mask 0.
+; (0..7) and the bit mask ORed in by RecordKeyPress.  Z and V have mask 0, and
+; so has W with iffunit=yes, which removes the energy bomb.
 ; The table must not cross a page (L is incremented without carry).
 ; Evidence: tools/check_routines.py input/scan-keyboard (every key); the POKE notes swap the
 ; SYMBOL SHIFT and B entries.
@@ -23066,7 +23114,13 @@ KeySymbolShiftActionMask:
     defb $00,$10                                                                          ; $FF6C ..  O            -> KeyFlagsScreens bit 4
     defb $07,$01                                                                          ; $FF6E ..  '9'          -> JoystickNumberKeys bit 0
     defb $02,$02                                                                          ; $FF70 ..  '2'          -> KeyFlagsViews bit 1
+assert $-GameImage = IffBombKeyStart-GameLoadAddress
+IF IFF_UNIT
+    defb $00,$00                               ; W            -> no action bit (no energy bomb)
+ELSE
     defb $03,$20                                                                          ; $FF72 .   W            -> KeyFlagsCombat bit 5
+ENDIF
+assert $-GameImage = IffBombKeyLimit-GameLoadAddress
     defb $01,$08                                                                          ; $FF74 ..  S            -> KeyFlagsFlight bit 3
     defb $00,$00                                                                          ; $FF76 ..  Z            -> no action bit
     defb $01,$02                                                                          ; $FF78 ..  M            -> KeyFlagsFlight bit 1
@@ -23559,7 +23613,6 @@ defc L_91D2 = ChartDiscGlyphs
 defc L_91F2 = CommodityTable
 defc L_9236 = EquipmentPriceTable
 defc L_9237 = FuelPrice
-defc L_9260 = UseEnergyBomb
 defc L_9280 = FlashViewAttributes
 defc L_9287 = FillViewAttributes
 defc L_92B5 = AttributeFillSavedSP
@@ -24252,6 +24305,9 @@ defc L_FF68 = KeySymbolShiftActionByte
 defc L_FF69 = KeySymbolShiftActionMask
 defc L_FF98 = KeyBActionByte
 defc L_FF99 = KeyBActionMask
+IF !IFF_UNIT
+defc L_9260 = UseEnergyBomb
+ENDIF
 IF !SCANNER_PIXEL_FIX
 defc L_A6A9 = PrintTileSquare
 defc L_A6AC = PrintTileRow

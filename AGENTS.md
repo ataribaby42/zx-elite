@@ -288,8 +288,8 @@ scenarios with `tools/run_runtime_scenarios.py`, always in 48K mode. The build
 option check deliberately leaves an Adder TAP with
 `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
 stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
-scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes` for
-testing.
+scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes
+iffunit=yes` for testing.
 Rebuild the default Krait version before collecting reference reconstruction/runtime-code seeds.
 The Adder test compares 128 actual rendered frames with the original side-B
 model, in addition to checking all 19 object loaders and other ship geometry.
@@ -526,6 +526,31 @@ part before a data include that starts at its limit; keep that order. Run
 `tools/check_text_full_stop_fix.py --emulator` for both ship choices, each
 built with the default tapfile, plus `python tools/check_routines.py --only
 text` on the default build and the option check.
+
+`iffunit=no` keeps the energy bomb. The optional `yes` in `src/iff-unit.asm`
+removes it and fits an I.F.F. unit in its place. Item 9 keeps its price, tech
+level and commander byte (`EnergyBombFitted`, used as `IffUnitFitted`), so the
+save format is unchanged; token 113 reads I.F.F. UNIT ("I.F.F. " and the UNIT
+token). The longer text uses the three empty tokens 146..148 at the end of the
+dictionary, which no `PrintToken` code reaches; `TextTokenDictionaryEnd` must
+keep its address. The option replaces exactly eight parts, each asserted with
+its `Iff...Start`/`Limit` constants and listed in `OPTION_PARTS` or
+`DATA_OPTION_PARTS` in `tools/bootstrap_sources.py`: the energy load of each
+scanner slot (`$8C3D`), the unreferenced vector `$91C9`, `UseEnergyBomb`
+(`$9260..$927F`), the dictionary from token 113 to its end
+(`$9D84..$9E73`), the bomb call in `UpdateCockpitSystems` (`$A568`), the
+bomb test in the `UpdateObjects` slot loop (`$DAC1..$DAD7`), the end of
+`UpdateObjects` (`$DBC8..$DBD4`) and W's `KeyActionTable` entry
+(`$FF72..$FF73`). `UseEnergyBomb` exists only without the option. With the
+unit fitted, `DrawScannerContacts` skips a threat in the dark half of the blink
+and draws every other contact exactly as the original. A threat is a missile
+aimed at the player (`+$25` = 0) or another object with the hostile bit that is
+not scoopable. Do not change the hostility rules, the scanner geometry or
+`FlashViewAttributes`; the blink clock counts cockpit frames and needs no extra
+RAM. Run `tools/check_iff_unit.py --emulator` for both ship choices, each built
+with the default tapfile, plus `python tools/check_routines.py --only scanner
+--only missions --only input --only text` on the default build and the option
+check.
 
 - Source boundaries, offsets and lengths must be calculated by scripts or
   labels. No tool may silently truncate or pad a block.

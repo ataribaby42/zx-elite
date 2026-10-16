@@ -2,6 +2,10 @@
 
 ZX Spectrum Elite 128k source reconstruction
 
+## 16.10.2026 V1.3
+
+- I.F.F. unit option; replaces the energy bomb and its W key, threats blink on the scanner
+
 ## 15.10.2026 V1.2
 
 - Station slot fix; docking slot faces the planet when the station appears

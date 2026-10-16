@@ -73,7 +73,9 @@ the cockpit views (screen id < 4), afterwards keeps only bits 0, 4 and 7 of L_FC
 Input: none.  Output: none.  Clobbers: AF, BC, HL.
 Evidence: called once per cockpit-view flight frame from L_A559; runtime:
 ecm-bomb-pod scenario (bomb fitted by test poke, W key as in the manual)
-executes $926C; tools/check_routines.py missions/p4-energy-bomb-use."""),
+executes $926C; tools/check_routines.py missions/p4-energy-bomb-use.
+iffunit=yes removes the energy bomb: IffScannerCode (src/iff-unit.asm) takes these
+32 bytes and the label exists only without the option."""),
     0x9280: ('FlashViewAttributes', 'verified', """
 One flash step: colour the view window with attribute $28 (cyan paper, black
 ink) through the L_9291 entry, so only the L_A843 mask applies, then with $0F

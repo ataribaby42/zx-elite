@@ -153,6 +153,34 @@ IF TEXT_FULL_STOP_FIX
     INCLUDE "text-full-stop-fix.asm"
 ENDIF
 
+IFNDEF IFF_UNIT
+    defc IFF_UNIT = 0
+ENDIF
+assert IFF_UNIT = 0 || IFF_UNIT = 1
+
+; Original fixed boundaries of the eight parts that iffunit=yes replaces
+; (src/iff-unit.asm): the energy bomb code, its W key and its name become an
+; I.F.F. unit that makes threats blink on the scanner.
+defc IffScannerHookStart = $8C3D                ; LD A,(IX+$22) of each DrawScannerContacts slot
+defc IffScannerHookLimit = $8C40
+defc IffBombVectorStart = $91C9                 ; JP UseEnergyBomb in the unreferenced vector block
+defc IffBombVectorLimit = $91CC
+defc IffScannerCodeStart = $9260                ; UseEnergyBomb
+defc IffScannerCodeLimit = $9280
+defc IffUnitTextStart = $9D84                   ; token 113 ENERGY BOMB .. end of the dictionary
+defc IffUnitTextLimit = $9E74
+defc IffBlinkHookStart = $A568                  ; CALL UseEnergyBomb in UpdateCockpitSystems
+defc IffBlinkHookLimit = $A56B
+defc IffShipCodeStart = $DAC1                   ; energy bomb test in the UpdateObjects slot loop
+defc IffShipCodeLimit = $DAD8
+defc IffObjectsTailStart = $DBC8                ; end of UpdateObjects: clears EnergyBombPending
+defc IffObjectsTailLimit = $DBD5
+defc IffBombKeyStart = $FF72                    ; KeyActionTable entry of W
+defc IffBombKeyLimit = $FF74
+IF IFF_UNIT
+    INCLUDE "iff-unit.asm"
+ENDIF
+
 ; Original fixed boundaries of the shared parent-ship launch selector.
 defc ParentLaunchSelectionStart = $F44A
 defc ParentLaunchSelectionLimit = $F470

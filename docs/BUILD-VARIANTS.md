@@ -42,8 +42,8 @@ python tools/build.py --verify-only --verify no
 `ship` accepts `krait` (default) or `adder`; `laser` accepts `original` (default)
 or `single`. `font` accepts `128` (default), `48`, `128fix` or `128fix_ecm_s`. `scannerpixelfix`,
 `stationrandomlaunchfix`, `stationslotfix`, `fuelfix`, `hyperspacedockingfix`, `aicouragefix`,
-`scannerblipfix`, `stardustfix`, `missiletargetfix` and `textfullstopfix` accept `no` (default) or
-`yes`.
+`scannerblipfix`, `stardustfix`, `missiletargetfix`, `textfullstopfix` and `iffunit` accept `no`
+(default) or `yes`.
 `verify` accepts `yes`
 (default) or `no`. A build does not change the saved BAT settings or remember
 its command-line overrides. No modification silently weakens verification: select
@@ -740,6 +740,158 @@ the fixed image prints "Meat." on the next line. Build the option with the
 default tapfile for this mode. Reports are in
 `build/text-full-stop-fix-check/`.
 
+## I.F.F. unit
+
+```bat
+make.bat iffunit=yes verify=no
+python tools/check_iff_unit.py
+python tools/check_iff_unit.py --emulator
+```
+
+The equivalent Python option is `--iffunit yes`. The default `no` keeps the
+original bytes and behaviour.
+
+This option is a modification, not a fix. It removes the energy bomb and puts
+an I.F.F. (identification friend or foe) unit in its place
+(`src/iff-unit.asm`). With the unit fitted, threats blink on the scanner while
+every other contact stays lit.
+
+### Equipment item
+
+Item 9 keeps the energy bomb's price (900.0 Cr), its tech level and its
+commander byte (`+$36`, `EnergyBombFitted`, used as `IffUnitFitted`). Buying
+it, "... PRESENT", the status screen and the " DESTROYED" damage message all
+print the item's token 113. Its text becomes I.F.F. UNIT: the characters
+"I.F.F. " followed by the UNIT token that ENERGY UNIT already uses. The screens
+print it in title case as "I.F.F. Unit". The saved commander format does not
+change. A commander saved with an energy bomb loads with the unit, and one
+saved with the unit loads into the original with an energy bomb.
+
+The new text is three bytes longer than ENERGY BOMB. The dictionary ends with
+three empty tokens, 146..148 (`$9E71..$9E73`). `PrintToken` reaches only tokens
+0..145 (codes `$A0..$FF`, `$60..$7F`, and `$0E..$1F` as tokens `$80..$91`), and
+nothing else reads the dictionary, so no code ever reads these three bytes. The
+option drops them: tokens 114..145 move up by three bytes and
+`TextTokenDictionaryEnd` keeps its address. Tokens are found by counting
+terminators, never by address.
+
+### Removed energy bomb
+
+- `UseEnergyBomb` (`$9260..$927F`) and its call in `UpdateCockpitSystems`
+  (`$A568`);
+- the bomb test in the `UpdateObjects` slot loop (`$DAC1..$DAD7`) and the
+  clearing of `EnergyBombPending` after the loop (`$DBC8`). Nothing reads or
+  writes `EnergyBombPending` (`$DA10`) any more;
+- the W entry of `KeyActionTable` (`$FF72..$FF73`), now `$00,$00` like Z and
+  V. W still types the letter (commander name, chart search); in flight it does
+  nothing.
+
+`FlashViewAttributes` stays, because the unreferenced vector at `L_91CC` jumps
+to it. The vector at `L_91C9` jumped to `UseEnergyBomb` and now jumps to
+`IffBlinkTick`. Sound request bit 0 has no setter any more.
+
+### Threats
+
+`DrawScannerContacts` calls `IffScannerContactEnergy` instead of loading the
+energy of each slot (`$8C3D`). With the unit fitted, in the dark half of the
+blink it returns 0 for a threat, and the slot is skipped like an empty one.
+Otherwise it returns the energy, and the contact is drawn exactly as in the
+original. A threat is:
+
+- a missile (`+$26` bit 0) whose target code (`+$25`) is 0, the player. The
+  player's own missiles always carry a locked target: F fires only in missile
+  state 2, which needs a nonzero target, and a laser hit changes a missile's
+  code to 6 or more, never 0;
+- any other object with the hostile bit (`+$21` bit 2), unless it is
+  scoopable (`+$26` bit 1: cargo canisters, escape capsules, debris, inert
+  Thargons). The station counts while it is hostile.
+
+The game sets the hostile bit (see [BOUNTY-HUNTERS.md](BOUNTY-HUNTERS.md)):
+
+- from the blueprint: the pirate Python and Cobra Mk III records, Asp Mk II,
+  Sidewinder, Krait or Adder, Thargoid and Thargon;
+- for the Viper and the Fer-de-Lance once the legal score reaches 40;
+- for any ship hit by the player's laser;
+- for the station in mission-3 state 4;
+- for every object while the player's missile flies, or after a hostile
+  trader or Viper raises the shared alert.
+
+Only the station's bit is ever cleared again. After a missile launch or a
+shared alert, traders and the station therefore blink too; the scoopable test
+keeps cargo from blinking.
+
+### Blink
+
+`IffBlinkClock`, one byte inside the replaced `UseEnergyBomb` bytes, counts
+cockpit-view frames: `UpdateCockpitSystems` calls `IffBlinkTick` where it
+called `UseEnergyBomb`. Threats are hidden while bit 1
+(`IffBlinkHiddenPhase`) is set: two frames lit, two frames dark. The frame
+rate depends on what is drawn. The emulator check measured 5.6 cockpit frames
+per second with a pirate in view, about 1.4 blinks per second. Just after
+launch, with nothing near, the game runs 9 frames per second.
+
+### Memory layout
+
+| Area | Original | With `iffunit=yes` |
+|---|---|---|
+| `$8C3D..$8C3F` | `LD A,(IX+$22)` | `CALL IffScannerContactEnergy` |
+| `$91C9..$91CB` | `JP UseEnergyBomb` | `JP IffBlinkTick` |
+| `$9260..$927F` (32 B) | `UseEnergyBomb` | `IffScannerContactEnergy`, `IffBlinkClock`, 2 unused bytes |
+| `$9D84..$9E73` (240 B) | token 113 ENERGY BOMB, tokens 114..145, empty tokens 146..148 | token 113 I.F.F. UNIT, tokens 114..145 three bytes later |
+| `$A568..$A56A` | `CALL UseEnergyBomb` | `CALL IffBlinkTick` |
+| `$DAC1..$DAD7` (23 B) | the energy bomb test | `JR UpdateSharedHostility`, `IffShipContact`, `IffBlinkTick` |
+| `$DBC8..$DBD4` (13 B) | clear `EnergyBombPending`, then the shared alert | the shared alert only, 4 unused bytes |
+| `$FF72..$FF73` | W: `KeyFlagsCombat` bit 5 | W: no action bit |
+
+The start and limit constants of every part are in `src/options.asm`
+(`IffScannerHook`, `IffBombVector`, `IffScannerCode`, `IffUnitText`,
+`IffBlinkHook`, `IffShipCode`, `IffObjectsTail`, `IffBombKey`), and the build
+asserts them. No other address changes, and no extra RAM is needed.
+`tools/bootstrap_sources.py` regenerates the eight conditional parts,
+including the two inside the token dictionary; `UseEnergyBomb` is defined only
+without the option.
+
+### Checks
+
+`tools/check_iff_unit.py` compares the assembled image with a baseline whose
+eight parts are restored from the reference tape, using the supplied 48K ROM
+in SkoolKit's simulator. The baseline must equal the reference image.
+
+- All 306 changed bytes lie inside the eight parts.
+- `PrintToken`, run for all 146 dictionary codes, prints every token as the
+  original except code `$71`: "ENERGY BOMB" becomes "I.F.F. UNIT".
+- `IffScannerContactEnergy` is checked against a model for 92,160 slot states:
+  every role byte, hostile and other behaviour bits, five missile targets, six
+  clock values and three item values. IX and IY are kept and no memory is
+  written.
+- `DrawScannerContacts` draws seven objects: a hostile station, a pirate, a
+  trader, a missile aimed at the player, a player-style missile with the
+  hostile bit, a hostile canister and a Fer-de-Lance, calm or hostile. The
+  screen equals the original drawing of all objects. In the dark half with the
+  unit fitted, it equals the original drawing of the non-threats only.
+- W latches no key bit (`RecordKeyPress`).
+- `UpdateCockpitSystems` with W and the item fitted changes only the blink
+  clock and the consumed key bit, while the original uses the bomb.
+- `UpdateObjects` ignores a nonzero `EnergyBombPending`; its RAM then equals
+  the original update without a bomb.
+
+`--emulator` loads `release/elite-128k.tap` through the 48K ROM:
+
+- docked, it buys item 9 ("9 I.F.F. Unit 900.0") and shows I.F.F. Unit on the
+  status screen;
+- in flight, test-only pokes put a pirate ahead and move the station off the
+  scanner, and `ScannerContactsDrawn` is sampled at every frame interrupt. The
+  pirate's contact was dark in 125 of 251 samples with 14 changes. Without the
+  unit 4 samples were dark (the moment between restoring the scanner
+  background and redrawing it), and with a trader instead 0;
+- W in flight leaves the pirate and the unit in place; on the reference tape
+  the same W uses the energy bomb and destroys the pirate. That run uses the
+  option build's addresses, which the layout check proves identical outside
+  the parts.
+
+Build the option with the default tapfile for this mode. Reports and
+screenshots of a lit and a dark frame are in `build/iff-unit-check/`.
+
 ## What verification means
 
 Always checked, including `verify=no`:
@@ -951,7 +1103,7 @@ Every area below is free for three independent reasons:
 | `$B31B..$B32A` | 16 | Dormant attribute-fill routine |
 | `$9A3A..$9A45` | 12 | Bytes after `DustPlotList` |
 | `$BDF5..$BDFF` | 11 | Zero padding before the page-aligned square tables (used by `textfullstopfix=yes`) |
-| `$91C9..$91D1` | 9 | Three unreferenced `JP` instructions |
+| `$91C9..$91D1` | 9 | Three unreferenced `JP` instructions (`iffunit=yes` retargets the first) |
 | `$7818..$781E` | 7 | Unreferenced cloak-colour test |
 | `$780F..$7812` | 4 | Unreferenced code that falls into the used `L_7813` |
 | `$A897..$A899` | 3 | Dormant `JP` vector (`$A89A` is the live `MissileTarget`) |
@@ -1004,7 +1156,12 @@ two bytes in place, `aicouragefix` nine within its original 19 and
 `missiletargetfix` one byte in place. `textfullstopfix=yes` rewrites 31 bytes
 in place and fills `$BDF5..$BDFF`. With the station slot, fuel and text full
 stop fixes 42 bytes remain free in 15 areas, the largest 9 bytes
-(`$91C9..$91D1`).
+(`$91C9..$91D1`). `iffunit=yes` reuses the energy bomb's own bytes and the
+three unreachable bytes at the end of the token dictionary, and claims the
+first unreferenced `JP` at `$91C9..$91CB`. Its parts keep 6 bytes unused
+(`$927E..$927F`, `$DBD1..$DBD4`), and `EnergyBombPending` becomes unused.
+With the I.F.F. unit as well, 39 bytes remain free in 15 areas, the largest 7
+bytes (`$7818..$781E`).
 
 ### Rules for using free space
 
@@ -1039,8 +1196,8 @@ Use `make.bat ship=krait font=48 verify=no` for the Krait check and
 The inherited broader gameplay scenarios above remain available; they are
 not all required for a font-only data substitution.
 
-The option check (`tools/check_build_options.py`) runs in about 20 seconds
-(84 builds). It checks the following:
+The option check (`tools/check_build_options.py`) runs in about 25 seconds
+(89 builds). It checks the following:
 
 - The default build reproduces the reference tape.
 - Every non-default value alone builds in both verification modes. The strict
@@ -1057,12 +1214,13 @@ The option check (`tools/check_build_options.py`) runs in about 20 seconds
   - the scanner contact fix: its three parts;
   - the stardust fix: its 69 bytes;
   - the missile target fix: its one instruction;
-  - the text full stop fix: its two parts.
+  - the text full stop fix: its two parts;
+  - the I.F.F. unit: its eight parts.
 - These areas, together with every byte `ship=adder` changes, are pairwise
   disjoint. That is what makes the options composable.
 - Combinations are built in both modes:
   - a greedy covering array in which every pair of values of two options is
-    built together at least once (360 pairs in 14 combinations), so two includes
+    built together at least once (416 pairs in 15 combinations), so two includes
     that clash on a symbol or an assertion fail there;
   - every option on at once for each ship and non-default font.
 
@@ -1073,12 +1231,12 @@ The option check (`tools/check_build_options.py`) runs in about 20 seconds
   are rejected even with identity disabled.
 
 `python tools/check_build_options.py --full` builds the complete product of
-all values instead of the selected combinations: 16,384 combinations, several
+all values instead of the selected combinations: 32,768 combinations, several
 hours. Use it after changing the build machinery itself. Either mode leaves
 Adder with `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
 stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
-scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes`
-built. A new option must be added to `OPTIONS`, and a new
+scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes
+iffunit=yes` built. A new option must be added to `OPTIONS`, and a new
 fix's areas to `FIX_PARTS`, in that tool.
 
 The ship check compares all other models with the original bytes, resolves
@@ -1128,7 +1286,8 @@ Maintained files for this feature:
 - `build.bat`, `make.bat`, `verify.bat`, `tools/build.py`;
 - `src/options.asm`, `src/adder-startup.asm`, `src/single-laser.asm`,
   `src/station-slot-fix.asm`, `src/fuel-fix.asm`, `src/ai-courage-fix.asm`,
-  `src/scanner-blip-fix.asm`, `src/stardust-fix.asm`, `src/text-full-stop-fix.asm`;
+  `src/scanner-blip-fix.asm`, `src/stardust-fix.asm`, `src/text-full-stop-fix.asm`,
+  `src/iff-unit.asm`;
 - `src/data/font.asm`, `src/data/font-48.asm`, `tools/font_variant.py`;
 - `src/game.asm`, `src/data/ship-blueprints-and-tables.asm`;
 - `src/data/initial-runtime-state.asm`;
@@ -1138,7 +1297,8 @@ Maintained files for this feature:
   `tools/check_graphics.py`, `tools/check_station_slot_fix.py`, `tools/check_fuel_fix.py`,
   `tools/check_hyperspace_docking_fix.py`, `tools/check_ai_courage_fix.py`,
   `tools/check_scanner_blip_fix.py`, `tools/check_stardust_fix.py`,
-  `tools/check_missile_target_fix.py`, `tools/check_text_full_stop_fix.py`, `tools/emulator_check.py`;
+  `tools/check_missile_target_fix.py`, `tools/check_text_full_stop_fix.py`,
+  `tools/check_iff_unit.py`, `tools/emulator_check.py`;
 - `AGENTS.md`, `README.md`, `docs/SHIPS.md`, `docs/GRAPHICS.md`, this document.
 
 The bootstrap generator preserves these conditional hooks and regenerates

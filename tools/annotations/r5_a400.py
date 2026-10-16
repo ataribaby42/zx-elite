@@ -582,7 +582,8 @@ Evidence: instruction semantics; FlightCondition values (see that variable).""")
 Cockpit-view frame update: return unless CurrentScreenId < 4; draw the
 indicators, run UpdateMissileControl, UpdateEscapePod and UseEnergyBomb, clear
 the one-shot key bits 1, 2, 3, 5 and 6 (T, F, U, W, Q) of KeyFlagsCombat, then continue
-at UpdateEnergyAndShields.  Caller: L_72FD."""),
+at UpdateEnergyAndShields.  Caller: L_72FD.
+iffunit=yes calls IffBlinkTick instead of UseEnergyBomb (src/iff-unit.asm)."""),
     0xA572: ('UpdateEnergyAndShields', 'verified', """
 Energy and shield update, also called directly by L_72D2 on the non-view screens.
 Docked (FlightCondition = 0): return.  EnergyBank4 below $A0 requests the flashing
@@ -796,7 +797,8 @@ Nonzero: fuel scoops (status token FUEL SCOOPS; L_EA71 checks it before scooping
     0xA84B: ('EscapePodFitted', 'verified', """
 Nonzero: escape pod (status token ESCAPE POD; used up by UpdateEscapePod)."""),
     0xA84C: ('EnergyBombFitted', 'verified', """
-Nonzero: energy bomb (status token ENERGY BOMB)."""),
+Nonzero: energy bomb (status token ENERGY BOMB).  With iffunit=yes the same byte means
+an I.F.F. unit (IffUnitFitted); token 113 then reads I.F.F. UNIT."""),
     0xA84D: ('EnergyUnitFitted', 'verified', """
 Nonzero: energy unit (status token ENERGY UNIT; doubles RechargeEnergyBanks)."""),
     0xA84E: ('DockingComputerFitted', 'verified', """

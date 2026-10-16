@@ -329,6 +329,7 @@ without +$26 bit 2, unless the blueprint in IY has maximum speed 39 (Thargoid), 
 clears this byte.
 NOTE: IY still holds the previously processed slot's blueprint at that test, so the
 slot after a Thargoid is spared and the Thargoid is not.
+iffunit=yes removes the energy bomb; nothing reads or writes this byte then.
 Evidence: tools/check_routines.py missions/energy-bomb-exemption."""),
     0xDA11: ('LastActiveObjectEnergy', 'verified', """
 Cleared by UpdateObjects, then set to the energy of each active slot: nonzero when at
@@ -379,6 +380,8 @@ Per-frame object update, called from the flight loops.
   encounter) unless the station is present, L_7061 is set or EncounterShipCount >= 4.
 - Clear the per-update variables, recount EncounterShipCount, then update all 8 slots
   (L_DA9A); afterwards clear EnergyBombPending and maybe SharedHostilityAlert.
+iffunit=yes (src/iff-unit.asm) removes the energy bomb test ($DAC1) and the clearing of
+EnergyBombPending ($DBC8); EnergyBombPending is then unused.
 Clobbers all registers including IX and IY."""),
     0xDA9A: (None, 'verified', """
 Slot loop: A = ObjectLoopCounter (8..1) is kept on the stack; IX = instance.  Skip slots
@@ -408,7 +411,8 @@ L_EA51 (collision, scooping, docking contact), draw/project (DrawObjectInView), 
 +$20 bit 3; an explosion state 01 advances to 10."""),
     0xDBBE: (None, 'verified', """
 Next slot (IX += InstanceSize).  After slot 7 clear EnergyBombPending; clear
-SharedHostilityAlert when TorusJumpInhibitFlag is zero."""),
+SharedHostilityAlert when TorusJumpInhibitFlag is zero.  iffunit=yes keeps only the
+second step (IffObjectsTailCode)."""),
     # ---------------------------------------------------------- vector maths
     0xDBD5: ('NormaliseVector', 'verified', """
 IX -> three sign-magnitude words (bit 15 = sign).  Scale the vector to length $8000

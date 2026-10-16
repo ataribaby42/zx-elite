@@ -328,6 +328,9 @@ out of range), scanner/p3-scanner-geometry (dx 0..13 both signs, tallest sticks)
 runtime: flight."""),
     0x8C3D: (None, 'verified', """
 Per-slot body of DrawScannerContacts (IX = slot).
+iffunit=yes calls IffScannerContactEnergy instead of loading the energy: with the
+I.F.F. unit fitted it returns 0 for a threat in the dark half of the blink, so the
+slot is skipped like an empty one (src/iff-unit.asm).
 Evidence: control flow."""),
     0x8D0B: ('ScannerDotInCentreByte', 'verified', """
 dx 0..3 (dx - 4 borrowed): C = dx + 4, the pixel of the stick within the centre byte
@@ -681,7 +684,8 @@ Evidence: write at $909A, read at $911D."""),
     0x91C9: (None, 'inferred', """
 Three JP instructions to L_9260, L_9280 and L_9287 (all executed routines).  No
 static reference, pointer or runtime access to this block was found; kept as code so that
-the targets relocate.  Possibly an unused vector block."""),
+the targets relocate.  Possibly an unused vector block.  iffunit=yes points the
+first entry at IffBlinkTick, since UseEnergyBomb no longer exists."""),
     0x91D2: ('ChartDiscGlyphs', 'verified', """
 Four 8x8 glyphs (32 bytes): small disc, large disc, small disc, large disc.
 L_AA96 selects one with DE = this + (L_AC1A AND $18) and XORs it into the screen with a

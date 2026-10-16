@@ -194,17 +194,31 @@ def emit_verified_data(region, memory, labels, payload, codec):
     elif name == 'TextTokenDictionary':
         number, address = 0, start
         while address < end:
-            codes = [f'${number + 0xA0:02X}'] if number < 0x60 else (
-                [f'${number:02X}'] if number < 0x80 else [f'${number - 0x72:02X}'])
-            entries[address] = (f'Token {number} (${number:02X}), PrintToken code {codes[0]}: '
+            # PrintToken reaches tokens 0..145: codes $A0..$FF, $60..$7F and $0E..$1F.
+            code = (f'${number + 0xA0:02X}' if number < 0x60 else f'${number:02X}' if number < 0x80
+                    else f'${number - 0x72:02X}' if number <= 0x1F + 0x72 else None)
+            entries[address] = (f'Token {number} (${number:02X}), '
+                                + (f'PrintToken code {code}: ' if code else 'no PrintToken code: ')
                                 + clip(codec.dictionary(number), 90))
             while memory[address]:
                 address += 1
             address += 1
             number += 1
+    parts = DATA_OPTION_PARTS.get(name, {})
+    part_ends = {part_end: (option, limit) for part_end, option, _, _, limit in parts.values()}
     pc = start
     anchor = start
     while pc < end:
+        if pc in part_ends:
+            option, limit = part_ends[pc]
+            lines += ['ENDIF']
+            if limit:
+                lines += [f'assert $-GameImage = {limit}-GameLoadAddress']
+        if pc in parts:
+            _, option, replacement, first, _ = parts[pc]
+            if first:
+                lines += [f'assert $-GameImage = {first}-GameLoadAddress']
+            lines += [f'IF {option}', *replacement, 'ELSE']
         if pc in entries:
             anchor = pc
             if pc not in labels:
@@ -234,13 +248,18 @@ def emit_verified_data(region, memory, labels, payload, codec):
             continue
         size = 1
         while (size < 16 and pc + size < end and (pc + size - anchor) % region['unit']
-               and pc + size not in labels and pc + size not in COMMENTS and pc + size not in entries):
+               and pc + size not in labels and pc + size not in COMMENTS and pc + size not in entries
+               and pc + size not in parts and pc + size not in part_ends):
             size += 1
         chunk = bytes(memory[pc:pc + size])
         text = ''.join(chr(value) if 32 <= value < 127 else '.' for value in chunk)
         comment = f'${pc:04X} {text}' + ('  ' + renamed(COMMENTS[pc]) if pc in COMMENTS else '')
         lines += [f'    {bytes_line(chunk):<85} ; {comment}']
         pc += size
+    if end in part_ends:
+        lines += ['ENDIF']
+        if part_ends[end][1]:
+            lines += [f'assert $-GameImage = {part_ends[end][1]}-GameLoadAddress']
     lines += ['', name + 'End:', f'defc {name}Size = {name}End - {name}',
               f'assert {name}Size = {end-start}', '']
     if name == 'InitialRuntimeState':
@@ -320,6 +339,13 @@ OPTIONAL_REGIONS = [
     (0xEB82, 0xEB86, 'MISSILE_TARGET_FIX'),
     (0xBCFC, 0xBD1B, 'TEXT_FULL_STOP_FIX'),
     (0xBDF5, 0xBE00, 'TEXT_FULL_STOP_FIX'),
+    (0x8C3D, 0x8C40, 'IFF_UNIT'),
+    (0x91C9, 0x91CC, 'IFF_UNIT'),
+    (0x9260, 0x9280, 'IFF_UNIT'),
+    (0xA568, 0xA56B, 'IFF_UNIT'),
+    (0xDAC1, 0xDAD8, 'IFF_UNIT'),
+    (0xDBC8, 0xDBD5, 'IFF_UNIT'),
+    (0xFF72, 0xFF74, 'IFF_UNIT'),
 ]
 # Options made of several parts: region start -> (macro or instruction, comment, limit
 # constant in src/options.asm; the start constant has Start in place of Limit).
@@ -346,10 +372,34 @@ OPTION_PARTS = {
     0xEB82: ('BIT 0,(IY+InstanceRoleFlags)', 'the scanned slot is a missile', 'MissileTargetCheckLimit'),
     0xBCFC: ('TextFullStopBufferCode', None, 'TextFullStopBufferLimit'),
     0xBDF5: ('TextFullStopHookCode', None, 'TextFullStopHookLimit'),
+    0x8C3D: ('CALL IffScannerContactEnergy', 'energy, or 0 for a threat in the dark half of the blink',
+             'IffScannerHookLimit'),
+    0x91C9: ('JP IffBlinkTick', 'no energy bomb: the vector only advances the blink clock',
+             'IffBombVectorLimit'),
+    0x9260: ('IffScannerCode', None, 'IffScannerCodeLimit'),
+    0xA568: ('CALL IffBlinkTick', 'advance the I.F.F. blink clock', 'IffBlinkHookLimit'),
+    0xDAC1: ('IffShipCode', None, 'IffShipCodeLimit'),
+    0xDBC8: ('IffObjectsTailCode', None, 'IffObjectsTailLimit'),
+    0xFF72: ('defb $00,$00', 'W            -> no action bit (no energy bomb)', 'IffBombKeyLimit'),
 }
 OPTION_PART_REGIONS = {start: (end, option) for start, end, option in OPTIONAL_REGIONS
                        if start in OPTION_PARTS}
 OPTION_PART_ENDS = {end: OPTION_PARTS[start][2] for start, (end, _) in OPTION_PART_REGIONS.items()}
+# Region starts whose label names the original code only: it is emitted after the
+# part's ELSE, so the option build has no such label (UseEnergyBomb).
+OPTION_PART_ELSE_LABELS = {0x9260}
+# Optional parts inside a verified data include: region name -> start -> (end, option,
+# replacement lines, start constant, limit constant).  A None constant is not
+# asserted: iffunit=yes makes token 113 longer and drops the unreachable tokens
+# 146..148, so the tokens between its two parts move; only the outer bounds are fixed.
+DATA_OPTION_PARTS = {
+    'TextTokenDictionary': {
+        0x9D84: (0x9D8A, 'IFF_UNIT', ['    IffUnitTokenText                    ; token 113: I.F.F. UNIT'],
+                 'IffUnitTextStart', None),
+        0x9E71: (0x9E74, 'IFF_UNIT', ['; Tokens 146..148: their three bytes hold the longer token 113.'],
+                 None, 'IffUnitTextLimit'),
+    },
+}
 # Labels defined by both the original code and its optional replacement.
 SHARED_OPTIONAL_LABELS = {0x716B, 0x7181, 0xA6D3}
 BRANCH = re.compile(r'^(JP|JR|CALL|DJNZ) (?:([A-Z]+),)?\$([0-9A-F]{4})$')
@@ -376,7 +426,8 @@ COMMENT_COLUMN = 47
 
 def condition_at(pc):
     for start, end, option in OPTIONAL_REGIONS:
-        if start <= pc < end and pc not in SHARED_OPTIONAL_LABELS and pc != start:
+        if (start <= pc < end and pc not in SHARED_OPTIONAL_LABELS
+                and (pc != start or pc in OPTION_PART_ELSE_LABELS)):
             return '!' + option
     return None
 
@@ -805,14 +856,21 @@ def image(data):
                 raise ValueError(f'{kind} region ${start:04X} is not zero-filled')
         while a < stop:
             if a != start:
+                # An optional part may replace entries inside a data run.
+                if a in OPTION_PART_ENDS:
+                    close_option_part(a)
                 if a in LABELS or a in notes or a in SECTIONS:
                     emit_header(a)
-                if a in labels and a not in interior:
+                if a in labels and a not in interior and a not in OPTION_PART_ELSE_LABELS:
                     emit_label(a)
+                if a in OPTION_PARTS:
+                    open_option_part(a)
             step = 2 if kind in ('words', 'pointers') else 1
             limit = stop
             boundary = a + step
-            while boundary < stop and (boundary - a) // step < unit and boundary not in labels and boundary not in COMMENTS:
+            while (boundary < stop and (boundary - a) // step < unit and boundary not in labels
+                   and boundary not in COMMENTS and boundary not in OPTION_PARTS
+                   and boundary not in OPTION_PART_ENDS):
                 boundary += step
             limit = boundary
             chunk = memory[a:limit]
@@ -851,11 +909,24 @@ def image(data):
         lines.append('ENDIF')
         context.pop()
 
+    def open_option_part(address):
+        """Start assertion, the replacement under IF, then ELSE for the original bytes."""
+        part, comment, limit = OPTION_PARTS[address]
+        lines.append(f'assert $-GameImage = {limit.replace("Limit", "Start")}-GameLoadAddress')
+        emit_if(OPTION_PART_REGIONS[address][1])
+        lines.append(code_line(part, comment) if comment else '    ' + part)
+        emit_else()
+        if address in OPTION_PART_ELSE_LABELS and address in labels:
+            emit_label(address)
+
+    def close_option_part(address):
+        emit_endif()
+        lines.append(f'assert $-GameImage = {OPTION_PART_ENDS[address]}-GameLoadAddress')
+
     while pc < end:
         # Close an optional part first: one may end where a data include begins.
         if pc in OPTION_PART_ENDS:
-            emit_endif()
-            lines += [f'assert $-GameImage = {OPTION_PART_ENDS[pc]}-GameLoadAddress']
+            close_option_part(pc)
         region=next((r for r in known_data if r['start']==pc),None)
         if region:
             lines += ['', '; KNOWN DATA: '+region['comment']]
@@ -888,7 +959,7 @@ def image(data):
                       '    defs 2,0 ; preserve the original reclaimed-slot padding',
                       'defc StartupAfterGraphicsCopy = AdderStartupAfterGraphicsCopy']
             emit_else()
-        if pc in labels and pc not in interior:
+        if pc in labels and pc not in interior and pc not in OPTION_PART_ELSE_LABELS:
             emit_label(pc)
         if pc == 0xA660:
             emit_if('SCANNER_PIXEL_FIX')
@@ -899,12 +970,7 @@ def image(data):
             lines += ['    INCLUDE "station-random-launch-fix.asm"']
             emit_else()
         if pc in OPTION_PARTS:
-            start = OPTION_PARTS[pc][2].replace('Limit', 'Start')
-            lines.append(f'assert $-GameImage = {start}-GameLoadAddress')
-            emit_if(OPTION_PART_REGIONS[pc][1])
-            part, comment, _ = OPTION_PARTS[pc]
-            lines.append(code_line(part, comment) if comment else '    ' + part)
-            emit_else()
+            open_option_part(pc)
         if pc == 0xF470:
             lines += ['    assert SelectParentLaunchType-GameImage = ParentLaunchSelectionStart-$6048',
                       '    assert LaunchSelectedShip-GameImage = ParentLaunchSelectionLimit-$6048']

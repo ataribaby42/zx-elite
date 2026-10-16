@@ -135,6 +135,13 @@ Other research notes:
 - The four large blocks at `$8153..$842F`, previously unclassified, are code. They are reached only through a self-modified `JR` in the disc-fill loops.
 - `$84C5..$8544` holds patch values and destination pointers for self-modifying code. `DrawScreenCircle` uses them to switch the circle renderer between the `$C000` view buffer and the screen. The destinations are now emitted as `defw` labels, so they follow the patched code if it moves.
 - `$E88B` is a complete but unused 16x16 multiply (`UnusedMultiplyWordHigh`).
+- `$9E71..$9E73` holds three empty dictionary tokens, 146..148, that no code
+  reaches. `PrintDictionaryToken` is entered only from `PrintToken`, whose codes
+  select tokens 0..145 (`$A0..$FF` tokens 0..95, `$60..$7F` tokens 96..127,
+  `$0E..$1F` tokens 128..145). Earlier generated comments gave them the codes
+  `$20..$22`, which `PrintToken` prints as characters. `iffunit=yes` uses the
+  three bytes for its longer token 113; `tools/check_iff_unit.py` prints every
+  reachable token through `PrintToken`.
 
 No byte remains unclassified. The last seven were resolved as follows
 (`dormant/unused-interrupt-routines` and the 48K access traces):

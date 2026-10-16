@@ -431,7 +431,8 @@ write maps of tools/run_runtime_scenarios.py --accesses."""),
 SP of the interrupted program, saved and restored by InterruptHandler."""),
     0xFF58: ('KeyActionTable', 'verified', """
 40 two-byte entries in KeyCharacterTable order: state-byte offset from KeyFlagsScreens
-(0..7) and the bit mask ORed in by RecordKeyPress.  Z and V have mask 0.
+(0..7) and the bit mask ORed in by RecordKeyPress.  Z and V have mask 0, and
+so has W with iffunit=yes, which removes the energy bomb.
 The table must not cross a page (L is incremented without carry).
 Evidence: tools/check_routines.py input/scan-keyboard (every key); the POKE notes swap the
 SYMBOL SHIFT and B entries."""),

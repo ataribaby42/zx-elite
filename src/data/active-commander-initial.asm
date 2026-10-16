@@ -153,7 +153,8 @@ FuelScoopsFitted:
 EscapePodFitted:
     defb $00                                                                              ; $A84B .  +$35 escape pod
 
-; VERIFIED: Nonzero: energy bomb (status token ENERGY BOMB).
+; VERIFIED: Nonzero: energy bomb (status token ENERGY BOMB).  With iffunit=yes the same byte means
+; an I.F.F. unit (IffUnitFitted); token 113 then reads I.F.F. UNIT.
 EnergyBombFitted:
     defb $00                                                                              ; $A84C .  +$36 energy bomb
 

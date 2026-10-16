@@ -236,8 +236,13 @@ TextTokenDictionary:
     defb $69,$20,$53,$43,$4F,$4F,$50,$53,$00                                              ; $9D71 i SCOOPS.
 ; Token 112 ($70), PrintToken code $70: ESCAPE POD
     defb $89,$43,$41,$50,$45,$20,$50,$4F,$44,$00                                          ; $9D7A .CAPE POD.
+assert $-GameImage = IffUnitTextStart-GameLoadAddress
+IF IFF_UNIT
+    IffUnitTokenText                    ; token 113: I.F.F. UNIT
+ELSE
 ; Token 113 ($71), PrintToken code $71: ENERGY BOMB
     defb $79,$42,$4F,$4D,$42,$00                                                          ; $9D84 yBOMB.
+ENDIF
 ; Token 114 ($72), PrintToken code $72: ENERGY UNIT
     defb $79,$AE,$00                                                                      ; $9D8A y..
 ; Token 115 ($73), PrintToken code $73: DOCKING COMPUTERS
@@ -305,12 +310,17 @@ TextTokenDictionary:
     defb $50,$8E,$53,$92,$54,$00                                                          ; $9E64 P.S.T.
 ; Token 145 ($91), PrintToken code $1F: FUEL LEAK*
     defb $69,$20,$81,$41,$4B,$2A,$00                                                      ; $9E6A i .AK*.
-; Token 146 ($92), PrintToken code $20: 
+IF IFF_UNIT
+; Tokens 146..148: their three bytes hold the longer token 113.
+ELSE
+; Token 146 ($92), no PrintToken code: 
     defb $00                                                                              ; $9E71 .
-; Token 147 ($93), PrintToken code $21: 
+; Token 147 ($93), no PrintToken code: 
     defb $00                                                                              ; $9E72 .
-; Token 148 ($94), PrintToken code $22: 
+; Token 148 ($94), no PrintToken code: 
     defb $00                                                                              ; $9E73 .
+ENDIF
+assert $-GameImage = IffUnitTextLimit-GameLoadAddress
 
 TextTokenDictionaryEnd:
 defc TextTokenDictionarySize = TextTokenDictionaryEnd - TextTokenDictionary

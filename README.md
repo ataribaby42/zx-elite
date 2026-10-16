@@ -58,6 +58,7 @@ For command-line options, run `make.bat` directly. It forwards arguments to
 | `stardustfix` | `no`, `yes` | `no` | `yes` keeps stardust off the view frame and outside it. In the original a stardust particle at height zero with a negative sign is drawn on the bottom frame line instead of the centre line, erasing a pixel of the line; at launch about two of the 16 particles start this way and slide along the line. Particles at the far right reach the right frame line, and while pitching particles also reach the left one and the area outside the frame. With `yes` such a particle is drawn on the centre line, and pixels on or outside the frame are not drawn. Rewrites the dust pixel routine in its own 69 bytes. |
 | `missiletargetfix` | `no`, `yes` | `no` | `yes` makes a missile explode when its target disappears. In the original a missile whose target is destroyed, scooped or out of range flies on towards the target's slot and homes on whatever appears there next, for example a police Viper launched from the station. Removing a missile can also blow up an unrelated object whose AI state byte happens to equal the missile's slot counter. Changes one byte in place. |
 | `textfullstopfix` | `no`, `yes` | `no` | `yes` keeps the full stop at the end of justified text. In the original a full stop that would be the 31st character of a line is lost, so 72 of the 2,048 planet descriptions on the DATA ON screen end without one (SOCELAGE: "noted for Its Exotic Goat Meat"). With `yes` the last word moves to the next line with its full stop. Rewrites 31 bytes in place and uses the 11 zero bytes before the square tables. |
+| `iffunit` | `no`, `yes` | `no` | `yes` replaces the energy bomb with an I.F.F. unit. Equipment item 9 becomes I.F.F. UNIT with the energy bomb's price (900.0 Cr), tech level and save-file byte, so a saved commander with an energy bomb loads with the unit; the bomb and its W key are removed. With the unit fitted, threats blink on the scanner (two cockpit frames lit, two dark): missiles aimed at you, and ships or the station that the game marks as hostile, such as pirates, Thargoids, Thargons, Vipers and Fer-de-Lances once your legal score reaches 40, and any ship you have hit. Other contacts stay lit; cargo canisters, escape capsules and debris never blink. While your own missile is in flight the original marks every object as hostile, so the station and traders near you blink then too. Uses the energy bomb's own bytes and three unused bytes at the end of the token dictionary. |
 | `verify` | `yes`, `no` | `yes` | `yes` requires byte-for-byte identity with the original TAP. `no` allows modified game bytes; TAP structure, metadata, checksums and assembler memory bounds remain mandatory. |
 | `tapfile` | A plain filename ending in `.tap` | `elite-128k.tap` | Names the output file inside `release/`. No directory paths are accepted. Quote an argument containing spaces, such as `"tapfile=My Elite.tap"`. Internal TAP headers are unchanged. |
 
@@ -72,7 +73,7 @@ Font choices:
 
 All four fonts contain 91 glyphs (728 bytes) and use the same startup copy and
 character renderer. Normal builds assemble the selected font source without
-reading `PATCH128.TAP`. The font, scanner, station, fuel, docking, AI courage, scanner contact, stardust, missile target and full stop fixes require no extra RAM.
+reading `PATCH128.TAP`. The font, scanner, station, fuel, docking, AI courage, scanner contact, stardust, missile target and full stop fixes and the I.F.F. unit require no extra RAM.
 
 Any game modification requires explicit `verify=no`; changing only `tapfile`
 still permits exact verification. The build verifies its output automatically.
@@ -201,7 +202,9 @@ assembled payloads; game origin and entry are checked against the linker map.
 | `tools/check_missile_target_fix.py` | Target-lock release for every slot counter and random slot contents against the original, and optional 48K ROM-load runs |
 | `src/text-full-stop-fix.asm` | Optional full stop fix; two macros, one in the justified printer and one in the padding before the square tables |
 | `tools/check_text_full_stop_fix.py` | All 2,048 planet descriptions and synthetic texts against the original, and optional 48K ROM-load runs of the DATA ON screen |
-| `tools/check_build_options.py` | Every option value alone, disjoint option areas, a pairwise covering array of combinations plus every option on at once, in both verification modes, and invalid TAP checks; `--full` builds all 2,048 combinations |
+| `src/iff-unit.asm` | Optional I.F.F. unit in place of the energy bomb; macros in the bomb's own bytes and at the end of the token dictionary |
+| `tools/check_iff_unit.py` | Every token text, the threat test for every slot state, scanner drawings against the original, the removed bomb and W key, and optional 48K ROM-load runs (purchase, blinking, W) |
+| `tools/check_build_options.py` | Every option value alone, disjoint option areas, a pairwise covering array of combinations plus every option on at once, in both verification modes, and invalid TAP checks; `--full` builds all 32,768 combinations |
 | `tools/check_scanner_pixel_fix.py` | Exhaustive pixel preservation, indicator/missile comparison and 48K first-launch test |
 | `tools/check_laser_variant.py` | Actual laser/line rendering, endpoint randomisation and stack checks |
 | `tools/render_cockpit.py` | Monochrome and initial-attribute cockpit renderings |
