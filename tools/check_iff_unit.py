@@ -37,6 +37,18 @@ pirate alive, while the reference tape's energy bomb destroys it.  The
 reference tape run uses the option build's symbol addresses, which the layout
 check proves to be identical outside the replaced parts; it is skipped when
 another option (such as ship=adder) is built as well.
+
+Mission situations then start from the RAM of a launch run, taken at the start
+of MainLoop: the baseline (an unused energy bomb) and the option image (the
+I.F.F. unit fitted) run up to 300 main loops each in the simulator after the
+same set-up.  After every loop their RAM must be identical except the scanner
+columns of the screen, the scanner work bytes, the replaced parts and the test
+stack:
+- mission 2: the real special encounter, a cloaked Asp and two Sidewinders;
+- a Thargoid and a Thargon;
+- witchspace with three Thargoids and no station;
+- mission 3, state 4: the hostile station (it launches Thargoids);
+- the player's missile at a trader, which makes every object hostile.
 """
 import argparse
 import json
@@ -61,6 +73,8 @@ HOSTILE = 0x04                                 # InstanceBehaviour bit 2
 PLAYER_TARGET = 0                              # missile InstanceAiState aimed at the player
 EXPLOSION_BITS = 0x30                          # InstanceFlags bits 4/5
 SPEED = 0x1B                                   # InstanceSpeed (not every field reaches the symbol map)
+FRAME_LOOP_LIMIT = 2 * 3500000                 # T-states allowed to reach a stop address
+MISSION_SAMPLES_NEVER = 1e9                    # sample_from of a run that records no samples
 FITTED = 0xFF                                  # BuyEquipmentItem stores $FF
 CANISTER_ROLES = 0x0A                          # +$26 of a released cargo canister
 BOMB_KEY_BIT = 0x20                            # KeyFlagsCombat bit 5: W, the energy bomb key
@@ -411,10 +425,11 @@ def flight_pokes(checker, blueprint, fitted):
     return [(s['EnergyBombFitted'], bytes([fitted])), (checker.slot(0), bytes(far)), (inst, bytes(record))]
 
 
-def run_flight(checker, tap, name, pokes, keys, seconds, sample_from):
+def run_flight(checker, tap, name, pokes, keys, seconds, sample_from, stop_at=None):
     """ROM load of tap in ZX Spectrum 48K mode, launch, pokes at 12 s; sample every frame interrupt.
 
-    Contacts appear only after the launch sequence, so samples start later (sample_from)."""
+    Contacts appear only after the launch sequence, so samples start later (sample_from).
+    With stop_at the run continues after `seconds` until the PC reaches that address."""
     import emulator_check as ec
     from skoolkit import tap2sna, CSimulator
     from skoolkit.snapshot import Snapshot
@@ -460,6 +475,10 @@ def run_flight(checker, tap, name, pokes, keys, seconds, sample_from):
         return True
 
     trace.run(s['Entry'], None, 0, int(seconds * 3500000), True, frame, set(), None, None, '$', '02X', '04X')
+    if stop_at is not None:
+        trace.run(sim.registers[PC], stop_at, 0, FRAME_LOOP_LIMIT, True, frame, set(), None, None,
+                  '$', '02X', '04X')
+        assert sim.registers[PC] == stop_at, hex(sim.registers[PC])
     assert applied[0]
     for drawn, screen in shots.items():
         ec.png(screen, OUTPUT / f'{name}-{"lit" if drawn else "dark"}.png')
@@ -514,6 +533,144 @@ def emulator_flight(checker):
     return results
 
 
+# ---------------------------------------------------------------------- mission situations
+# Both images start from the RAM of a real 48K ROM-load and launch, taken at the start of
+# MainLoop, and get the same mission set-up and the same unit byte ($FF: an unused energy
+# bomb in the baseline, the I.F.F. unit in the option image).  Then MainLoop runs loop by loop
+# in the Python simulator (no interrupts: no key, control or sound changes).  After every loop
+# the RAM must be identical except the scanner columns of the screen, the scanner work bytes,
+# the replaced parts and the test stack.
+MISSION_LOOPS = 300
+CALL_SIZE = 3                                   # CALL nn
+SCANNER_WORK = ('ScannerDotX', 'ScannerStickHeight', 'ScannerDotZ', 'ScannerSlotCounter',
+                'ScannerContactsDrawn')
+BOTTOM_THIRD = (0x5000, 0x5800)                 # screen bitmap of the scanner and the gauges
+SCANNER_COLUMNS = range(9, 23)                  # byte columns the contacts can reach (scanner/p3 checks)
+TEST_STACK_BYTES = 0x200
+MISSION_2_FLAG = 0x02                           # CommanderFlags bit 1: mission 2 triggered
+CLOAK_FLAG = 0x40                               # bit 6, cloaking device: the special Asp needs AND $42 = $02
+INVASION_HOSTILE_STATION = 4                    # InvasionMissionState that makes the station hostile
+ASP_MARK = 0x40                                 # InstanceRoleFlags bit 6: the mission Asp
+ASP_CLOAKED = 1                                 # MissionAspEncounterState: the marked Asp is hidden
+THARGOID, THARGON = 15, 18                      # blueprint IDs (docs/SHIPS.md)
+
+
+def place(checker, m, ctx, index, blueprint, position):
+    inst = checker.slot(index)
+    m.call('InitialiseShipFromBlueprint', stack=ctx.upper_stack,
+           **dict(cr.FRESH_REGISTERS, a=blueprint, ix=inst))
+    for axis, value in enumerate(position):
+        cr.put24(m.memory, inst + 3 * axis, value)
+
+
+def setup_cloaked_asp(checker, m, ctx):
+    """Mission 2: the real special encounter, a marked Asp and two Sidewinders, moved near."""
+    s = checker.symbols
+    m.poke('CommanderFlags', (m.byte('CommanderFlags') | MISSION_2_FLAG) & ~CLOAK_FLAG & 0xFF)
+    m.poke('MissionAspEncounterState', 0)
+    for index in range(1, s['InstanceSlotCount'] - 1):
+        m.poke(checker.slot(index) + s['InstanceEnergy'], 0)
+    m.call('SpawnRandomEncounter', stack=ctx.upper_stack, limit=500_000, **cr.FRESH_REGISTERS)
+    assert m.byte('MissionAspEncounterState') == ASP_CLOAKED
+    assert m.byte(checker.slot(1) + s['InstanceRoleFlags']) & ASP_MARK
+    for index, position in zip((1, 2, 3), ((0x0600, 0x0200, 0x1C00), (-0x0900, 0x0100, 0x2000),
+                                           (0x0C00, -0x0200, 0x2400))):
+        for axis, value in enumerate(position):
+            cr.put24(m.memory, checker.slot(index) + 3 * axis, value)
+
+
+def setup_thargoids(checker, m, ctx):
+    place(checker, m, ctx, 1, THARGOID, (0x0800, 0x0200, 0x1800))
+    place(checker, m, ctx, 2, THARGON, (-0x0600, 0x0100, 0x1400))
+
+
+def setup_witchspace(checker, m, ctx):
+    """Witchspace (mis-jump) with three Thargoids and no station."""
+    m.poke('WitchspaceFlag', 1)
+    m.poke(checker.slot(0) + checker.symbols['InstanceEnergy'], 0)
+    for index, position in zip((1, 2, 3), ((0x0800, 0x0200, 0x1800), (-0x0A00, -0x0200, 0x2000),
+                                           (0x0200, 0x0400, 0x2800))):
+        place(checker, m, ctx, index, THARGOID, position)
+
+
+def setup_hostile_station(checker, m, ctx):
+    """Mission 3, state 4: UpdateObjects makes the station hostile; a calm trader nearby."""
+    m.poke('InvasionMissionState', INVASION_HOSTILE_STATION)
+    place(checker, m, ctx, 1, COBRA_TRADER, (0x0600, 0x0100, 0x1C00))
+
+
+def setup_missile_alert(checker, m, ctx):
+    """The player's missile at a trader: the game marks every object hostile while it flies."""
+    place(checker, m, ctx, 1, COBRA_TRADER, (0x0400, 0x0100, 0x1400))
+    place(checker, m, ctx, 2, CANISTER, (-0x0800, 0x0000, 0x1000))
+    counter = checker.symbols['InstanceSlotCount'] - 1                  # ObjectLoopCounter of slot 1
+    m.call('LaunchMissile', stack=ctx.upper_stack, **dict(cr.FRESH_REGISTERS, c=counter))
+
+
+MISSIONS = (('cloaked-asp', setup_cloaked_asp), ('thargoids', setup_thargoids),
+            ('witchspace-thargoids', setup_witchspace), ('hostile-station', setup_hostile_station),
+            ('missile-alert', setup_missile_alert))
+
+
+def mission_machines(checker, ram):
+    """Baseline and option machine with the launch RAM and each image's own replaced parts."""
+    machines = []
+    for image in (checker.baseline, checker.image):
+        ctx = cr.ImageContext(checker.symbols, image)
+        memory = list(ctx.pristine[:0x4000]) + list(ram[0x4000:])
+        for start, end in checker.parts:
+            memory[start:end] = image[start - checker.base:end - checker.base]
+        ctx.pristine = tuple(memory)
+        machines.append((ctx, ctx.machine()))
+    return machines
+
+
+def emulator_missions(checker):
+    s = checker.symbols
+    _, ram = run_flight(checker, RELEASE_TAP, 'iff-unit-launch', [], [], 15, MISSION_SAMPLES_NEVER,
+                        stop_at=s['MainLoop'])
+    loop_end = s['L_732B'] + CALL_SIZE           # after CALL UpdateProximityAndCompass: one loop done
+    call = checker.image[s['L_732B'] - checker.base:loop_end - checker.base]
+    assert call[0] == 0xCD and int.from_bytes(call[1:], 'little') == s['UpdateProximityAndCompass']
+    work = {s[name] for name in SCANNER_WORK}
+    results = {}
+    for name, setup in MISSIONS:
+        (octx, om), (ictx, im) = mission_machines(checker, ram)
+        skip = work | {a for start, end in checker.parts for a in range(start, end)}
+        skip |= set(range(octx.upper_stack - TEST_STACK_BYTES, octx.upper_stack))
+        strict = [a for a in range(0x4000, 0x10000)
+                  if a not in skip and not BOTTOM_THIRD[0] <= a < BOTTOM_THIRD[1]]
+        for m, ctx in ((om, octx), (im, ictx)):
+            m.poke('EnergyBombFitted', FITTED)
+            setup(checker, m, ctx)
+        assert all(om.memory[a] == im.memory[a] for a in strict), name
+        scanner_loops, asp_states, station_hostile = 0, set(), False
+        for loop in range(MISSION_LOOPS):
+            for m, ctx in ((om, octx), (im, ictx)):
+                m.call('MainLoop', stop=loop_end, stack=ctx.upper_stack, halt=True, limit=30_000_000)
+            differ = [a for a in strict if om.memory[a] != im.memory[a]]
+            assert not differ, (name, loop, [f'${a:04X}' for a in differ[:8]])
+            screen = [a for a in range(*BOTTOM_THIRD) if om.memory[a] != im.memory[a]]
+            assert all((a & 0x1F) in SCANNER_COLUMNS for a in screen), (name, loop)
+            scanner_loops += bool(screen)
+            asp_states.add(om.byte('MissionAspEncounterState'))
+            station_hostile |= bool(om.byte(checker.slot(0) + s['InstanceBehaviour']) & HOSTILE)
+            if om.byte('PlayerDeadFlag'):
+                break
+        assert scanner_loops, (name, 'no threat blinked')
+        results[name] = dict(loops=loop + 1, scanner_loops=scanner_loops,
+                             player_dead=bool(om.byte('PlayerDeadFlag')),
+                             asp_states=sorted(asp_states), station_hostile=station_hostile)
+    assert ASP_CLOAKED in results['cloaked-asp']['asp_states']
+    assert results['hostile-station']['station_hostile'] and results['missile-alert']['station_hostile']
+    assert not results['thargoids']['station_hostile']
+    for name, result in results.items():
+        print(f'PASS: mission {name}: {result["loops"]} main loops from a 48K launch, RAM identical to the '
+              f'original outside the scanner; the scanner differs in {result["scanner_loops"]} loops'
+              + (', the player is killed' if result['player_dead'] else '') + '.', flush=True)
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--emulator', action='store_true', help='also run the 48K ROM-load scenarios')
@@ -521,7 +678,8 @@ def main():
     checker = Checker()
     checker.run()
     if args.emulator:
-        checker.report['emulator'] = dict(purchase=emulator_purchase(checker), flight=emulator_flight(checker))
+        checker.report['emulator'] = dict(purchase=emulator_purchase(checker), flight=emulator_flight(checker),
+                                          missions=emulator_missions(checker))
     checker.write()
 
 

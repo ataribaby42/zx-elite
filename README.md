@@ -203,7 +203,7 @@ assembled payloads; game origin and entry are checked against the linker map.
 | `src/text-full-stop-fix.asm` | Optional full stop fix; two macros, one in the justified printer and one in the padding before the square tables |
 | `tools/check_text_full_stop_fix.py` | All 2,048 planet descriptions and synthetic texts against the original, and optional 48K ROM-load runs of the DATA ON screen |
 | `src/iff-unit.asm` | Optional I.F.F. unit in place of the energy bomb; macros in the bomb's own bytes and at the end of the token dictionary |
-| `tools/check_iff_unit.py` | Every token text, the threat test for every slot state, scanner drawings against the original, the removed bomb and W key, and optional 48K ROM-load runs (purchase, blinking, W) |
+| `tools/check_iff_unit.py` | Every token text, the threat test for every slot state, scanner drawings against the original, the removed bomb and W key, and optional 48K ROM-load runs (purchase, blinking, W) followed by mission situations (cloaked Asp, Thargoids, witchspace, hostile station, missile alert) run loop by loop against the original |
 | `tools/check_build_options.py` | Every option value alone, disjoint option areas, a pairwise covering array of combinations plus every option on at once, in both verification modes, and invalid TAP checks; `--full` builds all 32,768 combinations |
 | `tools/check_scanner_pixel_fix.py` | Exhaustive pixel preservation, indicator/missile comparison and 48K first-launch test |
 | `tools/check_laser_variant.py` | Actual laser/line rendering, endpoint randomisation and stack checks |

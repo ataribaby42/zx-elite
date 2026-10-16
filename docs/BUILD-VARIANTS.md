@@ -887,7 +887,26 @@ in SkoolKit's simulator. The baseline must equal the reference image.
 - W in flight leaves the pirate and the unit in place; on the reference tape
   the same W uses the energy bomb and destroys the pirate. That run uses the
   option build's addresses, which the layout check proves identical outside
-  the parts.
+  the parts. It is skipped when another option, such as `ship=adder`, is
+  built as well.
+
+Mission situations start from the RAM of a launch run, taken at the start of
+`MainLoop`. The baseline gets an unused energy bomb and the option image the
+I.F.F. unit, then both receive the same set-up. Each runs up to 300 main loops
+in the simulator, without interrupts. After every loop their RAM must be
+identical except the scanner columns of the screen, the scanner work bytes, the
+replaced parts and the test stack. Results for Krait and Adder:
+
+| Situation | Loops | Loops with a different scanner |
+|---|---:|---:|
+| Mission 2: the real special encounter, a cloaked Asp and two Sidewinders | 300 | 150 |
+| A Thargoid and a Thargon | 300 | 150 |
+| Witchspace with three Thargoids and no station | 75 (player killed) | 37 |
+| Mission 3, state 4: the hostile station, which launches Thargoids | 245 (player killed) | 122 |
+| The player's missile at a trader, which makes every object hostile | 235 (player killed) | 117 |
+
+The cloaked Asp stays hidden in the 3D view exactly as in the original. The
+original draws it on the scanner, so with the unit it blinks there.
 
 Build the option with the default tapfile for this mode. Reports and
 screenshots of a lit and a dark frame are in `build/iff-unit-check/`.
