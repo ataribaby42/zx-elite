@@ -48,6 +48,7 @@ on each write, rather than changing the shared character renderer.
 | `DispatchShipEventPreservingParent` | Saves and restores parent IX/IY around the event dispatcher. |
 | `FindFreeShipSlot` | Looks for zero energy in six 39-byte instances after station slot zero. |
 | `InitialiseShipFromBlueprint` | Resolves the blueprint and fills an allocated instance's defaults. |
+| `RandomiseShipLowBytesAndSigns` | Loader tail shared by both placements: random x/y low bytes and signs, then A = 0 with Z. |
 | `CreateShipAtParent` | Allocates a child and copies the parent's position and orientation. |
 | `SelectParentLaunchType` | Shared selection of Viper, trader, Thargon, Thargoid or fighter. |
 | `LaunchSelectedShip` | Creates the selected child, adjusts non-station launches and inherits hostility. |
@@ -80,6 +81,7 @@ complete paths, original addresses and test scope.
 | `SpawnRandomEncounter` | Event-zero encounter entry, including the paths preceding the mixed ship selector. |
 | `SpawnMixedSingleShipEncounter` | Allocate one slot before selecting a mixed encounter ship; return when full. |
 | `SelectMixedEncounterShipType` | Select Thargoid, Fer-de-Lance, Asp, pirate Cobra or pirate Python. |
+| `SaveEncounterShipId` | Common entry of the single-ship encounters: push the blueprint ID for the Thargoid ECM test. |
 | `InitialiseEncounterShip` | Load the selected blueprint and restore saved AF before the optional byte `+$25` flag. |
 | `PlayerLegalScore` | Commander score: Clean at zero, Offender at 1..49, Fugitive at 50 or more. |
 | `PrintLegalStatus` | Consume the inline space, load the Clean token index and continue the status-screen row. |
@@ -97,6 +99,12 @@ Several names identify blocks within a larger routine, not separately callable
 subroutines. Their comments state the required registers, stack state and
 continuation. The hunter role is inferred from the verified legal-sensitive
 behaviour; it is not used as the name of a separate spawn event.
+
+`randomizedspawn=yes` (`src/randomized-spawn.asm`) adds
+`InitialiseEncounterShipByHostility`, the entry after the placement request
+that the Rock hermit and the special Asp use, and
+`RandomizedSpawnHermitOrViper`. `SelectEncounterTraderType` and
+`InitialiseEncounterShip` keep their addresses in that build.
 
 The source generator now preserves annotations and legacy aliases inside
 verified data includes as well as `game.asm`. It also emits the legal-status

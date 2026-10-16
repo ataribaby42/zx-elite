@@ -313,6 +313,16 @@ Details: +$20 = blueprint +$0A bits 0..2 (payload count) + blueprint +$12 bit 7 
 low bytes and both signs are random; their high bytes are random 0..7 for a calm ship
 and keep the template $32 when +$21 bit 2 (hostile) is set; z stays +$3200.  Uses three
 or five NextRandomByte values.  Returns A = 0 with Z set; IX unchanged, BC/DE/HL changed.
+Evidence: objects/r10-ship-creation (all 19 blueprint IDs).
+randomizedspawn=yes (src/randomized-spawn.asm) keeps the caller's A on the stack in place
+of the unread LD B,A and stores the last fields in fewer bytes ($F338..$F355).  Bit 7 of
+A then asks for a random placement: the test becomes hostility XOR bit 3 of one extra
+NextRandomByte.  Every caller but InitialiseEncounterShip passes A below $80 and gets the
+original placement and RNG use."""),
+    0xF366: ('RandomiseShipLowBytesAndSigns', 'verified', """
+Last part of InitialiseShipFromBlueprint, shared by both placements: random x and y low
+bytes and random x/y signs, then A = 0 with Z.  A hostile ship arrives here with the
+template high bytes $32 (a diagonal corner), a calm one after drawing high bytes 0..7.
 Evidence: objects/r10-ship-creation (all 19 blueprint IDs)."""),
     0xF381: (None, 'verified', """
 The 27 copied bytes are InstanceX/Y/Z and the three axes; speed +$1B is not copied, so
@@ -669,6 +679,7 @@ COMMENTS = {
     0xF2F7: 'event 9: slot-7 ship C+2',
     0xF2FA: 'events 10..15: none',
     # InitialiseShipFromBlueprint
+    0xF2FE: 'B is not read: LD BC reloads it below',
     0xF2FF: 'six-bit blueprint ID',
     0xF30C: 'IY = blueprint',
     0xF318: 'template size',

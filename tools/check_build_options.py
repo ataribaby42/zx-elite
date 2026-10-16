@@ -1,6 +1,6 @@
 """Exercise the build options; leave Adder/single/48K with every fix built.
 
-Default mode (89 builds, about 25 seconds):
+Default mode (92 builds, about 25 seconds):
 
 1. The default build must reproduce the reference tape.
 2. Every non-default value alone, in both verification modes: the strict build
@@ -19,7 +19,7 @@ Default mode (89 builds, about 25 seconds):
    must fail even with identity checks off.
 
 --full builds the complete product of all values instead of step 4's
-selection (32,768 combinations, several hours).  Use it after changing the
+selection (65,536 combinations, several hours).  Use it after changing the
 build machinery itself.
 """
 import argparse
@@ -47,6 +47,7 @@ OPTIONS = (
     ('missiletargetfix', ('no', 'yes')),
     ('textfullstopfix', ('no', 'yes')),
     ('iffunit', ('no', 'yes')),
+    ('randomizedspawn', ('no', 'yes')),
 )
 NAMES = tuple(name for name, _ in OPTIONS)
 DEFAULT = tuple(values[0] for _, values in OPTIONS)
@@ -72,6 +73,10 @@ FIX_PARTS = {
                  'IffShipCode', 'IffObjectsTail', 'IffBombKey'),
                 [(0x8C3D, 0x8C40), (0x91C9, 0x91CC), (0x9260, 0x9280), (0x9D84, 0x9E74),
                  (0xA568, 0xA56B), (0xDAC1, 0xDAD8), (0xDBC8, 0xDBD5), (0xFF72, 0xFF74)]),
+    'randomizedspawn': (('RandomizedSpawnIdPush', 'RandomizedSpawnPlacement', 'RandomizedSpawnAspEntry',
+                         'RandomizedSpawnRequest', 'RandomizedSpawnHermit'),
+                        [(0xF2FE, 0xF2FF), (0xF338, 0xF356), (0xF653, 0xF655), (0xF6C8, 0xF6DB),
+                         (0xF6FB, 0xF70E)]),
 }
 LASER_PATCH = bytes.fromhex('21 3f 00 79 f6 03 4f c3')  # + DrawLine, the owner's final ten-byte patch
 

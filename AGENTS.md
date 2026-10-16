@@ -289,7 +289,7 @@ option check deliberately leaves an Adder TAP with
 `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
 stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
 scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes
-iffunit=yes` for testing.
+iffunit=yes randomizedspawn=yes` for testing.
 Rebuild the default Krait version before collecting reference reconstruction/runtime-code seeds.
 The Adder test compares 128 actual rendered frames with the original side-B
 model, in addition to checking all 19 object loaders and other ship geometry.
@@ -551,6 +551,29 @@ RAM. Run `tools/check_iff_unit.py --emulator` for both ship choices, each built
 with the default tapfile, plus `python tools/check_routines.py --only scanner
 --only missions --only input --only text` on the default build and the option
 check.
+
+`randomizedspawn=no` keeps the original placement of new ships: a calm blueprint
+almost straight ahead (x/y high bytes 0..7), a hostile one towards a diagonal
+corner (the template's $32). The optional `yes` in `src/randomized-spawn.asm` lets
+a single ship of a random encounter take either placement at random. It replaces
+exactly five parts, each asserted with its `RandomizedSpawn...Start`/`Limit`
+constants and listed in `OPTION_PARTS`: the unread `LD B,A` of
+`InitialiseShipFromBlueprint` (`$F2FE`, now `PUSH AF`), the loader's last fields
+and hostility test (`$F338..$F355`), the special Asp's `JR` (`$F653..$F654`),
+`InitialiseEncounterShip` (`$F6C8..$F6DA`) and the trader and Rock hermit/Viper
+choice (`$F6FB..$F70D`). Bit 7 of the ID requests the random placement; every
+other caller of the loader passes an ID below $40 and must keep identical bytes,
+registers and RNG use. The corner is the hostility XOR bit 3 of one extra
+`NextRandomByte`; do not use the generator's carry output, which correlates with
+the ship type. Keep the Rock hermit (an asteroid's placement), the special Asp with
+its escort, groups and launches unchanged, and keep `SelectEncounterTraderType`,
+`InitialiseEncounterShip` and `SaveEncounterShipId` at their addresses. The
+shortened ECM test must return a Thargoid ID with the carry clear, because the
+special Asp's escort draws its first byte with that carry. Do not change a ship's
+type, hostility or AI. Run `tools/check_randomized_spawn.py --emulator` for both
+ship choices, each built with the default tapfile, plus
+`python tools/check_routines.py --only ai --only objects --only missions` on the
+default build and the option check.
 
 - Source boundaries, offsets and lengths must be calculated by scripts or
   labels. No tool may silently truncate or pad a block.

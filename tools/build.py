@@ -60,7 +60,7 @@ def verify(output=OUTPUT, exact=True):
     print('SHA256: '+sha(rebuilt))
     return report
 
-def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixelfix='no', stationrandomlaunchfix='no', tapfile=DEFAULT_TAPFILE, stationslotfix='no', fuelfix='no', hyperspacedockingfix='no', aicouragefix='no', scannerblipfix='no', stardustfix='no', missiletargetfix='no', textfullstopfix='no', iffunit='no'):
+def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixelfix='no', stationrandomlaunchfix='no', tapfile=DEFAULT_TAPFILE, stationslotfix='no', fuelfix='no', hyperspacedockingfix='no', aicouragefix='no', scannerblipfix='no', stardustfix='no', missiletargetfix='no', textfullstopfix='no', iffunit='no', randomizedspawn='no'):
     output = release_tap(tapfile)
     BUILD.mkdir(parents=True,exist_ok=True)
     output.parent.mkdir(parents=True,exist_ok=True)
@@ -90,6 +90,7 @@ def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixe
                  f'-DMISSILE_TARGET_FIX={int(missiletargetfix=="yes")}',
                  f'-DTEXT_FULL_STOP_FIX={int(textfullstopfix=="yes")}',
                  f'-DIFF_UNIT={int(iffunit=="yes")}',
+                 f'-DRANDOMIZED_SPAWN={int(randomizedspawn=="yes")}',
                  '-I=src','-I=src/data','-O=build',f'-o={name}.bin',f'src/{name}.asm']
         run=subprocess.run(command,cwd=ROOT,text=True,capture_output=True)
         (BUILD/f'{name}-assemble.log').write_text(run.stdout+run.stderr,encoding='utf-8')
@@ -139,6 +140,7 @@ def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixe
         report['missiletargetfix']=missiletargetfix
         report['textfullstopfix']=textfullstopfix
         report['iffunit']=iffunit
+        report['randomizedspawn']=randomizedspawn
         report['tapfile']=tapfile
         candidate.replace(output)
         (BUILD/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
@@ -164,11 +166,12 @@ def main():
     p.add_argument('--missiletargetfix',choices=['no','yes'],default='no',help='a missile whose target is removed explodes, and removing a missile no longer explodes unrelated objects (default: no)')
     p.add_argument('--textfullstopfix',choices=['no','yes'],default='no',help='a full stop arriving as the 31st character of a justified line wraps with its word instead of being lost (default: no)')
     p.add_argument('--iffunit',choices=['no','yes'],default='no',help='replace the energy bomb (item 9, W key) with an I.F.F. unit that makes threats blink on the scanner (default: no)')
+    p.add_argument('--randomizedspawn',choices=['no','yes'],default='no',help='a single ship of a random encounter appears ahead or in a corner at random, not by its hostility (default: no)')
     p.add_argument('--verify',choices=['yes','no'],default='yes',help='exact original-byte comparison (default: yes); structural checks always run')
     # Also accept make.bat ship=adder laser=single verify=no.
     arguments=[]
     for value in sys.argv[1:]:
-        if value.startswith(('ship=','laser=','font=','scannerpixelfix=','stationrandomlaunchfix=','stationslotfix=','fuelfix=','hyperspacedockingfix=','aicouragefix=','scannerblipfix=','stardustfix=','missiletargetfix=','textfullstopfix=','iffunit=','verify=','tapfile=')):
+        if value.startswith(('ship=','laser=','font=','scannerpixelfix=','stationrandomlaunchfix=','stationslotfix=','fuelfix=','hyperspacedockingfix=','aicouragefix=','scannerblipfix=','stardustfix=','missiletargetfix=','textfullstopfix=','iffunit=','randomizedspawn=','verify=','tapfile=')):
             key,setting=value.split('=',1)
             arguments += ['--'+key,setting]
         else:
@@ -176,7 +179,7 @@ def main():
     args=p.parse_args(arguments)
     try:
         if args.verify_only: verify(output=release_tap(args.tapfile),exact=args.verify=='yes')
-        else: assemble(args.ship,args.verify=='yes',args.laser,args.font,args.scannerpixelfix,args.stationrandomlaunchfix,args.tapfile,args.stationslotfix,args.fuelfix,args.hyperspacedockingfix,args.aicouragefix,args.scannerblipfix,args.stardustfix,args.missiletargetfix,args.textfullstopfix,args.iffunit)
+        else: assemble(args.ship,args.verify=='yes',args.laser,args.font,args.scannerpixelfix,args.stationrandomlaunchfix,args.tapfile,args.stationslotfix,args.fuelfix,args.hyperspacedockingfix,args.aicouragefix,args.scannerblipfix,args.stardustfix,args.missiletargetfix,args.textfullstopfix,args.iffunit,args.randomizedspawn)
     except (OSError,ValueError,KeyError,subprocess.SubprocessError) as ex:
         (BUILD/'verification.json').unlink(missing_ok=True)
         print('ERROR: '+str(ex),file=sys.stderr);return 1

@@ -77,7 +77,7 @@ OPTION_SYMBOLS = ('SHIP_ADDER', 'LASER_SINGLE', 'FONT_48', 'FONT_128FIX', 'FONT_
                   'SCANNER_PIXEL_FIX', 'STATION_RANDOM_LAUNCH_FIX', 'STATION_SLOT_FIX',
                   'FUEL_FIX', 'HYPERSPACE_DOCKING_FIX', 'AI_COURAGE_FIX',
                   'SCANNER_BLIP_FIX', 'STARDUST_FIX', 'MISSILE_TARGET_FIX', 'TEXT_FULL_STOP_FIX',
-                  'IFF_UNIT')
+                  'IFF_UNIT', 'RANDOMIZED_SPAWN')
 OUTPUT = ROOT / 'build/routine-checks/verification.json'
 
 # Object instance fields (offsets inside a 39-byte slot; tools/annotations, docs/SHIPS.md)

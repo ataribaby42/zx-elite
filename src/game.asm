@@ -20992,9 +20992,20 @@ DispatchShipEvent:
 ; and keep the template $32 when +$21 bit 2 (hostile) is set; z stays +$3200.  Uses three
 ; or five NextRandomByte values.  Returns A = 0 with Z set; IX unchanged, BC/DE/HL changed.
 ; Evidence: objects/r10-ship-creation (all 19 blueprint IDs).
+; randomizedspawn=yes (src/randomized-spawn.asm) keeps the caller's A on the stack in place
+; of the unread LD B,A and stores the last fields in fewer bytes ($F338..$F355).  Bit 7 of
+; A then asks for a random placement: the test becomes hostility XOR bit 3 of one extra
+; NextRandomByte.  Every caller but InitialiseEncounterShip passes A below $80 and gets the
+; original placement and RNG use.
 InitialiseShipFromBlueprint:
     LD HL,ShipBlueprintsAndDispatchTables      ; $F2FB: 21 80 61
-    LD B,A                                     ; $F2FE: 47
+assert $-GameImage = RandomizedSpawnIdPushStart-GameLoadAddress
+IF RANDOMIZED_SPAWN
+    PUSH AF                                    ; keep the caller's A: bit 7 asks for a randomized placement
+ELSE
+    LD B,A                                     ; $F2FE: 47  B is not read: LD BC reloads it below
+ENDIF
+assert $-GameImage = RandomizedSpawnIdPushLimit-GameLoadAddress
     AND $3F                                    ; $F2FF: E6 3F  six-bit blueprint ID
     ADD A,A                                    ; $F301: 87
 IF SHIP_ADDER
@@ -21035,6 +21046,10 @@ ENDIF
     RLA                                        ; $F334: 17
     RL C                                       ; $F335: CB 11
     RRA                                        ; $F337: 1F
+assert $-GameImage = RandomizedSpawnPlacementStart-GameLoadAddress
+IF RANDOMIZED_SPAWN
+    RandomizedSpawnPlacementCode
+ELSE
     LD (IX+$20),A                              ; $F338: DD 77 20
     LD A,(IY+$06)                              ; $F33B: FD 7E 06  speed = maximum / 2
     SRL A                                      ; $F33E: CB 3F
@@ -21045,14 +21060,21 @@ ENDIF
     LD (IX+$26),A                              ; $F349: DD 77 26  +$26 = 0: no role flags
     SET 6,(IX+$20)                             ; $F34C: DD CB 20 F6  counted by EncounterShipCount
     BIT 2,(IX+$21)                             ; $F350: DD CB 21 56  hostile: keep high bytes $32
-    JR NZ,L_F366                               ; $F354: 20 10
+    JR NZ,RandomiseShipLowBytesAndSigns        ; $F354: 20 10
+ENDIF
+assert $-GameImage = RandomizedSpawnPlacementLimit-GameLoadAddress
     CALL NextRandomByte                        ; $F356: CD 24 ED  calm: high bytes 0..7
     AND $07                                    ; $F359: E6 07
     LD (IX+$01),A                              ; $F35B: DD 77 01  x high byte
     CALL NextRandomByte                        ; $F35E: CD 24 ED
     AND $07                                    ; $F361: E6 07
     LD (IX+$04),A                              ; $F363: DD 77 04  y high byte
-L_F366:
+
+; VERIFIED: Last part of InitialiseShipFromBlueprint, shared by both placements: random x and y low
+; bytes and random x/y signs, then A = 0 with Z.  A hostile ship arrives here with the
+; template high bytes $32 (a diagonal corner), a calm one after drawing high bytes 0..7.
+; Evidence: objects/r10-ship-creation (all 19 blueprint IDs).
+RandomiseShipLowBytesAndSigns:
     CALL NextRandomByte                        ; $F366: CD 24 ED  random low bytes
     LD (IX+$00),A                              ; $F369: DD 77 00  x low byte
     CALL NextRandomByte                        ; $F36C: CD 24 ED
@@ -21544,6 +21566,8 @@ L_F616:
 ; contraband makes ship encounters more likely (L_F660).  The special Asp encounter needs
 ; MissionAspEncounterState = 0, NextRandomByte <> $FF and CommanderFlags AND $42 = $02.
 ; Evidence: tools/check_routines.py ai/p11-encounter-selection, missions/special-encounter.
+; randomizedspawn=yes keeps the special Asp's placement: its JR at $F653 enters
+; InitialiseEncounterShipByHostility (src/randomized-spawn.asm).
 SpawnRandomEncounter:
     LD A,(CargoHold+3)                         ; $F61D: 3A 30 A8  CargoHold+3: SLAVES
     LD C,A                                     ; $F620: 4F
@@ -21573,7 +21597,13 @@ SpawnRandomEncounter:
     CALL FindFreeShipSlot                      ; $F64D: CD 99 F3  slot for the Asp
     RET NZ                                     ; $F650: C0  BUG: no free slot pops the pushed AF ($0F02) into PC (ROM)
     LD A,$0D                                   ; $F651: 3E 0D  Asp Mk II
+assert $-GameImage = RandomizedSpawnAspEntryStart-GameLoadAddress
+IF RANDOMIZED_SPAWN
+    JR InitialiseEncounterShipByHostility      ; create it with the original placement
+ELSE
     JR InitialiseEncounterShip                 ; $F653: 18 73  create it; its RET goes to L_F655
+ENDIF
+assert $-GameImage = RandomizedSpawnAspEntryLimit-GameLoadAddress
 
 ; VERIFIED: Special-encounter continuation: the RET of InitialiseEncounterShip returns here
 ; (address pushed at $F648).  Set +$26 bit 6 and +$20 bit 2 (payload count 1 -> 5) on the
@@ -21667,14 +21697,27 @@ SelectMixedEncounterShipType:
     DEC B                                      ; $F6C5: 05  46..63: pirate Python (11)
 L_F6C6:
     LD A,B                                     ; $F6C6: 78
-L_F6C7:
+
+; VERIFIED: Common entry of the single-ship encounters (mixed selector, traders, Rock hermit or Viper,
+; the mission Thargoid or Python trader): push AF with A = the blueprint ID, which
+; InitialiseEncounterShip pops for its Thargoid test, and fall into InitialiseEncounterShip.
+; Evidence: ai/p11-encounter-selection (every path) in tools/check_routines.py.
+SaveEncounterShipId:
     PUSH AF                                    ; $F6C7: F5  keep the blueprint ID
 
 ; VERIFIED: A is the selected blueprint ID, IX the allocated slot; a saved AF word is on the stack.
 ; Initialize the instance, restore AF and optionally set bit 0 in instance +$25.
 ; That optional flag does not change hostility in +$21 or inspect PlayerLegalScore.
 ; Evidence: identical Fer-de-Lance spawn state across legal scores in tools/check_bounty_hunters.py.
+; VERIFIED: randomizedspawn=yes (src/randomized-spawn.asm) first sets bit 7 of A, which asks
+; InitialiseShipFromBlueprint for a random placement, and fits the same ECM test into the
+; remaining bytes.  The Rock hermit and the special Asp enter after that instruction, at
+; InitialiseEncounterShipByHostility, and keep the original placement.
 InitialiseEncounterShip:
+assert $-GameImage = RandomizedSpawnRequestStart-GameLoadAddress
+IF RANDOMIZED_SPAWN
+    RandomizedSpawnRequestCode
+ELSE
     CALL InitialiseShipFromBlueprint           ; $F6C8: CD FB F2
     POP AF                                     ; $F6CB: F1
     CP $0F                                     ; $F6CC: FE 0F  Thargoid: always +$25 bit 0
@@ -21685,6 +21728,8 @@ InitialiseEncounterShip:
 L_F6D6:
     SET 0,(IX+$25)                             ; $F6D6: DD CB 25 C6  +$25 bit 0: ECM fitted (L_F815)
     RET                                        ; $F6DA: C9
+ENDIF
+assert $-GameImage = RandomizedSpawnRequestLimit-GameLoadAddress
 
 ; VERIFIED: Allocate a slot and create blueprint C (Thargoid or Python trader, from L_F684) through
 ; the shared InitialiseEncounterShip path.
@@ -21692,7 +21737,7 @@ L_F6DB:
     CALL FindFreeShipSlot                      ; $F6DB: CD 99 F3
     RET NZ                                     ; $F6DE: C0
     LD A,C                                     ; $F6DF: 79  A = Thargoid or Python trader
-    JR L_F6C7                                  ; $F6E0: 18 E5
+    JR SaveEncounterShipId                     ; $F6E0: 18 E5
 
 ; VERIFIED: New random byte r2: (r2 AND 7) >= E -> group at L_F70E.  Otherwise allocate one slot and
 ; choose from bits 7..5 of r2 (rotated into C bits 2..0): 0..1 -> L_F706, 2..7 ->
@@ -21712,6 +21757,10 @@ L_F6E2:
     LD A,C                                     ; $F6F6: 79
     AND $07                                    ; $F6F7: E6 07  r2 bits 7..5
     CP $02                                     ; $F6F9: FE 02
+assert $-GameImage = RandomizedSpawnHermitStart-GameLoadAddress
+IF RANDOMIZED_SPAWN
+    RandomizedSpawnHermitCode
+ELSE
     JR C,L_F706                                ; $F6FB: 38 09  0..1: Rock hermit or Viper
 
 ; VERIFIED: Ordinary space encounter: A=2..7 selects Cobra trader (9) or Python trader (10).
@@ -21721,16 +21770,21 @@ SelectEncounterTraderType:
     SRL A                                      ; $F6FE: CB 3F
     SRL A                                      ; $F700: CB 3F
     ADD A,$09                                  ; $F702: C6 09  2..4: Cobra trader (9), 5..7: Python trader (10)
-    JR L_F6C7                                  ; $F704: 18 C1
+    JR SaveEncounterShipId                     ; $F704: 18 C1
 
 ; VERIFIED: Rock hermit (ID 7) or Viper (ID 8), chosen by bit 4 of r2 (bit 7 of the
 ; rotated copy in C), then created through InitialiseEncounterShip.
+; randomizedspawn=yes rewrites $F6FB..$F70D (with a shorter trader choice before it): the
+; Viper takes the randomized path, the Rock hermit enters at
+; InitialiseEncounterShipByHostility and keeps the placement of an asteroid.
 L_F706:
     LD A,C                                     ; $F706: 79
     RLCA                                       ; $F707: 07  r2 bit 4 to bit 0
     AND $01                                    ; $F708: E6 01
     ADD A,$07                                  ; $F70A: C6 07  7 Rock hermit, 8 Viper
-    JR L_F6C7                                  ; $F70C: 18 B9
+    JR SaveEncounterShipId                     ; $F70C: 18 B9
+ENDIF
+assert $-GameImage = RandomizedSpawnHermitLimit-GameLoadAddress
 
 ; VERIFIED: Create a group of 2 + ((r AND 3) >> 1) + (r AND 1) ships (2, 3, 3 or 4 for
 ; r AND 3 = 0..3), each a Sidewinder (ID 16) or Krait (ID 17; Adder with ship=adder)
@@ -24235,6 +24289,7 @@ defc L_F2C0 = ObjectSlot7OrientationBytes
 defc L_F2C9 = ChildLaunchOrientationToggle
 defc L_F2CA = DispatchShipEvent
 defc L_F2FB = InitialiseShipFromBlueprint
+defc L_F366 = RandomiseShipLowBytesAndSigns
 defc L_F381 = CreateShipAtParent
 defc L_F399 = FindFreeShipSlot
 defc L_F3CE = SpawnThargoidGroup
@@ -24251,6 +24306,7 @@ defc L_F5D8 = SetUpDisplayShip
 defc L_F61D = SpawnRandomEncounter
 defc L_F6A9 = SpawnMixedSingleShipEncounter
 defc L_F6AD = SelectMixedEncounterShipType
+defc L_F6C7 = SaveEncounterShipId
 defc L_F6C8 = InitialiseEncounterShip
 defc L_F6FD = SelectEncounterTraderType
 defc L_F72B = SteeringVectorX

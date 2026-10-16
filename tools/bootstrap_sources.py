@@ -346,6 +346,11 @@ OPTIONAL_REGIONS = [
     (0xDAC1, 0xDAD8, 'IFF_UNIT'),
     (0xDBC8, 0xDBD5, 'IFF_UNIT'),
     (0xFF72, 0xFF74, 'IFF_UNIT'),
+    (0xF2FE, 0xF2FF, 'RANDOMIZED_SPAWN'),
+    (0xF338, 0xF356, 'RANDOMIZED_SPAWN'),
+    (0xF653, 0xF655, 'RANDOMIZED_SPAWN'),
+    (0xF6C8, 0xF6DB, 'RANDOMIZED_SPAWN'),
+    (0xF6FB, 0xF70E, 'RANDOMIZED_SPAWN'),
 ]
 # Options made of several parts: region start -> (macro or instruction, comment, limit
 # constant in src/options.asm; the start constant has Start in place of Limit).
@@ -381,6 +386,13 @@ OPTION_PARTS = {
     0xDAC1: ('IffShipCode', None, 'IffShipCodeLimit'),
     0xDBC8: ('IffObjectsTailCode', None, 'IffObjectsTailLimit'),
     0xFF72: ('defb $00,$00', 'W            -> no action bit (no energy bomb)', 'IffBombKeyLimit'),
+    0xF2FE: ('PUSH AF', "keep the caller's A: bit 7 asks for a randomized placement",
+             'RandomizedSpawnIdPushLimit'),
+    0xF338: ('RandomizedSpawnPlacementCode', None, 'RandomizedSpawnPlacementLimit'),
+    0xF653: ('JR InitialiseEncounterShipByHostility', 'create it with the original placement',
+             'RandomizedSpawnAspEntryLimit'),
+    0xF6C8: ('RandomizedSpawnRequestCode', None, 'RandomizedSpawnRequestLimit'),
+    0xF6FB: ('RandomizedSpawnHermitCode', None, 'RandomizedSpawnHermitLimit'),
 }
 OPTION_PART_REGIONS = {start: (end, option) for start, end, option in OPTIONAL_REGIONS
                        if start in OPTION_PARTS}
@@ -401,7 +413,7 @@ DATA_OPTION_PARTS = {
     },
 }
 # Labels defined by both the original code and its optional replacement.
-SHARED_OPTIONAL_LABELS = {0x716B, 0x7181, 0xA6D3}
+SHARED_OPTIONAL_LABELS = {0x716B, 0x7181, 0xA6D3, 0xF6FD}
 BRANCH = re.compile(r'^(JP|JR|CALL|DJNZ) (?:([A-Z]+),)?\$([0-9A-F]{4})$')
 BYTE = re.compile(r'(?<![+-])\$([0-9A-F]{2})\b')
 LEGACY_REF = re.compile(r'\bL_([0-9A-F]{4})\b')

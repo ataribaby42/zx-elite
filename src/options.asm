@@ -181,6 +181,28 @@ IF IFF_UNIT
     INCLUDE "iff-unit.asm"
 ENDIF
 
+IFNDEF RANDOMIZED_SPAWN
+    defc RANDOMIZED_SPAWN = 0
+ENDIF
+assert RANDOMIZED_SPAWN = 0 || RANDOMIZED_SPAWN = 1
+
+; Original fixed boundaries of the five parts that randomizedspawn=yes replaces
+; (src/randomized-spawn.asm): a single ship of a random encounter takes the calm or
+; the hostile placement at random instead of by its hostility.
+defc RandomizedSpawnIdPushStart = $F2FE         ; LD B,A in InitialiseShipFromBlueprint (B is not read)
+defc RandomizedSpawnIdPushLimit = $F2FF
+defc RandomizedSpawnPlacementStart = $F338      ; last fields and hostility test of the loader
+defc RandomizedSpawnPlacementLimit = $F356
+defc RandomizedSpawnAspEntryStart = $F653       ; JR InitialiseEncounterShip of the special Asp
+defc RandomizedSpawnAspEntryLimit = $F655
+defc RandomizedSpawnRequestStart = $F6C8        ; InitialiseEncounterShip
+defc RandomizedSpawnRequestLimit = $F6DB
+defc RandomizedSpawnHermitStart = $F6FB         ; trader and Rock hermit/Viper choice
+defc RandomizedSpawnHermitLimit = $F70E
+IF RANDOMIZED_SPAWN
+    INCLUDE "randomized-spawn.asm"
+ENDIF
+
 ; Original fixed boundaries of the shared parent-ship launch selector.
 defc ParentLaunchSelectionStart = $F44A
 defc ParentLaunchSelectionLimit = $F470

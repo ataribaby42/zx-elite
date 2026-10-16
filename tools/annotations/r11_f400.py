@@ -111,7 +111,9 @@ event 16*n+9.  INFERRED: this is the rotating title-screen ship."""),
 C = 2*(SLAVES + NARCOTICS) + FIREARMS (CargoHold+3, +6, +10, 8-bit sum):
 contraband makes ship encounters more likely (L_F660).  The special Asp encounter needs
 MissionAspEncounterState = 0, NextRandomByte <> $FF and CommanderFlags AND $42 = $02.
-Evidence: tools/check_routines.py ai/p11-encounter-selection, missions/special-encounter."""),
+Evidence: tools/check_routines.py ai/p11-encounter-selection, missions/special-encounter.
+randomizedspawn=yes keeps the special Asp's placement: its JR at $F653 enters
+InitialiseEncounterShipByHostility (src/randomized-spawn.asm)."""),
     0xF655: (None, 'verified', """
 Special-encounter continuation: the RET of InitialiseEncounterShip returns here
 (address pushed at $F648).  Set +$26 bit 6 and +$20 bit 2 (payload count 1 -> 5) on the
@@ -130,6 +132,16 @@ B = r, E = r AND 7.  L_A871 = 4 -> one Thargoid (ID 15); L_A871 = 1 -> one Pytho
 g <> 0, E becomes (r AND 7) + 1 and g >= E means no encounter; an anarchy always gets one.
 Then r bit 3 set -> SpawnMixedSingleShipEncounter, else L_F6E2 with E.
 Evidence: tools/check_routines.py ai/p11-encounter-selection."""),
+    0xF6C7: ('SaveEncounterShipId', 'verified', """
+Common entry of the single-ship encounters (mixed selector, traders, Rock hermit or Viper,
+the mission Thargoid or Python trader): push AF with A = the blueprint ID, which
+InitialiseEncounterShip pops for its Thargoid test, and fall into InitialiseEncounterShip.
+Evidence: ai/p11-encounter-selection (every path) in tools/check_routines.py."""),
+    0xF6C8: (None, 'verified', """
+randomizedspawn=yes (src/randomized-spawn.asm) first sets bit 7 of A, which asks
+InitialiseShipFromBlueprint for a random placement, and fits the same ECM test into the
+remaining bytes.  The Rock hermit and the special Asp enter after that instruction, at
+InitialiseEncounterShipByHostility, and keep the original placement."""),
     0xF6DB: (None, 'verified', """
 Allocate a slot and create blueprint C (Thargoid or Python trader, from L_F684) through
 the shared InitialiseEncounterShip path."""),
@@ -139,7 +151,10 @@ choose from bits 7..5 of r2 (rotated into C bits 2..0): 0..1 -> L_F706, 2..7 ->
 SelectEncounterTraderType (2..4 Cobra trader, 5..7 Python trader)."""),
     0xF706: (None, 'verified', """
 Rock hermit (ID 7) or Viper (ID 8), chosen by bit 4 of r2 (bit 7 of the
-rotated copy in C), then created through InitialiseEncounterShip."""),
+rotated copy in C), then created through InitialiseEncounterShip.
+randomizedspawn=yes rewrites $F6FB..$F70D (with a shorter trader choice before it): the
+Viper takes the randomized path, the Rock hermit enters at
+InitialiseEncounterShipByHostility and keeps the placement of an asteroid."""),
     0xF70E: (None, 'verified', """
 Create a group of 2 + ((r AND 3) >> 1) + (r AND 1) ships (2, 3, 3 or 4 for
 r AND 3 = 0..3), each a Sidewinder (ID 16) or Krait (ID 17; Adder with ship=adder)

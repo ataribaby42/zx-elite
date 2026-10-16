@@ -5,6 +5,7 @@ ZX Spectrum Elite 128k source reconstruction
 ## 16.10.2026 V1.3
 
 - I.F.F. unit option; replaces the energy bomb and its W key, threats blink on the scanner
+- Randomized spawn option; a lone encounter ship appears ahead or in a corner at random, so its position no longer reveals a threat
 
 ## 15.10.2026 V1.2
 

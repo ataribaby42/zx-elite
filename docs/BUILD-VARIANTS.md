@@ -42,8 +42,8 @@ python tools/build.py --verify-only --verify no
 `ship` accepts `krait` (default) or `adder`; `laser` accepts `original` (default)
 or `single`. `font` accepts `128` (default), `48`, `128fix` or `128fix_ecm_s`. `scannerpixelfix`,
 `stationrandomlaunchfix`, `stationslotfix`, `fuelfix`, `hyperspacedockingfix`, `aicouragefix`,
-`scannerblipfix`, `stardustfix`, `missiletargetfix`, `textfullstopfix` and `iffunit` accept `no`
-(default) or `yes`.
+`scannerblipfix`, `stardustfix`, `missiletargetfix`, `textfullstopfix`, `iffunit` and `randomizedspawn`
+accept `no` (default) or `yes`.
 `verify` accepts `yes`
 (default) or `no`. A build does not change the saved BAT settings or remember
 its command-line overrides. No modification silently weakens verification: select
@@ -911,6 +911,152 @@ original draws it on the scanner, so with the unit it blinks there.
 Build the option with the default tapfile for this mode. Reports and
 screenshots of a lit and a dark frame are in `build/iff-unit-check/`.
 
+## Randomized spawn
+
+```bat
+make.bat randomizedspawn=yes verify=no
+python tools/check_randomized_spawn.py
+python tools/check_randomized_spawn.py --emulator
+```
+
+The equivalent Python option is `--randomizedspawn yes`. The default `no`
+keeps the original bytes and behaviour.
+
+### Original placement
+
+Every object that `InitialiseShipFromBlueprint` creates starts as a copy of
+`ShipInstanceTemplate`: x = y = z = +$3200, with the forward axis pointing back
+at the player. The loader keeps z = +$3200, 12,800 units ahead, and randomises
+the low bytes and signs of x and y. It also draws new high bytes 0..7 for x
+and y, but only when bit 2 of the blueprint behaviour (`InstanceBehaviour`,
+hostile) is clear:
+
+| At creation | x and y | In the front view |
+|---|---|---|
+| calm: Cobra and Python traders, Viper, Fer-de-Lance, Rock hermit, Asteroid | random sign, magnitude 0..$07FF | almost straight ahead, within about 9 degrees in x and y |
+| hostile: pirate Cobra and Python, Asp Mk II, Thargoid, Sidewinder, Krait | random sign, magnitude $3200..$32FF | about 45 degrees out in x and y, towards one of the four corners |
+
+The Fer-de-Lance starts calm and turns hostile later through its AI (see
+[Fer-de-Lance encounters](BOUNTY-HUNTERS.md)), so it also appears ahead.
+Station and parent launches, debris, missiles, the title ship and Thargoid
+groups overwrite the loader's coordinates; only random space encounters keep
+them. The starting point therefore tells the player at once whether a newly
+arrived ship is a threat.
+
+### Change
+
+With `yes` a single ship of a random encounter takes either placement with
+about even odds, whatever its hostility: the Cobra and Python traders and
+pirates, the Viper, the Asp Mk II, the Fer-de-Lance, a lone Thargoid, and the
+Python trader or Thargoid that the invasion mission states 1 and 4 force. Its
+type, hostility, energy, speed, payload, AI and ECM chance are created as
+before. Unchanged are the groups of 2..4 Sidewinders and Kraits, asteroids,
+the Rock hermit, the special Asp of mission 2 with its escort, and every other
+caller of the loader. The Rock hermit keeps the placement of an asteroid: a
+rock towards a corner would give it away.
+
+Five parts replace original bytes in place, asserted with the
+`RandomizedSpawn...Start`/`Limit` constants in `src/options.asm`. No free area
+and no RAM are used; 59 of the 71 bytes change.
+
+| Part | Original | Replacement |
+|---|---|---|
+| `$F2FE` (1 B) | `LD B,A` in `InitialiseShipFromBlueprint`; `LD BC` reloads B before any read | `PUSH AF`: keep the caller's A |
+| `$F338..$F355` (30 B) | the last fields (`+$20` with bit 6, speed, `+$25`, `+$26`), then `BIT 2,(IX+$21)` and `JR NZ` | the same fields in 19 bytes, then the placement test |
+| `$F653..$F654` (2 B) | the special Asp's `JR InitialiseEncounterShip` | `JR InitialiseEncounterShipByHostility` |
+| `$F6C8..$F6DA` (19 B) | `InitialiseEncounterShip` | `OR $80`, the request, then the loader call and the same ECM test in two bytes fewer |
+| `$F6FB..$F70D` (19 B) | the trader choice and the Rock hermit/Viper choice | the trader choice in two bytes fewer; the Viper takes the request path, the Rock hermit pushes its ID itself and enters after the request |
+
+The loader masks the ID with `AND $3F`, and every other caller passes an ID
+below $40, so bit 7 is free for the request. The fields keep their values:
+bit 6 of `+$20` is ORed in before the store instead of set afterwards, the
+speed is halved with `RRA` while the carry is known clear, and `+$26` is
+stored from B, which the template `LDIR` leaves at 0. The test then pops the
+caller's A. Without the request it tests the hostility alone, draws nothing
+and leaves the carry clear for the next `NextRandomByte`, exactly as the
+original. With the request it draws one byte and takes the corner when bit 3
+of that byte differs from the hostility. Then the loader continues with the
+original draws of the selected placement.
+
+`InitialiseEncounterShip` computes the ECM decision with `ADD A,$CD` and
+`RET C` instead of `CP $33` and `RET NC`. A Thargoid ID ($0F, which the
+special Asp also pushes to get its ECM) draws no byte and returns with the
+carry clear, as after the original `CP $0F`. That carry matters: the special
+Asp's continuation passes it to the `NextRandomByte` that sizes its escort.
+The ordinary encounter caller clears every register it uses afterwards.
+
+### Randomness
+
+`NextRandomByte` is weak. Each byte depends mostly on the low bits of the two
+bytes before it, and the request byte directly follows the bytes that chose
+the encounter and the ship type. In a model over all 65,536 states and eight
+governments, bit 3 is among the bits least correlated with the type: the
+largest deviation from even odds for one type in one government was 0.10. The
+generator's carry output, the obvious alternative in the same bytes, gave
+0.02 for the Viper and 0.89 for the Thargoid and was rejected. Measured with
+the real code over all 65,536 states in every government (74,960 single
+ships):
+
+| Ship | Corner share |
+|---|---:|
+| Asp Mk II | 0.52 |
+| Cobra pirate | 0.50 |
+| Python pirate | 0.49 |
+| Fer-de-Lance | 0.49 |
+| Cobra trader | 0.48 |
+| Python trader | 0.48 |
+| Viper | 0.48 |
+| Thargoid | 0.41 |
+| All | 0.490 |
+
+For one ship type in one government, counting at least 100 ships, the share
+lies between 0.40 (Cobra trader, government 5) and 0.54 (Asp Mk II,
+government 4); the check bounds it to 0.30..0.70. The Thargoid is exempt
+from that bound; its shape gives it away anyway. The ECM share of these ships
+is 0.234, against 0.229 in the original, because their ECM byte is drawn one
+or three bytes later.
+
+### Checks
+
+`tools/check_randomized_spawn.py` compares the assembled image with a
+baseline whose five parts are restored from the reference tape, using the
+supplied 48K ROM in SkoolKit's simulator. Without other options the baseline
+must equal the reference image.
+
+- A Python model of `NextRandomByte` matches the simulator in 512 states.
+- `InitialiseShipFromBlueprint` without the request, the way every other
+  caller uses it: all 19 IDs, 1,024 RNG states each, ID bit 6 clear and set,
+  varied entry flags and a garbage-filled slot (38,912 calls). The slot,
+  every register, the flags and the RNG state equal the original's.
+- With the request (19,456 calls): every byte from z on and every register
+  equal the original's, and x, y and the final RNG state equal a model of the
+  loader: the request byte, then the original draws of the selected
+  placement.
+- `SpawnRandomEncounter` for all 65,536 RNG states in each of the eight
+  governments, then 4,096 states each for invasion mission states 1 and 4,
+  the special Asp encounter and full slots (540,672 runs per image). Both
+  images create the same objects in the same slots. No encounter, asteroids,
+  groups, the Rock hermit, the special Asp with its escort and full slots
+  are identical byte for byte, including the RNG state and its number of
+  draws. A single ship differs only in x, y and the ECM bit; it has the
+  centre or the corner form, and the option image draws one byte more, plus
+  two for the centre form, minus two when the original took the centre.
+  Bytes outside the slots and the variables the test sets stay unchanged.
+  The corner shares are bounded as above.
+
+`--emulator` loads `release/elite-128k.tap` through the 48K ROM, launches and
+jumps to Diso. At 36 seconds the arrival tunnel is over and no station is
+present. The RAM of that moment is loaded into the simulator, which searches
+for RNG states that make the next encounter a trader towards a corner and a
+pirate ahead; the original places both the other way round. Each state is
+then poked into a second ROM-load run, with `ObjectUpdateCounter` = 1 so that
+the next object update dispatches the encounter. One second later the
+predicted ship is in its predicted placement: a Cobra trader at
+x = +$3206, y = +$3285, z = +$2FE4 (RNG state $000B) and a pirate Cobra at
+x = +$05B3, y = +$047F, z = +$3080 (state $0007), for Krait and Adder. Build
+the option with the default tapfile for this mode. Reports are in
+`build/randomized-spawn-check/`.
+
 ## What verification means
 
 Always checked, including `verify=no`:
@@ -1180,7 +1326,8 @@ three unreachable bytes at the end of the token dictionary, and claims the
 first unreferenced `JP` at `$91C9..$91CB`. Its parts keep 6 bytes unused
 (`$927E..$927F`, `$DBD1..$DBD4`), and `EnergyBombPending` becomes unused.
 With the I.F.F. unit as well, 39 bytes remain free in 15 areas, the largest 7
-bytes (`$7818..$781E`).
+bytes (`$7818..$781E`). `randomizedspawn=yes` uses no free area: it rewrites
+71 bytes of the ship loader and the encounter code in place, in five parts.
 
 ### Rules for using free space
 
@@ -1216,7 +1363,7 @@ The inherited broader gameplay scenarios above remain available; they are
 not all required for a font-only data substitution.
 
 The option check (`tools/check_build_options.py`) runs in about 25 seconds
-(89 builds). It checks the following:
+(92 builds). It checks the following:
 
 - The default build reproduces the reference tape.
 - Every non-default value alone builds in both verification modes. The strict
@@ -1234,12 +1381,13 @@ The option check (`tools/check_build_options.py`) runs in about 25 seconds
   - the stardust fix: its 69 bytes;
   - the missile target fix: its one instruction;
   - the text full stop fix: its two parts;
-  - the I.F.F. unit: its eight parts.
+  - the I.F.F. unit: its eight parts;
+  - the randomized spawn: its five parts.
 - These areas, together with every byte `ship=adder` changes, are pairwise
   disjoint. That is what makes the options composable.
 - Combinations are built in both modes:
   - a greedy covering array in which every pair of values of two options is
-    built together at least once (416 pairs in 15 combinations), so two includes
+    built together at least once (476 pairs in 20 combinations), so two includes
     that clash on a symbol or an assertion fail there;
   - every option on at once for each ship and non-default font.
 
@@ -1250,12 +1398,12 @@ The option check (`tools/check_build_options.py`) runs in about 25 seconds
   are rejected even with identity disabled.
 
 `python tools/check_build_options.py --full` builds the complete product of
-all values instead of the selected combinations: 32,768 combinations, several
+all values instead of the selected combinations: 65,536 combinations, several
 hours. Use it after changing the build machinery itself. Either mode leaves
 Adder with `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
 stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
 scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes
-iffunit=yes` built. A new option must be added to `OPTIONS`, and a new
+iffunit=yes randomizedspawn=yes` built. A new option must be added to `OPTIONS`, and a new
 fix's areas to `FIX_PARTS`, in that tool.
 
 The ship check compares all other models with the original bytes, resolves
@@ -1306,7 +1454,7 @@ Maintained files for this feature:
 - `src/options.asm`, `src/adder-startup.asm`, `src/single-laser.asm`,
   `src/station-slot-fix.asm`, `src/fuel-fix.asm`, `src/ai-courage-fix.asm`,
   `src/scanner-blip-fix.asm`, `src/stardust-fix.asm`, `src/text-full-stop-fix.asm`,
-  `src/iff-unit.asm`;
+  `src/iff-unit.asm`, `src/randomized-spawn.asm`;
 - `src/data/font.asm`, `src/data/font-48.asm`, `tools/font_variant.py`;
 - `src/game.asm`, `src/data/ship-blueprints-and-tables.asm`;
 - `src/data/initial-runtime-state.asm`;
@@ -1317,7 +1465,7 @@ Maintained files for this feature:
   `tools/check_hyperspace_docking_fix.py`, `tools/check_ai_courage_fix.py`,
   `tools/check_scanner_blip_fix.py`, `tools/check_stardust_fix.py`,
   `tools/check_missile_target_fix.py`, `tools/check_text_full_stop_fix.py`,
-  `tools/check_iff_unit.py`, `tools/emulator_check.py`;
+  `tools/check_iff_unit.py`, `tools/check_randomized_spawn.py`, `tools/emulator_check.py`;
 - `AGENTS.md`, `README.md`, `docs/SHIPS.md`, `docs/GRAPHICS.md`, this document.
 
 The bootstrap generator preserves these conditional hooks and regenerates
