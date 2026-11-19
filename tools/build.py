@@ -60,7 +60,7 @@ def verify(output=OUTPUT, exact=True):
     print('SHA256: '+sha(rebuilt))
     return report
 
-def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixelfix='no', stationrandomlaunchfix='no', tapfile=DEFAULT_TAPFILE, stationslotfix='no', fuelfix='no', hyperspacedockingfix='no', aicouragefix='no', scannerblipfix='no', stardustfix='no', missiletargetfix='no', textfullstopfix='no', iffunit='no', randomizedspawn='no', rotationdriftfix='no', competitionremove='no', dockingrotation='no'):
+def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixelfix='no', stationrandomlaunchfix='no', tapfile=DEFAULT_TAPFILE, stationslotfix='no', fuelfix='no', hyperspacedockingfix='no', aicouragefix='no', scannerblipfix='no', stardustfix='no', missiletargetfix='no', textfullstopfix='no', iffunit='no', randomizedspawn='no', rotationdriftfix='no', competitionremove='no', dockingrotation='no', trafficcontrol='no'):
     requested_competitionremove = competitionremove
     requested_rotationdriftfix = rotationdriftfix
     if dockingrotation == 'yes':
@@ -103,6 +103,7 @@ def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixe
                  f'-DCOMPETITION_REMOVE={int(competitionremove=="yes")}',
                  f'-DROTATION_DRIFT_FIX={int(rotationdriftfix=="yes")}',
                  f'-DDOCKING_ROTATION={int(dockingrotation=="yes")}',
+                 f'-DTRAFFIC_CONTROL={int(trafficcontrol=="yes")}',
                  f'-DRANDOMIZED_SPAWN={int(randomizedspawn=="yes")}',
                  '-I=src','-I=src/data','-O=build',f'-o={name}.bin',f'src/{name}.asm']
         run=subprocess.run(command,cwd=ROOT,text=True,capture_output=True)
@@ -157,6 +158,7 @@ def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixe
         report['rotationdriftfix']=rotationdriftfix
         report['rotationdriftfix_requested']=requested_rotationdriftfix
         report['dockingrotation']=dockingrotation
+        report['trafficcontrol']=trafficcontrol
         report['competitionremove']=competitionremove
         report['competitionremove_requested']=requested_competitionremove
         report['tapfile']=tapfile
@@ -188,11 +190,12 @@ def main():
     p.add_argument('--competitionremove',choices=['no','yes'],default='no',help='remove the post-save competition security number; forced to yes by rotationdriftfix=yes (default: no)')
     p.add_argument('--rotationdriftfix',choices=['no','yes'],default='no',help='prevent position drift under reversed roll/pitch; automatically enable competitionremove=yes (default: no)')
     p.add_argument('--dockingrotation',choices=['no','yes'],default='no',help='require roll alignment with the docking slot; automatically enable rotationdriftfix and competitionremove (default: no)')
+    p.add_argument('--trafficcontrol',choices=['no','yes'],default='no',help='suppress station traders inside a 1024-unit Chebyshev box while S is lit; police unchanged (default: no)')
     p.add_argument('--verify',choices=['yes','no'],default='yes',help='exact original-byte comparison (default: yes); structural checks always run')
     # Also accept make.bat ship=adder laser=single verify=no.
     arguments=[]
     for value in sys.argv[1:]:
-        if value.startswith(('ship=','laser=','font=','scannerpixelfix=','stationrandomlaunchfix=','stationslotfix=','fuelfix=','hyperspacedockingfix=','aicouragefix=','scannerblipfix=','stardustfix=','missiletargetfix=','textfullstopfix=','iffunit=','randomizedspawn=','rotationdriftfix=','competitionremove=','dockingrotation=','verify=','tapfile=')):
+        if value.startswith(('ship=','laser=','font=','scannerpixelfix=','stationrandomlaunchfix=','stationslotfix=','fuelfix=','hyperspacedockingfix=','aicouragefix=','scannerblipfix=','stardustfix=','missiletargetfix=','textfullstopfix=','iffunit=','randomizedspawn=','rotationdriftfix=','competitionremove=','dockingrotation=','trafficcontrol=','verify=','tapfile=')):
             key,setting=value.split('=',1)
             arguments += ['--'+key,setting]
         else:
@@ -200,7 +203,7 @@ def main():
     args=p.parse_args(arguments)
     try:
         if args.verify_only: verify(output=release_tap(args.tapfile),exact=args.verify=='yes')
-        else: assemble(args.ship,args.verify=='yes',args.laser,args.font,args.scannerpixelfix,args.stationrandomlaunchfix,args.tapfile,args.stationslotfix,args.fuelfix,args.hyperspacedockingfix,args.aicouragefix,args.scannerblipfix,args.stardustfix,args.missiletargetfix,args.textfullstopfix,args.iffunit,args.randomizedspawn,args.rotationdriftfix,args.competitionremove,args.dockingrotation)
+        else: assemble(args.ship,args.verify=='yes',args.laser,args.font,args.scannerpixelfix,args.stationrandomlaunchfix,args.tapfile,args.stationslotfix,args.fuelfix,args.hyperspacedockingfix,args.aicouragefix,args.scannerblipfix,args.stardustfix,args.missiletargetfix,args.textfullstopfix,args.iffunit,args.randomizedspawn,args.rotationdriftfix,args.competitionremove,args.dockingrotation,args.trafficcontrol)
     except (OSError,ValueError,KeyError,subprocess.SubprocessError) as ex:
         (BUILD/'verification.json').unlink(missing_ok=True)
         print('ERROR: '+str(ex),file=sys.stderr);return 1

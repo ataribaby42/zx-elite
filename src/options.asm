@@ -275,3 +275,21 @@ assert !ROTATION_DRIFT_FIX || COMPETITION_REMOVE
 IF COMPETITION_REMOVE
     INCLUDE "competition-remove.asm"
 ENDIF
+
+IFNDEF TRAFFIC_CONTROL
+    defc TRAFFIC_CONTROL = 0
+ENDIF
+assert TRAFFIC_CONTROL = 0 || TRAFFIC_CONTROL = 1
+; Four disjoint original regions: trader hook, shared proximity code and two
+; unreferenced fragments. The compact proximity test retains all caller results.
+defc TrafficControlHookStart = $F871
+defc TrafficControlHookLimit = $F876
+defc TrafficControlProximityStart = $F882
+defc TrafficControlProximityLimit = $F8A2
+defc TrafficControlXYStart = $7818
+defc TrafficControlXYLimit = $781F
+defc TrafficControlZStart = $91CC
+defc TrafficControlZLimit = $91D2
+IF TRAFFIC_CONTROL
+    INCLUDE "traffic-control.asm"
+ENDIF

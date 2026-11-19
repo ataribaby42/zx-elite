@@ -1853,10 +1853,16 @@ L_7813:
 ; No static, pointer or runtime reference was found; decoded because its JR
 ; lands on a verified instruction and it ends exactly at ArmExpandingSun.
 L_7818:
+assert $-GameImage = TrafficControlXYStart-GameLoadAddress
+IF TRAFFIC_CONTROL
+    TrafficControlXYCode
+ELSE
     LD A,(CloakingDeviceActive)                ; $7818: 3A 0C A8
     AND A                                      ; $781B: A7
     JR NZ,L_7806                               ; $781C: 20 E8
     RET                                        ; $781E: C9
+ENDIF
+assert $-GameImage = TrafficControlXYLimit-GameLoadAddress
 
 ; VERIFIED: Called at launch.  If commander byte NovaMissionActive is set: ExpandingSunActive = 1, which
 ; enables UpdateExpandingSun, and the view is coloured red (FillViewAttributes, L=2).
@@ -7466,9 +7472,15 @@ ELSE
 ENDIF
 assert $-GameImage = IffBombVectorLimit-GameLoadAddress
 L_91CC:
+assert $-GameImage = TrafficControlZStart-GameLoadAddress
+IF TRAFFIC_CONTROL
+    TrafficControlZCode
+ELSE
     JP FlashViewAttributes                     ; $91CC: C3 80 92
 L_91CF:
     JP FillViewAttributes                      ; $91CF: C3 87 92
+ENDIF
+assert $-GameImage = TrafficControlZLimit-GameLoadAddress
 
 ; VERIFIED: Four 8x8 glyphs (32 bytes): small disc, large disc, small disc, large disc.
 ; DrawShortRangeSystemMarker selects one with DE = this + (GeneratorSeed2High AND $18) and XORs it into the screen with a
@@ -22116,9 +22128,15 @@ TryLaunchStationTraffic:
 ; VERIFIED: Continue with the station gate RNG result in A: only values 0 and 1 permit a trader.
 ; Event $24 means parent-launch event 4, subtype 2; it is not a ship ID.
 TryLaunchStationTrader:
+assert $-GameImage = TrafficControlHookStart-GameLoadAddress
+IF TRAFFIC_CONTROL
+    TrafficControlHookCode
+ELSE
     CP $02                                     ; $F871: FE 02  only results 0 and 1
     RET NC                                     ; $F873: D0
     LD A,$24                                   ; $F874: 3E 24  event $24: subtype 2 (trader)
+ENDIF
+assert $-GameImage = TrafficControlHookLimit-GameLoadAddress
 
 ; VERIFIED: Dispatch the event in A while saving/restoring parent IX and IY.
 ; POP does not change flags, so the event success/failure result reaches the caller.
@@ -22134,6 +22152,10 @@ DispatchShipEventPreservingParent:
 ; magnitudes at +0/+1, +3/+4, +6/+7; the sign/high bytes +2/+5/+8 are ignored).  NC as
 ; soon as one axis is outside.  Clobbers HL, D (+2), flags.
 CheckShipProximity:
+assert $-GameImage = TrafficControlProximityStart-GameLoadAddress
+IF TRAFFIC_CONTROL
+    TrafficControlProximityCode
+ELSE
     LD H,(IX+$01)                              ; $F882: DD 66 01  |x| (16-bit magnitude)
     LD L,(IX+$00)                              ; $F885: DD 6E 00
     AND A                                      ; $F888: A7
@@ -22151,6 +22173,8 @@ CheckShipProximity:
     AND A                                      ; $F89E: A7
     SBC HL,DE                                  ; $F89F: ED 52  carry: inside the box
     RET                                        ; $F8A1: C9
+ENDIF
+assert $-GameImage = TrafficControlProximityLimit-GameLoadAddress
 
 ; VERIFIED: For instance +$21 bit 1, set hostility bit 2 when PlayerLegalScore >= 40 ($28).
 ; Only Viper and Fer-de-Lance blueprints initially carry bit 1.

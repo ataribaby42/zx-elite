@@ -20,7 +20,7 @@ Default mode uses single-option builds and a pairwise covering array:
    must fail even with identity checks off.
 
 --full builds the complete product of all values instead of step 4's
-selection (524,288 requested combinations). Use it after changing the
+selection (1,048,576 requested combinations). Use it after changing the
 build machinery itself.
 """
 import argparse
@@ -52,6 +52,7 @@ OPTIONS = (
     ('competitionremove', ('no', 'yes')),
     ('rotationdriftfix', ('no', 'yes')),
     ('dockingrotation', ('no', 'yes')),
+    ('trafficcontrol', ('no', 'yes')),
 )
 NAMES = tuple(name for name, _ in OPTIONS)
 DEFAULT = tuple(values[0] for _, values in OPTIONS)
@@ -61,6 +62,8 @@ FINAL = ('adder', 'single', '48') + ALL_FIXES
 # Areas a fix replaces: Start/Limit constant prefixes in src/options.asm, with the
 # original addresses they must keep.
 FIX_PARTS = {
+    'trafficcontrol': (('TrafficControlHook', 'TrafficControlProximity', 'TrafficControlXY', 'TrafficControlZ'),
+                       [(0xF871, 0xF876), (0xF882, 0xF8A2), (0x7818, 0x781F), (0x91CC, 0x91D2)]),
     'competitionremove': (('CompetitionSecurity', 'CompetitionParity'), [(0xD386, 0xD3E2), (0xD3F0, 0xD3FF)]),
     'rotationdriftfix': (('CompetitionSecurity', 'CompetitionParity', 'RotationDriftRotation', 'RotationDriftProduct',
                         'RotationDriftHighMultiply', 'RotationDriftMidMultiply', 'RotationDriftLowMultiply'),
@@ -189,6 +192,7 @@ def main():
         assert built['COMPETITION_REMOVE'] == int(effective_values(row)['competitionremove'] == 'yes')
         assert built['ROTATION_DRIFT_FIX'] == int(effective_values(row)['rotationdriftfix'] == 'yes')
         assert built['DOCKING_ROTATION'] == int(effective_values(row)['dockingrotation'] == 'yes')
+        assert built['TRAFFIC_CONTROL'] == int(effective_values(row)['trafficcontrol'] == 'yes')
         return RELEASE_TAP.read_bytes()
 
     # 1. Defaults.

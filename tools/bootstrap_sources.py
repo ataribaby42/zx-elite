@@ -317,6 +317,10 @@ def emit_graphics(region, memory, labels, payload, provenance=None):
 # assembled only in the ELSE branch, so labels inside them exist only when the
 # option is off (except names that the replacement defines as well).
 OPTIONAL_REGIONS = [
+    (0xF871, 0xF876, 'TRAFFIC_CONTROL'),
+    (0xF882, 0xF8A2, 'TRAFFIC_CONTROL'),
+    (0x7818, 0x781F, 'TRAFFIC_CONTROL'),
+    (0x91CC, 0x91D2, 'TRAFFIC_CONTROL'),
     (0xDF64, 0xDF67, 'ROTATION_DRIFT_FIX'),
     (0xDF6B, 0xDF6E, 'ROTATION_DRIFT_FIX'),
     (0xDF78, 0xDF7B, 'ROTATION_DRIFT_FIX'),
@@ -363,6 +367,10 @@ OPTIONAL_REGIONS = [
 # Options made of several parts: region start -> (macro or instruction, comment, limit
 # constant in src/options.asm; the start constant has Start in place of Limit).
 OPTION_PARTS = {
+    0xF871: ('TrafficControlHookCode', None, 'TrafficControlHookLimit'),
+    0xF882: ('TrafficControlProximityCode', None, 'TrafficControlProximityLimit'),
+    0x7818: ('TrafficControlXYCode', None, 'TrafficControlXYLimit'),
+    0x91CC: ('TrafficControlZCode', None, 'TrafficControlZLimit'),
     0xEB0A: ('DockingRotationHookCode', None, 'DockingRotationHookLimit'),
     0xDF64: ('CALL RotationDriftMultiply', None, 'RotationDriftHighMultiplyLimit'),
     0xDF6B: ('CALL RotationDriftMultiply', None, 'RotationDriftMidMultiplyLimit'),

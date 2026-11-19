@@ -1268,8 +1268,8 @@ Every area below is free for three independent reasons:
 | `$B31B..$B32A` | 16 | Dormant attribute-fill routine |
 | `$9A3A..$9A45` | 12 | Bytes after `DustPlotList` |
 | `$BDF5..$BDFF` | 11 | Zero padding before the page-aligned square tables (used by `textfullstopfix=yes`) |
-| `$91C9..$91D1` | 9 | Three unreferenced `JP` instructions (`iffunit=yes` retargets the first) |
-| `$7818..$781E` | 7 | Unreferenced cloak-colour test |
+| `$91C9..$91D1` | 9 | Three unreferenced `JP` instructions (`iffunit=yes` retargets the first; `trafficcontrol=yes` uses the other two) |
+| `$7818..$781E` | 7 | Unreferenced cloak-colour test (used by `trafficcontrol=yes`) |
 | `$780F..$7812` | 4 | Unreferenced code that falls into the used `L_7813` |
 | `$A897..$A899` | 3 | Dormant `JP` vector (`$A89A` is the live `MissileTarget`) |
 | `$FF53..$FF55` | 3 | `UnusedSelectInterruptMode1` (`IM 1`, `RET`), never called |
@@ -1406,12 +1406,12 @@ pairwise combinations and all eight dependency states. It checks the following:
   are rejected even with identity disabled.
 
 `python tools/check_build_options.py --full` builds the complete product of
-all values instead of the selected combinations: 524,288 requested combinations, several
+all values instead of the selected combinations: 1,048,576 requested combinations, several
 hours. Use it after changing the build machinery itself. Either mode leaves
 Adder with `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
 stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
 scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes
-iffunit=yes randomizedspawn=yes competitionremove=yes rotationdriftfix=yes dockingrotation=yes` built. A new option must be added to `OPTIONS`, and a new
+iffunit=yes randomizedspawn=yes competitionremove=yes rotationdriftfix=yes dockingrotation=yes trafficcontrol=yes` built. A new option must be added to `OPTIONS`, and a new
 fix's areas to `FIX_PARTS`, in that tool.
 
 The ship check compares all other models with the original bytes, resolves
@@ -1546,3 +1546,15 @@ orientation. It uses 18 of the 19 rotation-padding bytes and therefore enables
 alignment uses the original scrape damage; the docking computer is unaffected.
 Only one byte remains in those gaps. See [Docking roll alignment](DOCKING-ROTATION.md)
 for the ZX geometry, threshold, storage and regression tests.
+
+
+## Near-station traffic control
+
+`trafficcontrol=yes` suppresses random station traders while S is lit and
+`max(abs(x), abs(y), abs(z)) < 1024`, measured from the station centre.
+Police Vipers and special launches are unchanged. The option is independent
+of other features, including `stationrandomlaunchfix`, and defaults to `no`.
+It consumes 13 previously free bytes and shortens the shared AI proximity
+check for its existing callers; no additional RAM is allocated. See
+[Station traffic control](TRAFFIC-CONTROL.md) for the exact boundary,
+active-station invariant, storage, timings and targeted emulator checks.

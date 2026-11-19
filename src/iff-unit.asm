@@ -33,7 +33,8 @@
 ;   IffShipCode                   $DAC1..$DAD7  (23 B, the energy bomb test)
 ;   IffObjectsTailCode            $DBC8..$DBD4  (13 B, end of UpdateObjects)
 ;   defb $00,$00                  $FF72..$FF73  (KeyActionTable: W has no action, as Z and V)
-; FlashViewAttributes stays: the unreferenced vector at L_91CC still jumps to it.
+; FlashViewAttributes stays. trafficcontrol=yes may reuse the unreferenced
+; vectors at L_91CC/L_91CF; otherwise they retain their original targets.
 
 defc IffUnitFitted = EnergyBombFitted   ; commander +$36, equipment item 9
 defc IffBlinkHiddenPhase = $02          ; IffBlinkClock bit 1 set: threats not drawn

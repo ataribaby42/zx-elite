@@ -63,6 +63,7 @@ For command-line options, run `make.bat` directly. It forwards arguments to
 | `competitionremove` | `no`, `yes` | `no` | Remove the post-save competition security number without changing motion or the commander record. Forced to `yes` by `rotationdriftfix=yes`, even if explicitly set to `no`. See [competition removal](docs/COMPETITION-REMOVE.md). |
 | `rotationdriftfix` | `no`, `yes` | `no` | Prevent roll/pitch reversal drift of planet, sun and object positions; automatically enable `competitionremove=yes` and reuse the reclaimed code. See [rotation drift fix](docs/ROTATION-DRIFT-FIX.md). |
 | `dockingrotation` | `no`, `yes` | `no` | Require the docking slot to be approximately horizontal for manual docking, including upside-down alignment; otherwise apply the original scrape damage. Automatically enable `rotationdriftfix=yes` and therefore `competitionremove=yes`, overriding explicit `no`. See [docking rotation](docs/DOCKING-ROTATION.md). |
+| `trafficcontrol` | `no`, `yes` | `no` | Suppress random Cobra/Python station launches while S is lit and Chebyshev distance to the station centre is less than 1024 units. Police and special launches are unchanged; no dependencies or extra RAM. See [traffic control](docs/TRAFFIC-CONTROL.md). |
 | `verify` | `yes`, `no` | `yes` | `yes` requires byte-for-byte identity with the original TAP. `no` allows modified game bytes; TAP structure, metadata, checksums and assembler memory bounds remain mandatory. |
 | `tapfile` | A plain filename ending in `.tap` | `elite-128k.tap` | Names the output file inside `release/`. No directory paths are accepted. Quote an argument containing spaces, such as `"tapfile=My Elite.tap"`. Internal TAP headers are unchanged. |
 
@@ -212,12 +213,14 @@ assembled payloads; game origin and entry are checked against the linker map.
 | `src/competition-remove.asm` | Optional removal of the post-save security number; reclaimed space can host rotation helpers |
 | `src/rotation-drift-fix.asm` | Optional reversible position rotations and exact coordinate products, using security-number space |
 | `src/docking-rotation.asm` | Optional manual docking roll check; 18 bytes in the rotation fix's existing padding |
+| `src/traffic-control.asm` | Optional near-station trader suppression; 13 unused bytes and a compact equivalent of the existing AI proximity test |
+| `tools/check_traffic_control.py` | Chebyshev boundaries, every RNG seed, police, full allocation, equivalent proximity/steering and optional 48K ROM-load checks |
 | `tools/check_randomized_spawn.py` | The ship loader for every blueprint against the original and a model, every encounter for all 65,536 RNG states in each government, and an optional 48K ROM-load run |
 | `tools/check_competition_remove.py` | Standalone removal, original motion, save record and restart snapshot on success/BREAK; shared save checks |
 | `tools/check_rotation_drift_fix.py` | Coordinate arithmetic, inverse rotations, long drift runs, save success/BREAK and 48K ROM-load side-view regression |
 | `tools/check_docking_rotation.py` | All roll bytes, 360 angles in four views, original rejection paths, other contacts, docking computer and 48K ROM-load approaches |
 | `tools/benchmark_rotation_drift.py` | 48K rotation and complete-frame timing; optional previous-image comparison of exact outputs and stack use |
-| `tools/check_build_options.py` | Every option value alone, independent-area disjointness and the competition/rotation/docking dependencies, pairwise combinations, all eight dependency states and every option on at once, both verification modes and invalid TAP checks; `--full` builds all 524,288 requested combinations |
+| `tools/check_build_options.py` | Every option value alone, independent-area disjointness and the competition/rotation/docking dependencies, pairwise combinations, all eight dependency states and every option on at once, both verification modes and invalid TAP checks; `--full` builds all 1,048,576 requested combinations |
 | `tools/check_scanner_pixel_fix.py` | Exhaustive pixel preservation, indicator/missile comparison and 48K first-launch test |
 | `tools/check_laser_variant.py` | Actual laser/line rendering, endpoint randomisation and stack checks |
 | `tools/render_cockpit.py` | Monochrome and initial-attribute cockpit renderings |
