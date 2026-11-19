@@ -18,6 +18,10 @@ run `make.bat` directly for command-line options. The Python helper's defaults
 remain Krait, original laser, 128K-compatible font, all fixes disabled and
 strict verification.
 
+After every `make.bat` call, `build.bat` checks its return code and stops on
+failure, preserving that code. A later successful build cannot mask an earlier
+failure. The explicit option lines, REM examples and their ordering are kept.
+
 Build the byte-identical Krait reconstruction independently of `build.bat` settings:
 
 ```bat
@@ -49,6 +53,12 @@ accept `no` (default) or `yes`.
 its command-line overrides. No modification silently weakens verification: select
 `verify=no` explicitly. Modified builds with `verify=yes` correctly fail the
 original-byte comparison and leave no release TAP.
+
+`verify.bat` always records the filename it checked in `build/verification.json`.
+It preserves the last build's selected/requested options only if that filename
+and the verified SHA256 match the previous report. A replaced or differently
+named TAP receives fresh verification facts without stale build settings.
+A failed verification removes the previous success report.
 
 Single centred laser, alone or combined with Adder:
 
@@ -468,13 +478,17 @@ original 19 bytes restored from the reference tape, and checks the following:
 
 `--emulator` loads `release/elite-128k.tap` through the 48K ROM. After a
 launch, test-only pokes put a hostile Python, created by
-`InitialiseShipFromBlueprint`, straight ahead. They also make the station
-dormant far away, so that the AI decides by courage. The player then holds
-fire for 17 seconds. The fixed build ends with the Python fleeing at `$86`
-(courage 6) with full acceleration. The original build in the same run ends
-at `$E4`: fleeing, but with courage 100 after the wrap, and its course departs
-from the fixed one as it turns back. Build the option with the default
-tapfile for this mode. Reports are in `build/ai-courage-fix-check/`.
+`InitialiseShipFromBlueprint`, `$4000` straight ahead, stop the player's motion
+and make the station dormant far away. The test executes complete game updates
+with real interrupts and the fire key, recording damaging hits. Every observed
+position must remain outside even the larger proximity-avoidance box, so the AI
+decides by courage. After at least two hits while fleeing, the fixed Python must
+retain `$86` (courage 6) and acceleration 2. The run has a 256-update bound.
+A private negative control restores only the original hit code and executes the
+same number of updates; its courage must wrap. This replaces the old fixed-time
+snapshot, which could catch proximity avoidance when other options were enabled.
+Build the option with the default tapfile for this mode. Reports are in
+`build/ai-courage-fix-check/`.
 
 ## Scanner contact fix
 
@@ -855,7 +869,9 @@ without the option.
 
 `tools/check_iff_unit.py` compares the assembled image with a baseline whose
 eight parts are restored from the reference tape, using the supplied 48K ROM
-in SkoolKit's simulator. The baseline must equal the reference image.
+in SkoolKit's simulator. With no other options selected, the baseline must
+equal the reference image. Combined builds retain the other options in both
+images; the shared option registry includes `trafficcontrol`.
 
 - All 306 changed bytes lie inside the eight parts.
 - `PrintToken`, run for all 146 dictionary codes, prints every token as the
@@ -880,10 +896,12 @@ in SkoolKit's simulator. The baseline must equal the reference image.
 - docked, it buys item 9 ("9 I.F.F. Unit 900.0") and shows I.F.F. Unit on the
   status screen;
 - in flight, test-only pokes put a pirate ahead and move the station off the
-  scanner, and `ScannerContactsDrawn` is sampled at every frame interrupt. The
-  pirate's contact was dark in 125 of 251 samples with 14 changes. Without the
-  unit 4 samples were dark (the moment between restoring the scanner
-  background and redrawing it), and with a trader instead 0;
+  scanner, and `ScannerContactsDrawn` is sampled after completed game updates.
+  Every sample must match the two-lit/two-dark blink phase; an unfitted ship or
+  a calm trader must stay visible in every sample. Interrupts still drive input,
+  but a sample cannot land between restoring the background and redrawing the
+  contacts. A private negative control restores the original IFF regions and
+  must keep the pirate visible throughout the same sampling window;
 - W in flight leaves the pirate and the unit in place; on the reference tape
   the same W uses the energy bomb and destroys the pirate. That run uses the
   option build's addresses, which the layout check proves identical outside
@@ -1404,6 +1422,13 @@ pairwise combinations and all eight dependency states. It checks the following:
 - Invalid values of every option are rejected, as is strict `--verify-only`.
   Damaged checksums, invalid metadata with a valid XOR and truncated TAP data
   are rejected even with identity disabled.
+- On Windows, the real `build.bat` is run with a controlled `make.bat` stub.
+  Successful runs execute every requested build; failures in the first, middle
+  and final calls stop immediately and preserve a nonzero error code.
+- Verify-only retains metadata for the same custom TAP, discards settings for
+  renamed/replaced payloads, accepts missing or malformed previous reports and
+  removes the report on verification failure. Every successful report names
+  the file actually checked.
 
 `python tools/check_build_options.py --full` builds the complete product of
 all values instead of the selected combinations: 1,048,576 requested combinations, several

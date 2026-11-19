@@ -19,17 +19,16 @@ ApplyPlayerLaserHit restored from the reference tape:
   ship keeps fleeing after its first flight and never fires again, while the
   original ship turns back at hits 10 and 19.
 
---emulator loads release/elite-128k.tap through the 48K ROM.  After a launch,
-test-only pokes put a hostile Python straight ahead and move the station far
-away (dormant), so that the AI decides by courage; the player then holds fire.
-The hit Python must flee at courage 6 with full acceleration.  The original
-build in the same run ends at $E4: fleeing, but with courage 100 after the
-wrap.  Build the option with the default tapfile for this mode.
+--emulator loads release/elite-128k.tap through the 48K ROM. After a launch,
+test-only pokes put a hostile Python $4000 ahead and move the station far
+away (dormant). Complete game updates run with interrupts and the fire key.
+The Python must stay outside proximity avoidance, survive at least two hits
+while fleeing and retain courage 6 with full acceleration. A negative control
+restores the original hit code and runs the same number of game updates; its
+courage must wrap. Build the option with the default tapfile for this mode.
 """
 import argparse
 import json
-import subprocess
-import sys
 
 from tape import ROOT, RELEASE_TAP, parse, reference, sha
 from build import symbol_map
@@ -162,37 +161,79 @@ class Checker:
 
 
 def emulator(symbols):
-    """Open-space fight: a hostile Python created by InitialiseShipFromBlueprint is poked into
-    slot 1 straight ahead, the station is made dormant and moved far away (test-only pokes,
-    so that the AI decides by courage), and the player holds fire for 17 seconds."""
-    import run_runtime_scenarios as rs
+    """ROM-load, then observe real laser hits in complete, interruptible game updates."""
+    import benchmark_rotation_drift as bench
     image = (ROOT / 'build/game.bin').read_bytes()
-    assert bytes(parse(RELEASE_TAP.read_bytes())[5].payload) == image,         'Build the option with the default tapfile first'
+    assert bytes(parse(RELEASE_TAP.read_bytes())[5].payload) == image, \
+        'Build the option with the default tapfile first'
+    old_out = bench.OUT
+    bench.OUT = OUTPUT / 'emulator'
+    bench.OUT.mkdir(parents=True, exist_ok=True)
+    try:
+        memory, registers = bench.boot(symbols)
+    finally:
+        bench.OUT = old_out
     station, size = symbols['InitialRuntimeState'], symbols['InstanceSize']
     slot = station + size
     m = cr.ImageContext(symbols, image).machine()
+    m.memory[:] = memory
+    for index in range(symbols['InstanceSlotCount']):
+        m.poke(station + index * size + ENERGY, 0)
     m.call('InitialiseShipFromBlueprint', **dict(cr.FRESH_REGISTERS, a=PYTHON, ix=slot))
-    ship = bytearray(m.memory[slot:slot + size])
-    ship[0:9] = bytes([0, 0, 0, 0, 0, 0, 0, 0x08, 0])          # x = y = 0, z = $0800 ahead
-    ship[BEHAVIOUR] |= 4                                      # hostile
-    far = bytes([0, 0, 0, 0, 0, 0, 0, 0, 0x85])               # station at z = -$050000
-    args = [*rs.started(34), *rs.key(8, 0.4, '1'),
-            *rs.poke(16, f'{slot:#06x}', ship.hex()), *rs.poke(16, f'{station:#06x}', far.hex()),
-            *rs.poke(16, f'{station + ENERGY:#06x}', '00'),
-            *rs.poke(16, f"{symbols['StationDormantFlag']:#06x}", 'ff'), *rs.key(17, 16.5, 'A')]
-    name = 'ai-courage-python'
-    subprocess.run([sys.executable, str(rs.CHECKER), *args, '--name', name, '--no-screenshots'],
-                   cwd=ROOT, check=True, capture_output=True, text=True)
-    report = json.loads((ROOT / f'build/emulator/{name}.json').read_text())
-    memory = (ROOT / f'build/emulator/{name}-memory.bin').read_bytes()
-    assert report['machine'] == 'ZX Spectrum 48K' and all(p['applied'] for p in report['test_pokes'])
-    assert symbols['AiCourageHitStart'] in set(report['execution_map']), 'no damaging hit'
-    value = memory[slot + AI_STATE]
-    assert memory[slot + ENERGY] and memory[symbols['StationDormantFlag']] == 0xFF
-    assert value == FLEEING | 6 and memory[slot + 0x1C] == 2, f'${value:02X}'
-    print(f'PASS: 48K emulator open-space fight: the hit Python flees with +$25 ${value:02X} '
-          '(courage held at 6) and full acceleration.', flush=True)
-    return dict(ai_state=value, energy=memory[slot + ENERGY], acceleration=memory[slot + 0x1C])
+    for axis, value in enumerate((0, 0, 0x4000)):
+        cr.put24(m.memory, slot + axis * 3, value)
+    cr.put24(m.memory, station + 6, -0x50000)
+    m.poke('StationDormantFlag', 255)
+    m.poke('PlayerSpeed', 0)
+    m.poke('PlayerRoll', 0)
+    m.poke('PlayerPitch', 0)
+    m.poke('ControlsLockedFlag', 1)
+    m.poke(slot + AI_STATE, 0x7E)
+    m.poke(slot + BEHAVIOUR, m.byte(slot + BEHAVIOUR) | 4)
+    start_memory = list(m.memory)
+    part = symbols['AiCourageHitStart'], symbols['AiCourageHitLimit']
+    reference_image = reference()[1][5].payload
+    results = {}
+    update_limit = 256
+    for variant in ('fixed', 'original'):
+        sim = bench.clone(start_memory, registers)
+        if variant == 'original':
+            a, b = part
+            sim.memory[a:b] = reference_image[a-symbols['GameImage']:b-symbols['GameImage']]
+        hits, hits_while_fleeing = [], 0
+        for update in range(update_limit):
+            before_energy = sim.memory[slot + ENERGY]
+            executed = set()
+            bench.main_loop_frame(sim, symbols, keys=('A',), executed=executed)
+            point = [cr.get24(sim.memory, slot + axis * 3) for axis in range(3)]
+            # Courage must decide the turn: no active station, and outside even
+            # the larger avoidance box (x/y < $0A00, z < $0C00).
+            assert sim.memory[station + ENERGY] == 0
+            assert abs(point[0]) >= 0xA00 or abs(point[1]) >= 0xA00 or abs(point[2]) >= 0xC00, point
+            assert sim.memory[slot + ENERGY], (variant, 'Python destroyed', hits)
+            value = sim.memory[slot + AI_STATE]
+            if part[0] in executed:
+                assert sim.memory[slot + ENERGY] < before_energy, 'hit must damage the test Python'
+                hits.append(value)
+                # Object AI precedes the player's laser in MainLoop, and both
+                # hit routines preserve bit 7. The post-hit flag also counts a
+                # ship that began fleeing during this very update.
+                hits_while_fleeing += bool(value & FLEEING)
+            if (variant == 'fixed' and hits_while_fleeing >= 2 and value == FLEEING | 6
+                    and sim.memory[slot + 0x1C] == 2):
+                update_limit = update + 1  # identical game-update count for the negative control
+                break
+        results[variant] = dict(updates=update + 1, hit_states=hits,
+                                hits_while_fleeing=hits_while_fleeing, ai_state=value,
+                                energy=sim.memory[slot + ENERGY], acceleration=sim.memory[slot + 0x1C])
+    fixed, original = results['fixed'], results['original']
+    assert fixed['hits_while_fleeing'] >= 2 and fixed['ai_state'] == FLEEING | 6, results
+    assert fixed['acceleration'] == 2 and fixed['hit_states'][-2:] == [FLEEING | 6] * 2, results
+    assert original['hits_while_fleeing'] >= 2 and original['ai_state'] & 0x7F > 6, results
+    print('PASS: 48K ROM-load fight, complete game updates outside proximity avoidance: '
+          f"fixed Python stays at $86 after {len(fixed['hit_states'])} hits; "
+          f"restoring the original hit code gives ${original['ai_state']:02X}.", flush=True)
+    return results
 
 
 def main():

@@ -30,8 +30,8 @@ supplied 48K ROM in SkoolKit's Z80 simulator:
 --emulator loads release/elite-128k.tap through the 48K ROM (build the option
 with the default tapfile).  A docked run buys item 9 and shows I.F.F. UNIT in
 the equipment list and on the status screen.  Flight runs put a pirate or a
-trader near the player with test-only pokes and sample ScannerContactsDrawn at
-every frame interrupt: with the unit fitted the pirate's contact blinks, the
+trader near the player with test-only pokes and sample ScannerContactsDrawn after
+completed game updates: with the unit fitted the pirate's contact blinks, the
 trader's does not, and without the unit nothing blinks.  W then leaves the
 pirate alive, while the reference tape's energy bomb destroys it.  The
 reference tape run uses the option build's symbol addresses, which the layout
@@ -51,13 +51,15 @@ stack:
 - the player's missile at a trader, which makes every object hostile.
 """
 import argparse
+import contextlib
+import io
 import json
 import os
 import random
 import subprocess
 import sys
 
-from tape import ROOT, REFERENCE, RELEASE_TAP, parse, reference, sha
+from tape import ROOT, REFERENCE, RELEASE_TAP, frame as tape_frame, parse, reference, sha
 from build import symbol_map
 import check_routines as cr
 from text_codec import TextCodec
@@ -426,7 +428,7 @@ def flight_pokes(checker, blueprint, fitted):
 
 
 def run_flight(checker, tap, name, pokes, keys, seconds, sample_from, stop_at=None):
-    """ROM load of tap in ZX Spectrum 48K mode, launch, pokes at 12 s; sample every frame interrupt.
+    """ROM load in ZX Spectrum 48K, launch, pokes at 12 s; sample completed game updates.
 
     Contacts appear only after the launch sequence, so samples start later (sample_from).
     With stop_at the run continues after `seconds` until the PC reaches that address."""
@@ -466,15 +468,24 @@ def run_flight(checker, tap, name, pokes, keys, seconds, sample_from, stop_at=No
             for address, data in pokes:
                 sim.memory[address:address + len(data)] = data
             applied[0] = True
-        if elapsed >= sample_from:
-            drawn = sim.memory[s['ScannerContactsDrawn']]
-            samples.append((drawn, sim.memory[s['IffBlinkClock']] if 'IffBlinkClock' in s else 0,
-                            sum(bin(sim.memory[a]).count('1') for a in scanner)))
-            if drawn not in shots:
-                shots[drawn] = bytes(sim.memory[0x4000:0x5B00])
         return True
 
-    trace.run(s['Entry'], None, 0, int(seconds * 3500000), True, frame, set(), None, None, '$', '02X', '04X')
+    # Input and test pokes still follow real interrupts. Observe contacts only
+    # after a complete MainLoop: an interrupt can arrive between erasing the
+    # scanner background and drawing the contacts and is not a blink sample.
+    trace.run(s['Entry'], None, 0, int(min(seconds, sample_from) * 3500000), True,
+              frame, set(), None, None, '$', '02X', '04X')
+    while sim.registers[T] - start < seconds * 3500000:
+        with contextlib.redirect_stdout(io.StringIO()):
+            trace.run(sim.registers[PC], s['MainLoop'], 0, FRAME_LOOP_LIMIT, True,
+                      frame, set(), None, None, '$', '02X', '04X')
+        assert sim.registers[PC] == s['MainLoop'], ('game-update timeout', hex(sim.registers[PC]))
+        assert not sim.memory[s['PlayerDeadFlag']]
+        drawn = sim.memory[s['ScannerContactsDrawn']]
+        samples.append((drawn, sim.memory[s['IffBlinkClock']] if 'IffBlinkClock' in s else 0,
+                        sum(bin(sim.memory[a]).count('1') for a in scanner)))
+        if drawn not in shots:
+            shots[drawn] = bytes(sim.memory[0x4000:0x5B00])
     if stop_at is not None:
         trace.run(sim.registers[PC], stop_at, 0, FRAME_LOOP_LIMIT, True, frame, set(), None, None,
                   '$', '02X', '04X')
@@ -486,6 +497,7 @@ def run_flight(checker, tap, name, pokes, keys, seconds, sample_from, stop_at=No
 
 
 def blink_summary(samples):
+    assert samples, 'no completed game updates sampled'
     lit = [drawn for drawn, _, _ in samples]
     changes = sum(1 for a, b in zip(lit, lit[1:]) if a != b)
     return dict(samples=len(lit), dark=lit.count(0), changes=changes,
@@ -501,16 +513,32 @@ def emulator_flight(checker):
                                     ('trader-iff', COBRA_TRADER, FITTED)):
         samples, _ = run_flight(checker, RELEASE_TAP, f'iff-unit-{name}', flight_pokes(checker, blueprint, fitted),
                                 [], 19.5, 14.5)
+        # The clock advances once after the scanner draw: its previous bit 1
+        # selects the two-lit/two-dark phase. Calm/unfitted contacts never hide.
+        for drawn, clock, _ in samples:
+            expected = not ((clock - 1) & 2) if name == 'pirate-iff' else True
+            assert bool(drawn) == expected, (name, drawn, clock)
         results[name] = blink_summary(samples)
     blink, plain, trader = results['pirate-iff'], results['pirate-no-iff'], results['trader-iff']
     assert 0.3 <= blink['dark'] / blink['samples'] <= 0.7 and blink['changes'] >= 10, blink
     assert blink['clock_ticks'] >= 20, blink
     for other in (plain, trader):
-        assert other['dark'] <= other['samples'] // 20, other
+        assert other['dark'] == 0, other
     print(f'PASS: 48K emulator flight: with the I.F.F. unit the pirate\'s scanner contact is dark in '
-          f'{blink["dark"]} of {blink["samples"]} frame samples ({blink["changes"]} changes, '
+          f'{blink["dark"]} of {blink["samples"]} completed updates ({blink["changes"]} changes, '
           f'{blink["clock_ticks"]} cockpit frames); without the unit {plain["dark"]} and for a trader '
           f'{trader["dark"]} dark samples.', flush=True)
+
+    # Negative control: restoring the original IFF regions must leave the
+    # pirate visible throughout the same completed-update sampling window.
+    baseline_tap = OUTPUT / 'iff-unit-original.tap'
+    baseline_tap.write_bytes(b''.join(tape_frame(block.flag, checker.baseline if i == 5 else block.payload)
+                                    for i, block in enumerate(parse(RELEASE_TAP.read_bytes()))))
+    samples, _ = run_flight(checker, baseline_tap, 'iff-unit-original',
+                            flight_pokes(checker, COBRA_PIRATE, FITTED), [], 19.5, 14.5)
+    original = results['original'] = blink_summary(samples)
+    assert original['dark'] == 0 and original['changes'] == 0, original
+    print('PASS: original IFF regions restored: pirate visible in every completed update.', flush=True)
 
     # W: the option build keeps the pirate, the reference tape's energy bomb destroys it.  The
     # reference run needs the option build's addresses to be the reference's (no other option).

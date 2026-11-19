@@ -30,8 +30,15 @@ def check_source_includes(source, active=None):
     active.remove(source)
 
 def verify(output=OUTPUT, exact=True):
+    # Keep build settings only for the same named, byte-identical artifact.
+    # A report for a different/overwritten TAP must not lend it stale settings.
+    report_path = BUILD/'verification.json'
+    try:
+        previous = json.loads(report_path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        previous = {}
     # A failed verification must not leave a previous PASS report behind.
-    (BUILD/'verification.json').unlink(missing_ok=True)
+    report_path.unlink(missing_ok=True)
     rebuilt = output.read_bytes()
     blocks = parse(rebuilt)
     validate_pairs(blocks)
@@ -51,10 +58,15 @@ def verify(output=OUTPUT, exact=True):
     if exact and rebuilt != original:
         first = next((i for i,(a,b) in enumerate(zip(original,rebuilt)) if a!=b), min(len(original),len(rebuilt)))
         raise ValueError(f'Binary identity FAILED: first difference at TAP offset {first}; lengths {len(original)} / {len(rebuilt)}')
-    report = dict(structural_validation=True,identity_check='passed' if exact else 'disabled',
-                  binary_identical=True if exact else None,size=len(rebuilt),sha256=sha(rebuilt),blocks=describe(blocks))
+    digest = sha(rebuilt)
+    report = previous.copy() if (isinstance(previous, dict) and
+                                previous.get('tapfile') == output.name and
+                                previous.get('sha256') == digest) else {}
+    report.update(structural_validation=True,identity_check='passed' if exact else 'disabled',
+                  binary_identical=True if exact else None,size=len(rebuilt),sha256=digest,
+                  blocks=describe(blocks),tapfile=output.name)
     BUILD.mkdir(parents=True,exist_ok=True)
-    (BUILD/'verification.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+    report_path.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     print(f'PASS: all {len(blocks)} TAP blocks, metadata, lengths and checksums; {len(rebuilt):,} bytes.')
     print('Binary identity: '+('PASS (exact original bytes).' if exact else 'DISABLED (modified builds allowed).'))
     print('SHA256: '+sha(rebuilt))

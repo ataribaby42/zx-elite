@@ -26,6 +26,7 @@ build machinery itself.
 import argparse
 from itertools import combinations as pairs_of, product
 import json
+import os
 import subprocess
 import sys
 from tape import ROOT, RELEASE_TAP, frame, parse, reference, sha
@@ -146,6 +147,34 @@ def selected_rows(full):
     return ordered + [FINAL], pairs
 
 
+def check_batch_failures(directory):
+    """Execute the owner's real batch with a controlled make stub, without building releases."""
+    if os.name != 'nt':
+        return dict(skipped='Windows cmd.exe required')
+    source = (ROOT/'build.bat').read_bytes()
+    commands = [line[5:] for line in source.decode('ascii').splitlines()
+                if line.lower().startswith('call make.bat ')]
+    assert commands
+    results = []
+    for fail_at in (0, 1, (len(commands)+1)//2, len(commands)):
+        fixture = directory/f'batch-failure-{fail_at}'
+        fixture.mkdir(exist_ok=True)
+        (fixture/'build.bat').write_bytes(source)
+        (fixture/'make.bat').write_bytes((
+            '@echo off\r\nset /a ZX_ELITE_TEST_CALL+=1 >nul\r\n'
+            'echo make.bat %*>>calls.log\r\n'
+            f'if %ZX_ELITE_TEST_CALL%=={fail_at} exit /b 7\r\nexit /b 0\r\n').encode('ascii'))
+        (fixture/'calls.log').unlink(missing_ok=True)
+        result = subprocess.run(['cmd.exe', '/d', '/c', 'build.bat'], cwd=fixture,
+                                env=dict(os.environ, ZX_ELITE_TEST_CALL='0'), capture_output=True, text=True)
+        (fixture/'execution.log').write_text(result.stdout+result.stderr, encoding='utf-8')
+        calls = (fixture/'calls.log').read_text().splitlines()
+        assert calls == commands[:fail_at or len(commands)], (fail_at, calls)
+        assert result.returncode == (7 if fail_at else 0), (fail_at, result.returncode)
+        results.append(dict(fail_at=fail_at, calls=len(calls), returncode=result.returncode))
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--full', action='store_true', help='build the complete product of all option values')
@@ -194,6 +223,50 @@ def main():
         assert built['DOCKING_ROTATION'] == int(effective_values(row)['dockingrotation'] == 'yes')
         assert built['TRAFFIC_CONTROL'] == int(effective_values(row)['trafficcontrol'] == 'yes')
         return RELEASE_TAP.read_bytes()
+
+    batch_failures = check_batch_failures(directory)
+
+    # Verify-only must retain the last build's settings only for the exact same
+    # named payload, and always identify the file that was actually verified.
+    custom = RELEASE_TAP.with_name('build-options-verify-check.tap')
+    saved_custom = custom.read_bytes() if custom.exists() else None
+    try:
+        run('verify-custom-build', 'trafficcontrol=yes', 'verify=no', 'tapfile='+custom.name)
+        metadata_path = ROOT/'build/verification.json'
+        built_metadata = json.loads(metadata_path.read_text())
+        custom_bytes = custom.read_bytes()
+        run('verify-custom-retained', '--verify-only', 'verify=no', 'tapfile='+custom.name)
+        assert json.loads(metadata_path.read_text()) == built_metadata
+        assert parse(custom.read_bytes())[5].payload == (ROOT/'build/game.bin').read_bytes()
+        # Equal bytes with another filename must not inherit requested settings.
+        renamed = dict(built_metadata, tapfile='another.tap')
+        metadata_path.write_text(json.dumps(renamed))
+        run('verify-custom-renamed', '--verify-only', 'verify=no', 'tapfile='+custom.name)
+        other = json.loads(metadata_path.read_text())
+        assert other['tapfile'] == custom.name and not set(NAMES) & other.keys()
+        # The same filename can now contain a different, valid payload.
+        metadata_path.write_text(json.dumps(built_metadata))
+        custom.write_bytes(reference()[0])
+        run('verify-custom-replaced', '--verify-only', 'tapfile='+custom.name)
+        other = json.loads(metadata_path.read_text())
+        assert other['tapfile'] == custom.name and other['binary_identical'] is True
+        assert not set(NAMES) & other.keys()
+        for label_, previous in (('missing', None), ('malformed', '{'), ('non-object', '[]')):
+            if previous is None:
+                metadata_path.unlink()
+            else:
+                metadata_path.write_text(previous)
+            run('verify-custom-'+label_, '--verify-only', 'tapfile='+custom.name)
+            assert json.loads(metadata_path.read_text())['tapfile'] == custom.name
+        custom.write_bytes(custom_bytes)
+        metadata_path.write_text(json.dumps(built_metadata))
+        run('verify-custom-failure', '--verify-only', 'tapfile='+custom.name, success=False)
+        assert not metadata_path.exists(), 'Failed verification left stale metadata'
+    finally:
+        if saved_custom is None:
+            custom.unlink(missing_ok=True)
+        else:
+            custom.write_bytes(saved_custom)
 
     # 1. Defaults.
     run('defaults')
@@ -334,6 +407,7 @@ def main():
         independent_areas_disjoint=True,
         declared_dependency=dict(rotationdriftfix='competitionremove', dockingrotation='rotationdriftfix'),
         combinations=combinations, invalid_values_rejected=list(NAMES),
+        batch_failure_propagation=batch_failures, verify_only_metadata_checked=True,
         corrupt_tapes_rejected_without_identity=True,
         final=dict(zip(NAMES, FINAL)), final_tape_sha256=sha(good)), indent=2)+'\n', encoding='utf-8')
     scope = 'the complete product' if full else f'all {pairs} value pairs and every option on at once'

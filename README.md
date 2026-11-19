@@ -87,6 +87,9 @@ When running `verify.bat` separately, supply the same `tapfile` and use
 `--ship adder`, `--font 48`, `--verify no` and `--tapfile elite-custom.tap`.
 Use `python tools/build.py --help` for command-line help; `--verify-only`
 checks an existing TAP without building (the mode used by `verify.bat`).
+Verification records the selected TAP filename and retains the previous build
+settings only when both its filename and SHA256 still match. `build.bat` stops
+at the first failed build and returns its error code.
 
 See [Build variants](docs/BUILD-VARIANTS.md) for memory layouts and targeted
 regression checks.
