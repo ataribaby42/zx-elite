@@ -60,9 +60,12 @@ def run(emulate):
     path = OUT / 'verification.json'
     path.unlink(missing_ok=True)
     s = symbol_map(ROOT / 'build/game.map')
-    assert s['DOCKING_ROTATION'] == s['ROTATION_DRIFT_FIX'] == s['COMPETITION_REMOVE'] == 1
+    assert s['DOCKING_ROTATION'] == s['COMPETITION_REMOVE'] == 1
     image = (ROOT / 'build/game.bin').read_bytes()
     ref = reference()[1][5].payload
+    if not s['ROTATION_DRIFT_FIX']:
+        start, end = s['ApplyPlayerMotion']-s['GameImage'], s['RotateAndDrawTitleShip']-s['GameImage']
+        assert image[start:end] == ref[start:end], 'docking without rotation repair changed motion'
     baseline = bytearray(image)
     a, b = s['DockingRotationHookStart']-s['GameImage'], s['DockingRotationHookLimit']-s['GameImage']
     baseline[a:b] = ref[a:b]  # Only restore the original six-byte success tail.
@@ -142,7 +145,10 @@ def run(emulate):
                   ship='adder' if s['SHIP_ADDER'] else 'krait', image_sha256=sha(image),
                   high_byte_cases=cases, angle_view_cases=1440, unchanged_cases=36,
                   other_object_cases=object_cases, scooping_cases=scoop_cases,
-                  docking_computer_cases=3, helper_bytes=18, remaining_rotation_padding=1)
+                  docking_computer_cases=3, helper_bytes=18,
+                  rotationdriftfix=bool(s['ROTATION_DRIFT_FIX']),
+                  remaining_rotation_padding=1 if s['ROTATION_DRIFT_FIX'] else None,
+                  remaining_competition_padding=1 if s['ROTATION_DRIFT_FIX'] else 87)
     if emulate:
         report['emulator'] = emulator(s, image, ref[a:b])
     data = json.dumps(report, indent=2)+'\n'

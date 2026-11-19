@@ -7,8 +7,8 @@ Default mode uses single-option builds and a pairwise covering array:
    fails and leaves no release or PASS report; the relaxed build changes only
    the bytes that option declares.  Laser and font bytes are compared with
    independent sources (the owner's patch note and PATCH128.TAP).
-3. Declared areas are disjoint except for the competition -> rotation -> docking
-   dependency chain. Docking uses only three padding gaps within rotation.
+3. Rotation and docking independently require competition removal. Docking's
+   success tail uses competition space alone, or rotation padding when combined.
    Dependent payloads take precedence inside their declared shared regions.
 4. Combinations: a covering array in which every pair of values of two
    options is built together at least once (two includes that clash on a
@@ -72,7 +72,7 @@ FIX_PARTS = {
                         (0xDF64, 0xDF67), (0xDF6B, 0xDF6E), (0xDF78, 0xDF7B)]),
     'dockingrotation': (('DockingRotationHook', 'DockingRotationLoad', 'DockingRotationCompare',
                          'DockingRotationAccept'),
-                        [(0xEB0A, 0xEB10), (0xD3DD, 0xD3E2), (0xD3F7, 0xD3FF), (0xDF05, 0xDF0B)]),
+                        [(0xEB0A, 0xEB10), (0xD3DD, 0xD3E2), (0xD3F7, 0xD3FF), (0xD388, 0xD38E)]),
     'stationrandomlaunchfix': (('ParentLaunchSelection',), [(0xF44A, 0xF470)]),
     'stationslotfix': (('StationSwitchOnStore', 'StationSlotAlign', 'StationSlotRoof', 'StationSlotFinish'),
                        [(0x77CB, 0x77CE), (0xE88B, 0xE8CF), (0xAC56, 0xAC77), (0xFCED, 0xFD00)]),
@@ -95,14 +95,14 @@ FIX_PARTS = {
                          (0xF6FB, 0xF70E)]),
 }
 LASER_PATCH = bytes.fromhex('21 3f 00 79 f6 03 4f c3')  # + DrawLine, the owner's final ten-byte patch
+# The combined layout retains the rotation fix's original padding allocation.
+DOCKING_WITH_ROTATION_AREAS = FIX_PARTS['dockingrotation'][1][:-1] + [(0xDF05, 0xDF0B)]
 
 
 def effective_values(row):
     """Independent expectation for requested vs effective build settings."""
     values = dict(zip(NAMES, row))
-    if values['dockingrotation'] == 'yes':
-        values['rotationdriftfix'] = 'yes'
-    if values['rotationdriftfix'] == 'yes':
+    if values['rotationdriftfix'] == 'yes' or values['dockingrotation'] == 'yes':
         values['competitionremove'] = 'yes'
     return values
 
@@ -134,7 +134,7 @@ def selected_rows(full):
         rows, pairs = covering_rows()
         rows += [(ship, 'single', font) + ALL_FIXES for ship in ('krait', 'adder')
                  for font in ('48', '128fix', '128fix_ecm_s')]
-        # Exercise every requested state of the three-option dependency chain,
+        # Exercise every requested state of the three related options,
         # including explicit no values overridden by a dependent yes.
         for values in product(('no', 'yes'), repeat=3):
             selected = dict(zip(NAMES, DEFAULT))
@@ -311,6 +311,17 @@ def main():
     areas['font'] = [(symbols['FontBitmap'], symbols['FontBitmapEnd'])]
     overlay = {name: parse(single[name, 'yes'][1])[5].payload for name in FIX_PARTS}
     overlay['scannerpixelfix'] = scanner_image
+    combined_values = dict(zip(NAMES, DEFAULT), dockingrotation='yes', rotationdriftfix='yes')
+    combined_row = tuple(combined_values[n] for n in NAMES)
+    combined_tap = build_both(combined_row)
+    combined_symbols = symbol_map(ROOT/'build/game.map')
+    combined_areas = [(combined_symbols[p+'Start'], combined_symbols[p+'Limit'])
+                      for p in FIX_PARTS['dockingrotation'][0]]
+    assert combined_areas == DOCKING_WITH_ROTATION_AREAS, combined_areas
+    docking_layouts = {
+        'no': (overlay['dockingrotation'], areas['dockingrotation']),
+        'yes': (parse(combined_tap)[5].payload, combined_areas),
+    }
 
     def expected(row):
         """The reference (or the Adder build) with the selected options' bytes overlaid."""
@@ -333,7 +344,10 @@ def main():
             if name == 'competitionremove' and values['rotationdriftfix'] == 'yes':
                 continue
             if values[name] == 'yes':
-                for start, end in areas[name]:
+                selected_areas = areas[name]
+                if name == 'dockingrotation':
+                    image, selected_areas = docking_layouts[values['rotationdriftfix']]
+                for start, end in selected_areas:
                     payload[start-base:end-base] = image[start-base:end-base]
         return b''.join(frame(b.flag, bytes(payload) if i == 5 else b.payload) for i, b in enumerate(blocks))
 
@@ -342,26 +356,30 @@ def main():
         if name != 'ship':
             assert tap == expected(row), f'{name}={value}: bytes outside its declared areas changed'
         singles.append(dict(option=name, value=value, relaxed_sha256=sha(tap)))
+    assert combined_tap == expected(combined_row), 'combined docking changed bytes outside its padding'
 
-    # 3. Only explicit dependency regions may overlap. The docking helper's
-    # three parts are wholly inside the rotation padding, not arbitrary code.
+    # 3. Only declared shared regions may overlap. Check both docking layouts
+    # against the padding of the parent that actually supplies their storage.
     adder_payload = parse(adder_tap)[5].payload
     claimed = {name: {address for start, end in found for address in range(start, end)}
                for name, found in areas.items()}
     claimed['ship'] = {base+i for i, (a, b) in enumerate(zip(reference_payload, adder_payload)) if a != b}
-    docking_gaps = {address for start, end in areas['dockingrotation'][1:] for address in range(start, end)}
-    competition_gaps = {address for start, end in areas['dockingrotation'][1:3] for address in range(start, end)}
-    shared = {('competitionremove', 'rotationdriftfix'): claimed['competitionremove'],
-              ('competitionremove', 'dockingrotation'): competition_gaps,
-              ('dockingrotation', 'rotationdriftfix'): docking_gaps}
-    rotation_payload = overlay['rotationdriftfix']
-    assert all(rotation_payload[a-base] == 0 for a in docking_gaps), 'docking must reuse padding only'
-    for first, second in pairs_of(sorted(claimed), 2):
-        common = claimed[first] & claimed[second]
-        if (first, second) in shared:
-            assert common == shared[first, second], ('incorrect dependency overlap', first, second)
-            continue
-        assert not common, (first, second, sorted(f'${a:04X}' for a in common)[:8])
+    for rotation, (_, docking_areas) in docking_layouts.items():
+        active_claims = dict(claimed, dockingrotation={a for start, end in docking_areas for a in range(start, end)})
+        docking_gaps = {a for start, end in docking_areas[1:] for a in range(start, end)}
+        competition_parts = docking_areas[1:3] if rotation == 'yes' else docking_areas[1:]
+        competition_gaps = {a for start, end in competition_parts for a in range(start, end)}
+        shared = {('competitionremove', 'rotationdriftfix'): claimed['competitionremove'],
+                  ('competitionremove', 'dockingrotation'): competition_gaps,
+                  ('dockingrotation', 'rotationdriftfix'): docking_gaps}
+        parent = overlay['rotationdriftfix' if rotation == 'yes' else 'competitionremove']
+        assert all(parent[a-base] == 0 for a in docking_gaps), ('docking must reuse padding only', rotation)
+        for first, second in pairs_of(sorted(active_claims), 2):
+            common = active_claims[first] & active_claims[second]
+            if (first, second) in shared:
+                assert common == shared[first, second], ('incorrect dependency overlap', rotation, first, second)
+                continue
+            assert not common, (rotation, first, second, sorted(f'${a:04X}' for a in common)[:8])
 
     # 4. Combinations.
     rows, pairs = selected_rows(full)
@@ -411,7 +429,8 @@ def main():
         declared_areas={name: [f'${s:04X}..${e-1:04X}' for s, e in found] for name, found in sorted(areas.items())},
         adder_changed_bytes=len(claimed['ship']), areas_pairwise_disjoint=False,
         independent_areas_disjoint=True,
-        declared_dependency=dict(rotationdriftfix='competitionremove', dockingrotation='rotationdriftfix'),
+        declared_dependency=dict(rotationdriftfix='competitionremove', dockingrotation='competitionremove'),
+        docking_with_rotation_areas=[f'${s:04X}..${e-1:04X}' for s, e in combined_areas],
         combinations=combinations, invalid_values_rejected=list(NAMES),
         batch_failure_propagation=batch_failures, verify_only_metadata_checked=True,
         corrupt_tapes_rejected_without_identity=True,

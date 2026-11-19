@@ -2,7 +2,8 @@
 ; ZX Coriolis vertices 12..15 have |x|=10, |y|=30, z=160: local Y is the long
 ; axis. Its x component must have magnitude >=106/127 (about 33 degrees).
 ; Evidence and tests: docs/DOCKING-ROTATION.md; tools/check_docking_rotation.py.
-; The 18-byte helper uses only the optimized rotation fix's three padding gaps.
+; The 18-byte helper uses competition-removal space. When rotation repair is
+; enabled too, its success tail moves into that fix's six-byte padding gap.
 
 defc DockingRotationRoofXHigh = InstanceAxisY+1
 defc DockingRotationMinimum = 106

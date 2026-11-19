@@ -2,6 +2,14 @@
 
 ZX Spectrum Elite 128k source reconstruction
 
+## 19.11.2026 V1.4
+
+- competitionremove – removes the competition number after saving; automatically enabled by rotationdriftfix and dockingrotation.
+- rotationdriftfix – fixes planet and sun drift during rotation, optimized without additional memory.
+- dockingrotation – checks the player’s rotational alignment with the station’s docking slot.
+- trafficcontrol – suppresses Cobra/Python launches while S is active and Chebyshev distance from the station’s centre is < 1024; Vipers remain unrestricted.
+- Fixed review findings, expanded regression tests and improved build failure handling.
+
 ## 16.10.2026 V1.3
 
 - I.F.F. unit option; replaces the energy bomb and its W key, threats blink on the scanner

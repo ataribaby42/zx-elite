@@ -30,19 +30,23 @@ structure layouts or routines are copied into the ZX source.
 
 ## Storage and dependency
 
-The option uses 18 of the optimized `rotationdriftfix`'s 19 padding bytes.
-It therefore automatically enables `rotationdriftfix=yes`, which in turn
-enables `competitionremove=yes`, even if either was explicitly requested
-as `no`. No station-orientation fix is implied: `stationslotfix` remains
-independent. Build metadata records requested and effective parent options.
-Direct assembly uses the same implied defaults and rejects explicit conflicts.
+The option automatically enables only `competitionremove=yes`, even if
+removal was explicitly requested as `no`. Both `rotationdriftfix` and
+`stationslotfix` remain independent. Build metadata records requested and
+effective settings. Direct assembly uses the same implied defaults and
+rejects an explicit `COMPETITION_REMOVE=0` conflict.
+
+With rotation repair off, the 18-byte helper fits entirely in reclaimed
+competition code and leaves **87 bytes** free. The original position arithmetic
+is unchanged. When both options are enabled, the six-byte success tail moves
+into rotation padding, retaining the existing combined build byte for byte.
 
 | Fixed range, inclusive | Capacity | Docking use |
 |---|---:|---|
 | `$EB0A..$EB0F` | 6 B | Replace the original success tail with a call, conditional scrape and return |
 | `$D3DD..$D3E1` | 5 B | Load the station roof's horizontal component and jump to the comparison |
 | `$D3F7..$D3FE` | 8 B | Sign removal, threshold, failure return and success jump; 1 B remains |
-| `$DF05..$DF0A` | 6 B | Set `DockingContactFlag=1` and return |
+| `$D388..$D38D` without rotation repair, or `$DF05..$DF0A` with it | 6 B | Set `DockingContactFlag=1` and return |
 
 Only **one byte at `$D3FE` remains free** in these rotation-fix gaps when both
 options are enabled. No new data variable, table, persistent record or image
@@ -53,18 +57,22 @@ overwrites A and flags before using them. All targets and field references
 are symbolic, and every region is bounded by assembler assertions.
 
 The generator owns the six-byte conditional hook. The three helper macros
-are nested in the rotation macros' padding; the option checker permits only
-these exact overlaps and proves that the parent build contains zeros there.
+are nested in competition-removal padding or rotation padding, according to
+the selected layout. The option checker permits only these exact overlaps
+and proves that the active parent build contains zeros there.
 It also verifies all eight requested competition/rotation/docking states.
 
 ## Build and checks
 
 ```bat
-make.bat dockingrotation=yes verify=no
+make.bat dockingrotation=yes rotationdriftfix=no competitionremove=no verify=no
+python tools\check_docking_rotation.py --emulator
+python tools\check_competition_remove.py
+make.bat ship=adder dockingrotation=yes verify=no
+python tools\check_docking_rotation.py --emulator
+make.bat dockingrotation=yes rotationdriftfix=yes verify=no
 python tools\check_docking_rotation.py --emulator
 python tools\check_rotation_drift_fix.py
-make.bat ship=adder dockingrotation=yes verify=no
-python tools\check_docking_rotation.py
 ```
 
 `tools/check_docking_rotation.py` uses **ZX Spectrum 48K** and
@@ -75,6 +83,8 @@ roll angles in each of four views; 36 unchanged earlier rejection cases;
 It verifies the slot axis against the current blueprint and the sign-magnitude
 threshold against an independent integer model. Only the original six-byte
 success tail is restored for the comparison image, preserving all other options.
+With rotation repair off, the check also compares the complete position-motion
+code against the reference bytes.
 
 The ROM-load scenarios launch and place a controlled station in contact with
 the player, retaining its natural rotation and survival flag. Horizontal and
@@ -89,6 +99,29 @@ window, which could stop after damage was queued but before it reached the
 shield. The vertical test requires a shield reduction and a clear docking flag;
 the computer test requires the actual C-key path. Reports, memory dumps and
 final screenshots are regenerated under `build/docking-rotation-check/`.
+
+## Validation of independent options
+
+The dependency split passed `python tools/check_build_options.py`: 130 builds,
+all 756 pairs of option values, both docking layouts and all eight requested
+competition/rotation/docking states. The complete Cartesian product was not run.
+Direct z88dk probes also checked implied defaults, explicit rotation-off,
+combined options and rejection of explicit competition-removal conflicts.
+
+The docking ROM-load and save checks passed for Krait and Adder with rotation
+repair off, and for Adder with every option enabled. The latter also passed
+`python tools/check_rotation_drift_fix.py`. The eight fixtures in
+`python tools/check_variant_relocation.py` passed. All emulator checks used
+ZX Spectrum 48K with `assets/zxspectrum48k.rom`.
+
+`make.bat` and `verify.bat` still reproduce the reference exactly. Enabling
+both docking and rotation repair preserves the previous combined image.
+Krait with only docking requested now has TAP SHA256
+`074d30b8fd8dbd21656202b3e2af713090b6299e80670b4d3bd862c98022d44f`.
+Assembler: z88dk `23854-4d530b6eb7-20251002`; TAP size and all image bounds
+remain unchanged. Detailed results from this check are in
+`build/docking-dependency-review/`; the maintained commands above regenerate
+the feature reports.
 
 ## Validation of the initial implementation
 

@@ -6,12 +6,14 @@ It changes neither motion nor the 104-byte save format. `COMMANDER SAVED`,
 the 102-byte restart snapshot, name entry, load handling and BREAK remain.
 The unused `SECURITY NUMBER:` message entry stays to preserve text numbering.
 
-`rotationdriftfix=yes` needs the reclaimed code space and therefore forces
+Both `rotationdriftfix=yes` and `dockingrotation=yes` need reclaimed code space and force
 `competitionremove=yes`, including when the command explicitly requests `no`.
 The builder prints that resolution. `build/verification.json` records the
 effective `competitionremove` and the original `competitionremove_requested`.
-`dockingrotation=yes` enables `rotationdriftfix=yes`, so it also enables
-competition removal through that dependency.
+The two options are independent: `dockingrotation=yes rotationdriftfix=no`
+keeps the original position arithmetic and removes the competition number.
+The following table applies with `dockingrotation=no`; with docking enabled,
+removal is always enabled and the requested rotation setting is unchanged.
 
 | Requested competitionremove | Requested rotationdriftfix | Effective behaviour |
 |---|---|---|
@@ -33,15 +35,16 @@ python tools\check_rotation_drift_fix.py
 Only the original block-5 regions `$D386..$D3E1` (92 bytes) and
 `$D3F0..$D3FE` (15 bytes) are removed. A two-byte `JR` keeps the successful
 save connected to `CopyCommanderToTemplate`, leaving 90 + 15 = **105 bytes**
-of zero-filled space when rotation repair is off. When rotation repair is on,
+of zero-filled space when both rotation repair and docking alignment are off.
+Docking alignment alone uses 18 bytes, leaving **87 bytes** free. When rotation repair is on,
 its helpers occupy these regions. The later [rotation optimization](ROTATION-DRIFT-FIX.md)
 also stays within these boundaries. No extra memory or shorter TAP is implied.
 
 The regions belong to `CompetitionSecurityStart/Limit` and
 `CompetitionParityStart/Limit` in `src/options.asm`. The source generator
 guards them with `COMPETITION_REMOVE`; their macros in
-`src/competition-remove.asm` select padding or rotation helpers. Direct
-assembly defaults the dependency to the rotation setting and rejects an
+`src/competition-remove.asm` select padding, docking helpers or rotation helpers. Direct
+assembly defaults removal to the logical OR of the rotation and docking settings and rejects an
 explicit conflicting assembler configuration. Normal Python/BAT builds
 resolve the dependency automatically before assembly.
 
@@ -50,7 +53,7 @@ settings, assembler flags, strict rejection and the exact shared-region
 payload. Only the declared competition/rotation/docking dependencies may
 overlap; every independent option's regions must remain disjoint. Full Cartesian
 coverage is not necessary for this dependency; the pairwise suite plus
-targeted save and byte-identity checks cover its four states.
+targeted save and byte-identity checks cover all eight requested states.
 
 `tools/check_competition_remove.py` runs in **ZX Spectrum 48K** RAM with
 `assets/zxspectrum48k.rom`. It executes save success and BREAK, stubbing

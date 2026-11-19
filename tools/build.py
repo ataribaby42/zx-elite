@@ -75,13 +75,12 @@ def verify(output=OUTPUT, exact=True):
 def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixelfix='no', stationrandomlaunchfix='no', tapfile=DEFAULT_TAPFILE, stationslotfix='no', fuelfix='no', hyperspacedockingfix='no', aicouragefix='no', scannerblipfix='no', stardustfix='no', missiletargetfix='no', textfullstopfix='no', iffunit='no', randomizedspawn='no', rotationdriftfix='no', competitionremove='no', dockingrotation='no', trafficcontrol='no'):
     requested_competitionremove = competitionremove
     requested_rotationdriftfix = rotationdriftfix
-    if dockingrotation == 'yes':
-        if rotationdriftfix != 'yes':
-            print('Enabled rotationdriftfix=yes (required by dockingrotation=yes).')
-        rotationdriftfix = 'yes'
-    if rotationdriftfix == 'yes':
+    if rotationdriftfix == 'yes' or dockingrotation == 'yes':
         if competitionremove != 'yes':
-            print('Enabled competitionremove=yes (required by rotationdriftfix=yes).')
+            parents = ' and '.join(name+'=yes' for name, value in
+                                   (('rotationdriftfix', rotationdriftfix), ('dockingrotation', dockingrotation))
+                                   if value == 'yes')
+            print(f'Enabled competitionremove=yes (required by {parents}).')
         competitionremove = 'yes'
     output = release_tap(tapfile)
     BUILD.mkdir(parents=True,exist_ok=True)
@@ -199,9 +198,9 @@ def main():
     p.add_argument('--textfullstopfix',choices=['no','yes'],default='no',help='a full stop arriving as the 31st character of a justified line wraps with its word instead of being lost (default: no)')
     p.add_argument('--iffunit',choices=['no','yes'],default='no',help='replace the energy bomb (item 9, W key) with an I.F.F. unit that makes threats blink on the scanner (default: no)')
     p.add_argument('--randomizedspawn',choices=['no','yes'],default='no',help='a single ship of a random encounter appears ahead or in a corner at random, not by its hostility (default: no)')
-    p.add_argument('--competitionremove',choices=['no','yes'],default='no',help='remove the post-save competition security number; forced to yes by rotationdriftfix=yes (default: no)')
+    p.add_argument('--competitionremove',choices=['no','yes'],default='no',help='remove the post-save competition security number; forced to yes by rotationdriftfix=yes or dockingrotation=yes (default: no)')
     p.add_argument('--rotationdriftfix',choices=['no','yes'],default='no',help='prevent position drift under reversed roll/pitch; automatically enable competitionremove=yes (default: no)')
-    p.add_argument('--dockingrotation',choices=['no','yes'],default='no',help='require roll alignment with the docking slot; automatically enable rotationdriftfix and competitionremove (default: no)')
+    p.add_argument('--dockingrotation',choices=['no','yes'],default='no',help='require roll alignment with the docking slot; automatically enable competitionremove, leaving rotationdriftfix independent (default: no)')
     p.add_argument('--trafficcontrol',choices=['no','yes'],default='no',help='suppress station traders inside a 1024-unit Chebyshev box while S is lit; police unchanged (default: no)')
     p.add_argument('--verify',choices=['yes','no'],default='yes',help='exact original-byte comparison (default: yes); structural checks always run')
     # Also accept make.bat ship=adder laser=single verify=no.

@@ -8,8 +8,8 @@ the reference bytes and post-save security number are preserved.
 position arithmetic. [Competition removal](COMPETITION-REMOVE.md) can also be
 selected alone without changing motion. Build it
 with `make.bat rotationdriftfix=yes verify=no`.
-The dependent [docking roll check](DOCKING-ROTATION.md) enables this fix
-automatically when `dockingrotation=yes`.
+The independent [docking roll check](DOCKING-ROTATION.md) also requires
+competition removal, but does not enable this rotation fix.
 
 ## Cause and scope
 
@@ -127,7 +127,7 @@ implementation.
 Seven fixed regions (including the two owned by `competitionremove`) are guarded by Start/Limit assertions in `src/options.asm`
 and declared in both the source generator and build-option overlap check.
 The rotation payload takes precedence over standalone zero padding. The
-dependent docking check may additionally use only the three padding gaps:
+docking check, when selected together with rotation repair, uses only the three padding gaps:
 
 | Original range (inclusive) | Bytes | Use with the fix |
 |---|---:|---|
@@ -196,7 +196,7 @@ view. Both versions execute exactly 1,280 complete game updates with the same
 alternating roll ramp. Interrupts remain active; copied player controls are
 locked so elapsed time cannot change the ramp. Every update has a bounded
 timeout. A private comparison image restores only the seven original regions
-and, when enabled, the dependent docking hook. For the corrected Krait build
+and, when enabled, the docking hook that calls those regions. For the corrected Krait build
 with docking, traffic control and both station fixes, roll-plane radius ratios
 were:
 

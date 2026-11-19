@@ -1410,11 +1410,13 @@ pairwise combinations and all eight dependency states. It checks the following:
   - the randomized spawn: its five parts;
   - competition removal: its two reclaimed areas;
   - rotation drift: its seven areas, including those two reclaimed areas;
-  - docking rotation: its six-byte hook and three gaps within rotation padding.
+  - docking rotation: its six-byte hook and three helper regions, with the
+    success tail placed in competition space alone or rotation padding when combined.
 - Independent areas, together with every byte `ship=adder` changes, must be
   disjoint. Permitted overlaps are the two competition regions reused by
-  `rotationdriftfix`, and the three rotation-padding gaps used by
-  `dockingrotation`. The test verifies effective settings and dependent payload
+  `rotationdriftfix`, and docking helpers in competition space or the three
+  rotation-padding gaps. Both layouts must reuse zero padding in their active
+  parent build. The test verifies effective settings and dependent payload
   precedence, including explicit parent `no` requests overridden by a child `yes`.
 - Combinations are built in both modes:
   - a greedy covering array in which every pair of values of two options is
@@ -1574,10 +1576,12 @@ for the seven bounded replacement areas, arithmetic limits and targeted tests.
 
 `dockingrotation=yes` adds a manual docking roll check: the slot's long side
 must be approximately horizontal, including the equivalent 180-degree
-orientation. It uses 18 of the 19 rotation-padding bytes and therefore enables
-`rotationdriftfix=yes` (and `competitionremove=yes`) automatically. Failed roll
+orientation. It automatically enables only `competitionremove=yes`;
+`rotationdriftfix` remains independent. Alone it uses 18 reclaimed competition
+bytes, leaving 87 free. With rotation repair enabled too, it uses 18 of the
+19 rotation-padding bytes. Failed roll
 alignment uses the original scrape damage; the docking computer is unaffected.
-Only one byte remains in those gaps. See [Docking roll alignment](DOCKING-ROTATION.md)
+Only one byte remains in those gaps when both options are enabled. See [Docking roll alignment](DOCKING-ROTATION.md)
 for the ZX geometry, threshold, storage and regression tests.
 
 
