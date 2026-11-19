@@ -65,18 +65,28 @@ and coefficients 0, 1 and 2 use direct short paths. No new table is allocated,
 and the shared graphics multipliers remain unchanged.
 
 The half-product wrapper tail-calls `AddScaledCoordinate`. Product packing
-clears the half-scale flag before signed addition, retaining the carry that
-the existing `DoubleSignMagnitude` roll-coefficient preparation consumes.
+clears the half-scale flag before signed addition. The dispatcher explicitly
+clears carry before `DoubleSignMagnitude`: its input carry must not come from
+the pitch plane. Otherwise an overflow of the low coordinate word can turn
+zero roll into coefficient 1, or increase a nonzero roll coefficient by 1.
+For example, pitch 1 and roll 0 at `(10000,-65536,65300)` must keep X=10000;
+before this correction X became 10254 in one update.
 The packing hook also omits saving BC: its caller immediately replaces BC
-with the stacked product sign. These changes preserve coordinate bytes and
-avoid increasing peak stack use. Six shears still replace four when both
+with the stacked product sign. The carry correction fits in the same bytes:
+after loading DE=InstanceY, two one-byte loads copy its zero high byte into
+HL=InstanceX, replacing the three-byte immediate load. Assertions guard those
+field-offset assumptions. It adds two T-states to the dispatcher, no storage
+or stack use. Six shears still replace four when both
 axes turn; frame timing is not identical to the unmodified game.
 
 ## Speed
 
-The optimized routine takes **9,270.4 T-states** on average for simultaneous
+The optimization measurements below predate the carry correction described
+above; the retained evidence identifies those historical binaries.
+The optimized routine took **9,270.4 T-states** on average for simultaneous
 maximum roll and pitch in the five-vector fixture, down from **11,626.2**
-(**20.3% less CPU time**). Straight flight takes the same time as before.
+(**20.3% less CPU time**). That optimization kept straight-flight timing
+unchanged; the subsequent carry correction adds the two dispatcher T-states.
 
 Complete-frame measurements with both controls at 15:
 
@@ -108,6 +118,9 @@ roll/pitch pair and observes stack depth on representative paths. The report
 is `build/rotation-speed/verification.json`. The optimization's before/after
 report is retained in [evidence](evidence/rotation-drift-optimization.json);
 its previous image was saved before editing and is identified by its hash.
+The equality comparison is intended for optimizations that preserve behaviour;
+an image with the pitch-carry defect is expected to fail against the corrected
+implementation.
 
 ## Memory and saving
 
@@ -165,8 +178,9 @@ verify.bat verify=no
 
 `build/rotation-drift-fix-check/verification.json` records 32,768 exact byte
 products (including preservation of B/C), 1,710 signed coordinate cases,
-858 checks preserving carry through the half-product wrapper, 488 inverse-plane
-cases, unchanged translation edge cases, both body callers in four view selections, and actual
+12,288 complete rotation cases against an independent integer model, 488
+inverse-plane cases, unchanged translation edge cases, both body callers in
+four view selections, and actual
 save control flow on success and BREAK. The save test stubs keyboard, display
 and ROM transport; it compares all 104 bytes handed to ROM and the restart
 snapshot. It does not simulate cassette audio saving.
@@ -176,20 +190,32 @@ after 1,280 updates. With the fix, after **12,800** updates it is **0.999216x**.
 Pitch, combined axes and continuous roll also stay within 0.5% of the initial
 3D radius in those long tests.
 
-The optional emulator check ROM-loads the release, launches, places controlled
-sun/planet vectors, selects the right view and alternates M/N for 64 seconds
-in a 90-second flight. A comparison run restores only the seven original
-regions with test-only pokes. For the optimized Krait build, final roll-plane
-radius ratios were:
+The optional emulator check ROM-loads the release, launches and stops at
+`MainLoop` before placing controlled sun/planet vectors and selecting the right
+view. Both versions execute exactly 1,280 complete game updates with the same
+alternating roll ramp. Interrupts remain active; copied player controls are
+locked so elapsed time cannot change the ramp. Every update has a bounded
+timeout. A private comparison image restores only the seven original regions
+and, when enabled, the dependent docking hook. For the corrected Krait build
+with docking, traffic control and both station fixes, roll-plane radius ratios
+were:
 
 | Body | Original | Fixed |
 |---|---:|---:|
-| Planet | 1.48408 | 1.00041 |
-| Sun | 1.71101 | 1.00231 |
+| Planet | 3.95864 | 0.99966 |
+| Sun | 3.35916 | 1.00053 |
 
-These timed runs may execute different numbers of game updates. The separate
-routine tests compare explicit update counts. Emulator reports, memory dumps
-and screenshots are regenerated under `build/emulator/rotation-drift-*`.
+The former timed negative control could fail with other options because its
+final planet drift depended on the number and phase of updates. The fixed
+update count makes that comparison reproducible without weakening the 0.5%
+limit on the corrected variant. An additional real game update checks the
+pitch-only carry regression for both bodies, including the original translation.
+The complete rotation cases include all signed control bytes in the legal
+0..15 range (both zero encodings), both input carries, word-boundary fixtures
+and large coordinates. They replace the old wrapper comparison that wrongly
+treated consumption of pitch carry as required behaviour.
+Reports, memory dumps and final screenshots are regenerated under
+`build/rotation-drift-fix-check/`.
 
 The optimization was checked with the default exact build and verification,
 targeted arithmetic/save checks for Krait and Adder, the Krait 48K ROM-load
@@ -209,8 +235,8 @@ competition-removal dependency and checks its shared-area precedence.
 Builds used z88dk `Z80 Macro Assembler 23854-4d530b6eb7-20251002`. The default
 TAP retained SHA256
 `d9013872555f448308e0b8a69b624600335384cd38911165bde74a9d11de84d6`.
-With only `rotationdriftfix=yes`, the optimized Krait TAP has SHA256
-`efd74ea3b6413b128a5a91bd4bd9f91021d4efd086914ee1b3ce0e55ba6a5ac9`.
+With only `rotationdriftfix=yes`, the corrected Krait TAP has SHA256
+`0ff9edae4718445cc65a52250fd25f405ac69e1fffe07754d22a896e1b60c703`.
 All builds keep six TAP blocks (three header/data pairs), payloads 130, 6912
 and 40801 bytes, total size 47918 bytes, and image end `$FFA9` exclusive.
 Modified builds disable only binary identity; structure, checksums, metadata

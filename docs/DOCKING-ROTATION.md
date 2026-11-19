@@ -80,9 +80,15 @@ The ROM-load scenarios launch and place a controlled station in contact with
 the player, retaining its natural rotation and survival flag. Horizontal and
 inverted approaches dock; a vertical approach scrapes and loses front shield;
 the same vertical approach docks with the old success tail; and C docks
-despite the misalignment. The failed contact is observed briefly, before
-repeated scrapes exhaust the shields and energy. Reports and memory dumps
-are regenerated under `build/docking-rotation-check/` and `build/emulator/`.
+despite the misalignment. Fixtures are injected at `MainLoop` after the actual
+48K ROM load and launch. Each observation follows a whole game update, with
+interrupts active. The test stops at the first completed update that reduces
+the shield or docks, with a maximum of 32 updates and a timeout on each update.
+This avoids both repeated fatal scrapes and the former 0.15-second observation
+window, which could stop after damage was queued but before it reached the
+shield. The vertical test requires a shield reduction and a clear docking flag;
+the computer test requires the actual C-key path. Reports, memory dumps and
+final screenshots are regenerated under `build/docking-rotation-check/`.
 
 ## Validation of the initial implementation
 
@@ -108,7 +114,8 @@ both builds. `python tools/check_variant_relocation.py` passed its eight
 existing isolated fixtures; those cover the older optional modules, while
 the new helper's fixed-region bounds are checked during every assembly.
 
-The Krait build from `make.bat dockingrotation=yes verify=no` has TAP SHA256
+At the initial implementation, the Krait build from
+`make.bat dockingrotation=yes verify=no` had TAP SHA256
 `0aef4f27c1349c4e74a47e5c904e844210be0fa2ce03d7a3159286945a43a026`.
 Assembler: z88dk `23854-4d530b6eb7-20251002`. All builds retain six TAP
 blocks (three header/data pairs), payloads 130/6912/40801 bytes, total

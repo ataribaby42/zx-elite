@@ -8,8 +8,6 @@ import argparse
 import json
 import math
 import random
-import subprocess
-import sys
 
 from tape import ROOT, RELEASE_TAP, reference, parse, sha
 from build import symbol_map
@@ -31,6 +29,51 @@ def put_vector(m, p, v):
 
 def signed(n):
     return abs(n) | (128 if n < 0 else 0)
+
+
+def rotation_model(point, roll, pitch):
+    """Independent integer three-shear model, truncating products toward zero."""
+    def product(value, coefficient, divisor):
+        n = value * coefficient
+        return (1 if n >= 0 else -1) * (abs(n) // divisor)
+
+    def plane(u, v, coefficient):
+        u -= product(v, coefficient, 512)
+        v += product(u, coefficient, 256)
+        u -= product(v, coefficient, 512)
+        return u, v
+
+    x, y, z = point
+    z, y = plane(z, y, cr.sm8(pitch))
+    x, y = plane(x, y, 2 * cr.sm8(roll))
+    return x, y, z
+
+
+def check_full_rotation(ctx):
+    """Check control conversion and both planes together, including pitch carry."""
+    m, s = ctx.machine(), ctx.symbols
+    p = s['PlanetPosition']
+    points = ((10000, -65536, 65300), (-10000, 65536, -65300),
+              (196608, 65536, 524288), (-196608, -65536, -524288),
+              (0, 1, -1), (3000000, -2000000, 1000000))
+    angles = (*range(16), *range(128, 144))
+    cases = 0
+    for roll in angles:
+        for pitch in angles:
+            for point in points:
+                expected = rotation_model(point, roll, pitch)
+                for carry in (0, 1):
+                    put_vector(m, p, point)
+                    m.poke('PlayerRoll', roll)
+                    m.poke('PlayerPitch', pitch)
+                    m.call('ApplyPlayerMotion', ix=p, iy=0x1234, f=carry,
+                           stop='TranslatePlayerPosition', balance=False)
+                    actual = vector(m, p)
+                    assert actual == expected, (point, roll, pitch, carry, actual, expected)
+                    assert m.ix() == p and m.iy() == 0x1234
+                    assert m.byte('RotationDriftHalfScale') == 0
+                    cases += 1
+    return cases
 
 
 def run(emulate):
@@ -78,26 +121,9 @@ def run(emulate):
         assert m.ix() == p and m.iy() == 0x1234
         assert m.byte('RotationDriftHalfScale') == 0
 
-    # Half-coordinate cleanup must retain carry from the signed addition:
-    # DoubleSignMagnitude consumes it when preparing the subsequent roll.
-    # Compare with the same half product called without the wrapper. Both
-    # carry values occur here; an XOR A cleanup silently changes full motion.
-    direct = fixed.machine()
-    carries = set()
-    for u, v, c, half in cases:
-        if not half:
-            continue
-        outputs = []
-        for mm, entry in ((m, 'RotationDriftHalfCoordinate'),
-                          (direct, 'AddScaledCoordinate')):
-            put_vector(mm, p, (u, v, 271))
-            mm.poke('RotationDriftHalfScale', int(mm is direct))
-            mm.call(entry, ix=p, iy=0x1234, hl=s['InstanceX'],
-                    de=s['InstanceY'], c=signed(c))
-            outputs.append((bytes(mm.memory[p:p + 9]), mm.pair('hl'), mm.r[cr.F] & 1))
-        assert outputs[0] == outputs[1], (u, v, c, outputs)
-        carries.add(outputs[0][2])
-    assert carries == {0, 1}, carries
+    # The roll coefficient must not inherit carry from the pitch plane. Test
+    # the full dispatcher against mathematics, not against its old wrapper.
+    full_rotation_cases = check_full_rotation(fixed)
 
     # Each plane transform must be inverted exactly by its opposite rate
     # (numeric coordinates; positive and negative zero are equivalent).
@@ -172,7 +198,7 @@ def run(emulate):
     report = dict(passed=True, machine='ZX Spectrum 48K', rom='assets/zxspectrum48k.rom',
                   image_sha256=sha(image), ship='adder' if s['SHIP_ADDER'] else 'krait',
                   products=32768, coordinate_cases=len(cases), inverse_plane_cases=488,
-                  half_wrapper_carry_cases=sum(half for _, _, _, half in cases),
+                  full_rotation_cases=full_rotation_cases,
                   drift=drift, save=save)
     if emulate:
         report['emulator'] = emulator(s, image, original)
@@ -183,34 +209,41 @@ def run(emulate):
 
 
 def emulator(s, image, original):
-    import run_runtime_scenarios as rs
+    import benchmark_rotation_drift as bench
+    from emulator_check import png
+    from skoolkit.simutils import T
+
     assert bytes(parse(RELEASE_TAP.read_bytes())[5].payload) == image
+    bench.OUT = OUT
+    memory, registers = bench.boot(s)
     results = {}
     start = (0x080000, 0x010000, 0x030000)
     sun = (0x100000, -0x040000, 0x060000)
-    def packed(v):
-        data = [0] * 9
-        for i, n in enumerate(v):
-            cr.put24(data, i * 3, n)
-        return bytes(data).hex()
+    rolls = cr.alternating_roll_bytes(32, 20)
+    ship = 'adder' if s['SHIP_ADDER'] else 'krait'
     for name, old in (('fixed', False), ('original', True)):
-        args = [*rs.started(90), *rs.key(8, .5, '1'), *rs.key(19, .5, '4'),
-                *rs.poke(18, hex(s['PlanetPosition']), packed(start)),
-                *rs.poke(18, hex(s['SunPosition']), packed(sun))]
+        sim = bench.clone(memory, registers)
+        ram = sim.memory
         if old:
             parts = FIX_PARTS['rotationdriftfix'][0] + (('DockingRotationHook',) if s.get('DOCKING_ROTATION') else ())
             for part in parts:
                 a, b = s[part+'Start'], s[part+'Limit']
-                args += rs.poke(0, hex(a), original[a-s['GameImage']:b-s['GameImage']].hex())
-        for i in range(16):
-            args += rs.key(22 + i * 4, 4, 'M' if i % 2 == 0 else 'N')
-        label = 'rotation-drift-' + ('adder-' if s['SHIP_ADDER'] else 'krait-') + name
-        subprocess.run([sys.executable, str(rs.CHECKER), *args, '--name', label],
-                       cwd=ROOT, check=True, capture_output=True, text=True)
-        result = json.loads((ROOT / f'build/emulator/{label}.json').read_text())
-        ram = list((ROOT / f'build/emulator/{label}-memory.bin').read_bytes())
-        assert result['machine'] == 'ZX Spectrum 48K' and all(p['applied'] for p in result['test_pokes'])
-        assert s['ApplyPlayerMotion'] in result['execution_map']
+                ram[a:b] = original[a-s['GameImage']:b-s['GameImage']]
+        for body, point in (('PlanetPosition', start), ('SunPosition', sun)):
+            for axis, value in enumerate(point):
+                cr.put24(ram, s[body] + axis * 3, value)
+        # Same control ramp and update count for every option combination.
+        # Interrupts still run; locking the copied controls avoids time-based
+        # key repeats changing the number of turns between slow/fast builds.
+        for key, value in (('ControlsLockedFlag', 1), ('CurrentScreenId', 3),
+                           ('PlayerPitch', 0), ('PlayerSpeed', 0)):
+            ram[s[key]] = value
+        executed, operations = set(), 0
+        for roll in rolls:
+            ram[s['PlayerRoll']] = roll
+            operations += bench.main_loop_frame(sim, s, executed=executed)
+            assert ram[s['FlightCondition']] and s['RunGameOverSequence'] not in executed
+        assert s['ApplyPlayerMotion'] in executed and s['DrawSunAndPlanet'] in executed
         ratios = {}
         for body, v in (('PlanetPosition', start), ('SunPosition', sun)):
             xy = [cr.get24(ram, s[body] + i * 3) for i in range(2)]
@@ -218,9 +251,32 @@ def emulator(s, image, original):
             if not old:
                 assert abs(ratios[body] - 1) < .005, ratios
         results[name] = dict(ratios=ratios, current_view=ram[s['CurrentScreenId']],
-                             operations=result['operations'])
+                             updates=len(rolls), operations=operations,
+                             tstates=sim.registers[T]-registers[T])
+        label = 'rotation-drift-' + ship + '-' + name
+        (OUT / (label+'-memory.bin')).write_bytes(bytes(ram))
+        png(ram[0x4000:0x5B00], OUT / (label+'.png'))
     assert results['fixed']['current_view'] == 3, results
     assert results['original']['ratios']['PlanetPosition'] > 1.1, results
+
+    # Carry regression through the real callers in an interrupt-driven frame.
+    # With no roll, pitch must leave X exactly unchanged for both bodies.
+    sim = bench.clone(memory, registers)
+    point = (10000, -65536, 65300)
+    for body in ('PlanetPosition', 'SunPosition'):
+        for axis, value in enumerate(point):
+            cr.put24(sim.memory, s[body] + axis * 3, value)
+    for key, value in (('ControlsLockedFlag', 1), ('CurrentScreenId', 3),
+                       ('PlayerPitch', 1), ('PlayerRoll', 0), ('PlayerSpeed', 0)):
+        sim.memory[s[key]] = value
+    bench.main_loop_frame(sim, s)
+    x, y, z = rotation_model(point, 0, 1)
+    expected = (x, y, z-2)  # original translation with PlayerSpeed=0
+    results['pitch_only'] = {}
+    for body in ('PlanetPosition', 'SunPosition'):
+        actual = tuple(cr.get24(sim.memory, s[body] + i * 3) for i in range(3))
+        assert actual == expected, (body, actual, expected)
+        results['pitch_only'][body] = actual
     return results
 
 

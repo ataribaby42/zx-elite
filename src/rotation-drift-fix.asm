@@ -9,10 +9,13 @@ MACRO RotationDriftRotationCode
     LD HL,InstanceZ
     CALL RotationDriftRotatePlane
     LD A,(PlayerRoll)
+    AND A                       ; DoubleSignMagnitude must not consume pitch carry
     CALL DoubleSignMagnitude
     LD A,C
     LD DE,InstanceY
-    LD HL,InstanceX
+    assert InstanceX = 0 && InstanceY >= 0 && InstanceY < 256
+    LD H,D                      ; DE's zero high byte gives HL = InstanceX
+    LD L,D                      ; saves the byte used to clear carry above
     CALL RotationDriftRotatePlane
     JP TranslatePlayerPosition
 ; Exact B*C. Handle C=0/1/2 directly so slow turns do not pay for table lookups.
@@ -80,7 +83,7 @@ RotationDriftHalfCoordinate:
     LD A,1
     LD (RotationDriftHalfScale),A
     ; Product packing consumes the flag before the signed addition. Tail-call
-    ; to retain its carry (used by DoubleSignMagnitude) and save stack depth.
+    ; to save stack depth; the dispatcher clears carry before converting roll.
     JP AddScaledCoordinate
 RotationDriftHalfScale:
     defb 0

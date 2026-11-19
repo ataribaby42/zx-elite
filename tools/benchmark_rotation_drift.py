@@ -8,6 +8,7 @@ real interrupts but does not model ULA contention; this is not hardware FPS.
 """
 import argparse
 import contextlib
+import io
 import json
 import statistics
 from pathlib import Path
@@ -18,7 +19,7 @@ from check_build_options import FIX_PARTS
 import check_routines as cr
 from skoolkit import CSimulator, tap2sna
 from skoolkit.snapshot import Snapshot
-from skoolkit.simutils import T, from_snapshot
+from skoolkit.simutils import PC, T, from_snapshot
 from skoolkit.trace import Tracer
 from emulator_check import KEYS
 
@@ -68,6 +69,28 @@ def clone(memory, registers):
     trace.keyboard = [0] * 8
     sim.set_tracer(trace)
     return sim
+
+
+def main_loop_frame(sim, s, keys=(), executed=None):
+    """Run one complete game update with interrupts and a bounded timeout.
+
+    Feature checks inject fixtures only at MainLoop and observe the next
+    MainLoop, after contact, drawing and shield updates have all finished.
+    The generous bound also allows the docking animation to finish.
+    """
+    assert sim.registers[PC] == s['MainLoop']
+    trace = Tracer(sim, 0, 0, 0, [0] * 16, 0, False)
+    trace.keyboard = [0] * 8
+    for key in keys:
+        row, mask = KEYS[key]
+        trace.keyboard[row] |= mask
+    sim.set_tracer(trace)
+    with contextlib.redirect_stdout(io.StringIO()):
+        trace.run(s['MainLoop'], s['MainLoop'], 0, 30 * CLOCK_HZ, True,
+                  None, executed, None, None, '$', '02X', '04X')
+    assert sim.registers[PC] == s['MainLoop'], ('main-loop timeout', hex(sim.registers[PC]))
+    assert not sim.memory[s['PlayerDeadFlag']]
+    return trace.operations
 
 
 def compare_previous(contexts, s):

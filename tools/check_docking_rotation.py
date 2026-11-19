@@ -6,8 +6,6 @@ the release for aligned/inverted/misaligned approaches and the docking computer.
 import argparse
 import json
 import math
-import subprocess
-import sys
 
 from tape import ROOT, RELEASE_TAP, reference, parse, sha
 from build import symbol_map
@@ -154,20 +152,24 @@ def run(emulate):
 
 
 def emulator(s, image, original_hook):
-    import run_runtime_scenarios as rs
+    import benchmark_rotation_drift as bench
+    from emulator_check import png
+
     assert parse(RELEASE_TAP.read_bytes())[5].payload == image, 'Build the default TAP filename first'
+    bench.OUT = OUT
+    memory, registers = bench.boot(s)
     results = {}
     for name, degree, original, computer in (('aligned', 0, False, False),
             ('inverted', 180, False, False), ('vertical', 90, False, False),
             ('vertical-original', 90, True, False), ('vertical-computer', 90, False, True)):
         station = s['InitialRuntimeState']
-        # Observe failed contact briefly: repeated scrapes can drain all energy.
-        args = [*rs.started(18.15 if name == 'vertical' else 27), *rs.key(8, .5, '1')]
-        # Reproducible contact fixture inside a real, interrupt-driven flight.
-        data = bytearray(9)
-        cr.put24(data, 6, 150)
-        args += rs.poke(18, hex(station), data.hex())
-        args += rs.poke(18, hex(station+s['InstanceAxisZ']), axes(degree).hex())
+        sim = bench.clone(memory, registers)
+        ram = sim.memory
+        # Inject at MainLoop, then observe completed game updates: contact and
+        # shield damage happen in different parts of the same update.
+        for axis, value in enumerate((0, 0, 150)):
+            cr.put24(ram, station+axis*3, value)
+        ram[station+s['InstanceAxisZ']:station+s['InstanceAxisX']+6] = axes(degree)
         # Retain this build's normal station roll, including bit 7 (also the
         # pirate-mission survival marker). Pitch immediately follows roll.
         station_roll = image[station+s['InstanceRoll']-s['GameImage']]
@@ -175,29 +177,39 @@ def emulator(s, image, original_hook):
                 (station+s['InstanceBehaviour'], 0), (station+s['InstanceEnergy'], 240),
                 (s['StationDormantFlag'], 0), (s['StationPresent'], 1),
                 (s['PlayerSpeed'], 0), (s['PlayerRoll'], 0), (s['PlayerPitch'], 0),
+                (s['ControlsLockedFlag'], 1), (s['DockingContactFlag'], 0),
                 (s['DockingComputerFitted'], 1)):
-            args += rs.poke(18, hex(address), bytes((value,)).hex())
+            ram[address] = value
         if original:
-            args += rs.poke(0, hex(s['DockingRotationHookStart']), original_hook.hex())
-        if computer:
-            args += rs.key(18.05, .5, 'C')
-        label = 'docking-rotation-'+name
-        subprocess.run([sys.executable, str(rs.CHECKER), *args, '--name', label, '--no-screenshots'],
-                       cwd=ROOT, check=True, capture_output=True, text=True)
-        run_report = json.loads((ROOT / f'build/emulator/{label}.json').read_text())
-        ram = (ROOT / f'build/emulator/{label}-memory.bin').read_bytes()
-        assert run_report['machine'] == 'ZX Spectrum 48K'
-        assert all(p['applied'] for p in run_report['test_pokes'])
+            ram[s['DockingRotationHookStart']:s['DockingRotationHookLimit']] = original_hook
+        shield_before = ram[s['ForwardShield']]
+        assert shield_before > 0
+        executed, operations = set(), 0
+        for updates in range(1, 33):
+            operations += bench.main_loop_frame(sim, s, keys=('C',) if computer else (),
+                                               executed=executed)
+            assert s['RunGameOverSequence'] not in executed, name
+            if not ram[s['FlightCondition']] or (name == 'vertical' and ram[s['ForwardShield']] < shield_before):
+                break
+        else:
+            raise AssertionError((name, 'no docking/contact outcome after 32 updates'))
         docked = ram[s['FlightCondition']] == 0
         assert docked == (name != 'vertical'), (name, docked, ram[s['PlayerDeadFlag']])
         assert not ram[s['PlayerDeadFlag']], name
-        assert s['RunGameOverSequence'] not in run_report['execution_map'], name
-        if not original:
-            assert s['DockingRotationCheck'] in run_report['execution_map'], name
+        if not original and not computer:
+            assert s['DockingRotationCheck'] in executed, name
+        if computer:
+            assert ram[s['DockingComputerFlag']] == 1, name
         results[name] = dict(docked=docked, player_dead=ram[s['PlayerDeadFlag']],
-                             front_shield=ram[s['ForwardShield']], operations=run_report['operations'])
+                             front_shield_before=shield_before, front_shield=ram[s['ForwardShield']],
+                             updates=updates, operations=operations)
         if name == 'vertical':
-            assert ram[s['ForwardShield']] < 160, 'misalignment must damage the front shield'
+            assert ram[s['ForwardShield']] < shield_before, 'misalignment must damage the front shield'
+            assert s['UpdateEnergyAndShields'] in executed
+            assert ram[s['DockingContactFlag']] == 0
+        label = 'docking-rotation-'+('adder-' if s['SHIP_ADDER'] else 'krait-')+name
+        (OUT / (label+'-memory.bin')).write_bytes(bytes(ram))
+        png(ram[0x4000:0x5B00], OUT / (label+'.png'))
         print('PASS: 48K ROM-load:', name, 'docked' if docked else 'scraped, stayed in flight', flush=True)
     return results
 
