@@ -263,21 +263,42 @@ class Checker:
         m.call('UpdateStationDormancy', iy=IY_SENTINEL, **cr.ZERO_REGISTERS)
         assert m.byte('StationDormantFlag') == 0 and m.iy() == IY_SENTINEL
         d = [p - q for p, q in zip(position(m, self.planet), position(m, self.station))]
+        full_axis = []
+        for i in range(3):
+            value = m.word(self.station + AXIS_Z + 2 * i)
+            full_axis.append(-(value & 0x7FFF) if value & 0x8000 else value)
+        self.last_arrival_precision = (angle(full_axis, d),
+                                       angle(full_axis, axis(m, self.station, AXIS_Z)))
         return arrival, angle(axis(m, self.station, AXIS_Z), d)
 
     def check_arrivals(self):
         rng = random.Random(0xA221)
         fixed_worst, original_errors, arrival_away = 0.0, [], 0
+        full_worst = quantization_worst = 0.0
         for index, (galaxy, seeds) in enumerate(self.systems()):
             turns = [(rng.choice((0, 1, 4, 8, 15)) | rng.choice((0, 0x80)),
                       rng.choice((0, 1, 3, 8)) | rng.choice((0, 0x80))) for _ in range(12)]
             arrival, fixed = self.fly(self.fixed, galaxy, seeds, turns)
+            full_error, quantization_error = self.last_arrival_precision
+            full_worst = max(full_worst, full_error)
+            quantization_worst = max(quantization_worst, quantization_error)
             fixed_worst = max(fixed_worst, fixed)
             arrival_away += arrival > 90
             if index % 4 == 0:
                 original_errors.append((arrival, self.fly(self.original, galaxy, seeds, turns)[1]))
         assert arrival_away == 464, arrival_away
-        assert fixed_worst < MAX_NOMINAL_ERROR, fixed_worst
+        if self.symbols.get('ROTATION_DRIFT_FIX', 0):
+            # New rotations sample different directions. The historical <1 deg
+            # limit on high bytes alone fails at [3543,-2007,98219]: the full
+            # nose is only 0.391 deg off, but truncating it to [3,-1,127] gives
+            # 1.012 deg. Check alignment and high-byte quantization separately.
+            # A unit vector of length >=127 loses less than one unit per axis.
+            quantization_limit = math.degrees(math.asin(math.sqrt(3) / 127))
+            assert full_worst < MAX_NOMINAL_ERROR, full_worst
+            assert quantization_worst < quantization_limit, quantization_worst
+            assert fixed_worst < MAX_NOMINAL_ERROR + quantization_limit, fixed_worst
+        else:
+            assert fixed_worst < MAX_NOMINAL_ERROR, fixed_worst
         # The original keeps every reversed slot and adds the dormant turns to the others.
         assert all(after > 90 for arrival, after in original_errors if arrival > 90)
         turned = sum(arrival < 1 and after > 10 for arrival, after in original_errors)
@@ -286,6 +307,8 @@ class Checker:
         self.report['arrivals'] = dict(
             systems=2048, reversed_at_arrival=arrival_away, turns_while_dormant=12,
             fixed_worst_slot_error_degrees=round(fixed_worst, 3),
+            full_axis_error_degrees=round(full_worst, 3),
+            high_byte_quantization_degrees=round(quantization_worst, 3),
             original_sample=len(original_errors),
             original_slot_error_over_10_degrees=sum(e > 10 for e in original_errors),
             original_turned_away_from_a_correct_arrival=turned,

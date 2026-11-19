@@ -8,6 +8,7 @@ missions/energy-bomb-exemption, screen/xor-crosshair, screen/pixel-screen-addres
 numbers/fuel-and-seed-helpers, maths/square-root-and-normalise, maths/rotation-helpers and
 the pass-2 checks pipeline/r8-projected-object-size, missions/r8-docking-contact,
 missions/r8-energy-drain, missions/r8-object-presence-flags and maths/r8-motion-helpers.
+Optional position-rotation entry: tools/check_rotation_drift_fix.py; docs/ROTATION-DRIFT-FIX.md.
 """
 
 SECTIONS = {
@@ -516,6 +517,10 @@ Rotate one component of the three orientation vectors (IX+$0A, +$10, +$16) by th
 object's angles: pitch couples +$0A/+$10, roll couples +$10/+$16; IX += 2.
 Applied to all three components this rotates the object about its own axes: pitch mixes
 its Z (nose) and Y (roof) vectors, roll mixes its X (side) and Y vectors."""),
+    0xDF0B: ('TranslatePlayerPosition', 'verified', """
+Forward translation after position rotation. Original entry at the LD A,(PlayerSpeed).
+rotationdriftfix=yes rejoins here; instruction bytes and all callers are unchanged.
+Evidence: original block-5 $DF0B..$DF45; tools/check_rotation_drift_fix.py."""),
     0xDED1: ('ApplyPlayerMotion', 'verified', """
 Rotate the 24-bit position at IX+0..8 by the player's pitch (L_7043, y-z) and roll
 (L_7042, x-y) with AddScaledCoordinate, then move z by 2*(L_7044+1): positive z decreases,
@@ -528,7 +533,9 @@ direction is not undone by the same rate in the other.  Rolling alternately left
 pushes positions away from the view axis at unchanged depth (planet 4.98 times further
 after 20 cycles of 32 updates each way); one direction alone does not.
 Evidence: tools/check_routines.py maths/r8-motion-helpers (z step, zero crossing,
-overflow, returned HL), maths/roll-reversal-drift."""),
+overflow, returned HL), maths/roll-reversal-drift.
+rotationdriftfix=yes replaces these rotation steps and the coordinate products with
+reversible three-shear planes and exact products; see docs/ROTATION-DRIFT-FIX.md."""),
     0xDF46: ('AddScaledCoordinate', 'verified', """
 Coordinate at IX+HL += coordinate at IX+DE * |C| / 256, sign = sign(C) XOR source sign
 (24-bit sign-magnitude, approximate products).  IX/IY preserved.

@@ -1362,8 +1362,8 @@ Use `make.bat ship=krait font=48 verify=no` for the Krait check and
 The inherited broader gameplay scenarios above remain available; they are
 not all required for a font-only data substitution.
 
-The option check (`tools/check_build_options.py`) runs in about 25 seconds
-(92 builds). It checks the following:
+The option check (`tools/check_build_options.py`) uses single-option builds,
+pairwise combinations and all eight dependency states. It checks the following:
 
 - The default build reproduces the reference tape.
 - Every non-default value alone builds in both verification modes. The strict
@@ -1382,14 +1382,22 @@ The option check (`tools/check_build_options.py`) runs in about 25 seconds
   - the missile target fix: its one instruction;
   - the text full stop fix: its two parts;
   - the I.F.F. unit: its eight parts;
-  - the randomized spawn: its five parts.
-- These areas, together with every byte `ship=adder` changes, are pairwise
-  disjoint. That is what makes the options composable.
+  - the randomized spawn: its five parts;
+  - competition removal: its two reclaimed areas;
+  - rotation drift: its seven areas, including those two reclaimed areas;
+  - docking rotation: its six-byte hook and three gaps within rotation padding.
+- Independent areas, together with every byte `ship=adder` changes, must be
+  disjoint. Permitted overlaps are the two competition regions reused by
+  `rotationdriftfix`, and the three rotation-padding gaps used by
+  `dockingrotation`. The test verifies effective settings and dependent payload
+  precedence, including explicit parent `no` requests overridden by a child `yes`.
 - Combinations are built in both modes:
   - a greedy covering array in which every pair of values of two options is
-    built together at least once (476 pairs in 20 combinations), so two includes
+    built together at least once, so two includes
     that clash on a symbol or an assertion fail there;
-  - every option on at once for each ship and non-default font.
+  - every option on at once for each ship and non-default font;
+  - every requested combination of competition removal, rotation drift and
+    docking rotation, including explicit conflicting parent values.
 
   Each relaxed build must equal the reference, or the Adder build, with the
   selected options' bytes overlaid.
@@ -1398,12 +1406,12 @@ The option check (`tools/check_build_options.py`) runs in about 25 seconds
   are rejected even with identity disabled.
 
 `python tools/check_build_options.py --full` builds the complete product of
-all values instead of the selected combinations: 65,536 combinations, several
+all values instead of the selected combinations: 524,288 requested combinations, several
 hours. Use it after changing the build machinery itself. Either mode leaves
 Adder with `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
 stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
 scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes
-iffunit=yes randomizedspawn=yes` built. A new option must be added to `OPTIONS`, and a new
+iffunit=yes randomizedspawn=yes competitionremove=yes rotationdriftfix=yes dockingrotation=yes` built. A new option must be added to `OPTIONS`, and a new
 fix's areas to `FIX_PARTS`, in that tool.
 
 The ship check compares all other models with the original bytes, resolves
@@ -1518,3 +1526,23 @@ named releases untouched. Verification and emulator/analysis helpers retain
 the default filename unless explicitly configured; `verify.bat` accepts
 `tapfile=`, while existing emulator helpers use `release/elite-128k.tap`.
 Rebuild that default filename before running those emulator helpers.
+
+## Position rotation and post-save security number
+
+`competitionremove=no rotationdriftfix=no dockingrotation=no` preserves the reference.
+`competitionremove=yes` independently removes the post-save security number
+([details](COMPETITION-REMOVE.md)). `rotationdriftfix=yes` automatically enables
+that removal, overriding an explicit `competitionremove=no`, and reuses the
+post-save security-number code for reversible position rotations and exact
+coordinate products. It fixes the outward drift under repeated roll/pitch
+reversals for sun, planet and object positions. The 104-byte commander tape
+record remains unchanged. See [Position rotation fix](ROTATION-DRIFT-FIX.md)
+for the seven bounded replacement areas, arithmetic limits and targeted tests.
+
+`dockingrotation=yes` adds a manual docking roll check: the slot's long side
+must be approximately horizontal, including the equivalent 180-degree
+orientation. It uses 18 of the 19 rotation-padding bytes and therefore enables
+`rotationdriftfix=yes` (and `competitionremove=yes`) automatically. Failed roll
+alignment uses the original scrape damage; the docking computer is unaffected.
+Only one byte remains in those gaps. See [Docking roll alignment](DOCKING-ROTATION.md)
+for the ZX geometry, threshold, storage and regression tests.

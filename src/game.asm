@@ -14987,6 +14987,9 @@ L_D34C:
 ; Evidence: decoded messages, ROM entry points; tools/check_routines.py
 ; commander/security-number (Python model of HL and DE) and commander/p7-security-number-print
 ; (printed text).
+; competitionremove=yes skips the security-number output. rotationdriftfix=yes enables
+; that option and reuses its code for position rotation; the tape record, success message
+; and restart snapshot remain unchanged.
 AccessMenuSave:
     LD HL,ActiveCommanderRecord                ; $D35A: 21 16 A8  name field of the active record
     CALL PromptCommanderName                   ; $D35D: CD 25 D4  input the name into the record
@@ -15005,6 +15008,10 @@ AccessMenuSave:
     JP NC,ReportTapeBreak                      ; $D37E: D2 07 D4  BREAK: message "BREAK"
     LD A,$97                                   ; $D381: 3E 97  message $97: COMMANDER SAVED
     CALL PrintStatusLineMessage                ; $D383: CD 2C D4  bottom status line (row 22), beep if enabled
+assert $-GameImage = CompetitionSecurityStart-GameLoadAddress
+IF COMPETITION_REMOVE
+    CompetitionSecurityCode
+ELSE
     LD HL,$0C01                                ; $D386: 21 01 0C  column 1, row 12
     LD (TextColumn),HL                         ; $D389: 22 0D A8
     LD A,$04                                   ; $D38C: 3E 04  message 4: "SECURITY NUMBER: "
@@ -15057,6 +15064,8 @@ L_D3AB:
     POP HL                                     ; $D3DD: E1
     AND A                                      ; $D3DE: A7
     CALL PrintDecimalHL                        ; $D3DF: CD 60 B7  second number (the pushed DE)
+ENDIF
+assert $-GameImage = CompetitionSecurityLimit-GameLoadAddress
 
 ; VERIFIED: Copy the 102 persistent bytes of ActiveCommanderRecord to CommanderTemplateBuffer (the
 ; restart snapshot) after a successful load or save, then return to AccessMenuKeyLoop.
@@ -15074,6 +15083,10 @@ L_D3ED:
 
 ; VERIFIED: Count the set bits of A in C (B = 8 RRA steps) and rotate the parity (bit 0 of C) into
 ; bit 7 of D (RR C / RR D).  Clobbers: A, B, C, flags.  Used by the security number.
+assert $-GameImage = CompetitionParityStart-GameLoadAddress
+IF COMPETITION_REMOVE
+    CompetitionParitySpace
+ELSE
 RotateParityIntoD:
     LD B,$08                                   ; $D3F0: 06 08
     LD C,$00                                   ; $D3F2: 0E 00  C = number of set bits
@@ -15086,6 +15099,8 @@ L_D3F8:
     RR C                                       ; $D3FA: CB 19  carry = parity
     RR D                                       ; $D3FC: CB 1A  parity into bit 7 of D
     RET                                        ; $D3FE: C9
+ENDIF
+assert $-GameImage = CompetitionParityLimit-GameLoadAddress
 
 ; VERIFIED: LD-BYTES returned with carry clear: HALT for the next keyboard scan; if the key code
 ; LastKeyCode is ' ' (BREAK) print "BREAK" (ReportTapeBreak), otherwise "TAPE LOADING ERROR" and restore
@@ -17232,7 +17247,13 @@ RotateOrientationComponent:
 ; after 20 cycles of 32 updates each way); one direction alone does not.
 ; Evidence: tools/check_routines.py maths/r8-motion-helpers (z step, zero crossing,
 ; overflow, returned HL), maths/roll-reversal-drift.
+; rotationdriftfix=yes replaces these rotation steps and the coordinate products with
+; reversible three-shear planes and exact products; see docs/ROTATION-DRIFT-FIX.md.
 ApplyPlayerMotion:
+assert $-GameImage = RotationDriftRotationStart-GameLoadAddress
+IF ROTATION_DRIFT_FIX
+    RotationDriftRotationCode
+ELSE
     LD A,(PlayerPitch)                         ; $DED1: 3A 43 70
     XOR $80                                    ; $DED4: EE 80  C = -pitch
     LD C,A                                     ; $DED6: 4F
@@ -17257,6 +17278,13 @@ ApplyPlayerMotion:
     LD HL,$0003                                ; $DF02: 21 03 00
     LD DE,$0006                                ; $DF05: 11 06 00
     CALL AddScaledCoordinate                   ; $DF08: CD 46 DF  y += z * pitch / 256 (new z)
+ENDIF
+assert $-GameImage = RotationDriftRotationLimit-GameLoadAddress
+
+; VERIFIED: Forward translation after position rotation. Original entry at the LD A,(PlayerSpeed).
+; rotationdriftfix=yes rejoins here; instruction bytes and all callers are unchanged.
+; Evidence: original block-5 $DF0B..$DF45; tools/check_rotation_drift_fix.py.
+TranslatePlayerPosition:
     LD A,(PlayerSpeed)                         ; $DF0B: 3A 44 70  player speed
     INC A                                      ; $DF0E: 3C
     ADD A,A                                    ; $DF0F: 87
@@ -17310,12 +17338,24 @@ AddScaledCoordinate:
     RES 7,C                                    ; $DF5F: CB B9
     RES 7,B                                    ; $DF61: CB B8  magnitudes only
     PUSH DE                                    ; $DF63: D5
+assert $-GameImage = RotationDriftHighMultiplyStart-GameLoadAddress
+IF ROTATION_DRIFT_FIX
+    CALL RotationDriftMultiply
+ELSE
     CALL MultiplyUnsigned                      ; $DF64: CD 5D E4  high byte * |C|
+ENDIF
+assert $-GameImage = RotationDriftHighMultiplyLimit-GameLoadAddress
     POP DE                                     ; $DF67: D1
     PUSH HL                                    ; $DF68: E5
     LD B,D                                     ; $DF69: 42
     PUSH DE                                    ; $DF6A: D5
+assert $-GameImage = RotationDriftMidMultiplyStart-GameLoadAddress
+IF ROTATION_DRIFT_FIX
+    CALL RotationDriftMultiply
+ELSE
     CALL MultiplyUnsigned                      ; $DF6B: CD 5D E4  mid byte * |C|
+ENDIF
+assert $-GameImage = RotationDriftMidMultiplyLimit-GameLoadAddress
     POP DE                                     ; $DF6E: D1
     LD B,E                                     ; $DF6F: 43
     LD A,L                                     ; $DF70: 7D
@@ -17325,16 +17365,28 @@ AddScaledCoordinate:
     ADD HL,DE                                  ; $DF75: 19
     LD E,A                                     ; $DF76: 5F
     PUSH HL                                    ; $DF77: E5
+assert $-GameImage = RotationDriftLowMultiplyStart-GameLoadAddress
+IF ROTATION_DRIFT_FIX
+    CALL RotationDriftMultiplyHigh
+ELSE
     CALL MultiplyUnsignedHigh                  ; $DF78: CD 34 E4  low byte * |C| (high part)
+ENDIF
+assert $-GameImage = RotationDriftLowMultiplyLimit-GameLoadAddress
     ADD A,E                                    ; $DF7B: 83
     POP HL                                     ; $DF7C: E1
     JR NC,L_DF80                               ; $DF7D: 30 01
     INC HL                                     ; $DF7F: 23
 L_DF80:
+assert $-GameImage = RotationDriftProductStart-GameLoadAddress
+IF ROTATION_DRIFT_FIX
+    RotationDriftProductHook
+ELSE
     LD B,A                                     ; $DF80: 47
     LD A,H                                     ; $DF81: 7C
     LD H,L                                     ; $DF82: 65
     LD L,B                                     ; $DF83: 68
+ENDIF
+assert $-GameImage = RotationDriftProductLimit-GameLoadAddress
     POP BC                                     ; $DF84: C1
     LD C,B                                     ; $DF85: 48
     LD B,(IY+$02)                              ; $DF86: FD 46 02
@@ -19321,8 +19373,11 @@ L_EAD5:
 ; 1, and CheckDocking docks on its next call.  Otherwise a scrape: SoundEffectRequests
 ; bit 6 and FrontDamageThisUpdate += 12 + 2*PlayerSpeed (again on every update while
 ; in contact).  The contact box, not the slot position, decides; the roll of the
-; station is not tested.  The station keeps its energy.
-; Evidence: tools/check_routines.py contact/p9-station-docking.
+; station is not tested in the original. The station keeps its energy.
+; dockingrotation=yes replaces only the six-byte success tail with an additional
+; slot-roll gate; failures use the same scrape path.
+; Evidence: tools/check_routines.py contact/p9-station-docking;
+; tools/check_docking_rotation.py for the optional gate.
 TestStationDocking:
     BIT 2,(IX+$26)                             ; $EAD8: DD CB 26 56
     JR Z,CollideWithObject                     ; $EADC: 28 45  not the station: collision
@@ -19346,9 +19401,15 @@ TestStationDocking:
     LD A,B                                     ; $EB05: 78
     CP $3C                                     ; $EB06: FE 3C  |Z.x| >= $1E: scrape
     JR NC,L_EB10                               ; $EB08: 30 06
+assert $-GameImage = DockingRotationHookStart-GameLoadAddress
+IF DOCKING_ROTATION
+    DockingRotationHookCode
+ELSE
     LD A,$01                                   ; $EB0A: 3E 01
     LD (DockingContactFlag),A                  ; $EB0C: 32 15 DA  DockingContactFlag = 1: CheckDocking docks
     RET                                        ; $EB0F: C9
+ENDIF
+assert $-GameImage = DockingRotationHookLimit-GameLoadAddress
 L_EB10:
     LD HL,SoundEffectRequests                  ; $EB10: 21 7D 70
     SET 6,(HL)                                 ; $EB13: CB F6  sound request bit 6
@@ -24092,7 +24153,6 @@ defc L_D320 = AccessMenuLoad
 defc L_D326 = LoadCommanderRecord
 defc L_D35A = AccessMenuSave
 defc L_D3E2 = CopyCommanderToTemplate
-defc L_D3F0 = RotateParityIntoD
 defc L_D3FF = TapeLoadFailed
 defc L_D407 = ReportTapeBreak
 defc L_D411 = ReportTapeLoadingError
@@ -24171,6 +24231,7 @@ defc L_DE0B = RotateVectorRollPitch
 defc L_DE5D = AddScaledSignMagnitude
 defc L_DE88 = RotateOrientationComponent
 defc L_DED1 = ApplyPlayerMotion
+defc L_DF0B = TranslatePlayerPosition
 defc L_DF46 = AddScaledCoordinate
 defc L_DFDD = RotateAndDrawTitleShip
 defc L_E008 = DrawObjectInView
@@ -24361,6 +24422,9 @@ defc L_FF68 = KeySymbolShiftActionByte
 defc L_FF69 = KeySymbolShiftActionMask
 defc L_FF98 = KeyBActionByte
 defc L_FF99 = KeyBActionMask
+IF !COMPETITION_REMOVE
+defc L_D3F0 = RotateParityIntoD
+ENDIF
 IF !IFF_UNIT
 defc L_9260 = UseEnergyBomb
 ENDIF

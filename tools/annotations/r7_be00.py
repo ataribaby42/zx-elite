@@ -6,7 +6,8 @@ runtime traces (docs/generated/runtime-xrefs.json: docked screens, market,
 inventory, system data, access menu); the supplied 48K ROM (LD-BYTES/SA-BYTES
 entry points); SkoolKit execution tests for InsertSpaceInTextBuffer,
 CompareWithGalaxySeeds, the rating thresholds (all bands) and the security
-number (3000 random records against a Python model).  The square tables
+number (3000 random records against a Python model). Optional removal after save:
+tools/check_competition_remove.py verifies the record, restart snapshot and BREAK path.  The square tables
 ($BE00), font ($C000), cockpit attributes ($C700) and bitmap ($C800) are
 verified include files owned elsewhere.
 """
@@ -347,7 +348,10 @@ On BREAK the typed name and the nine sun bytes are already in the record; the te
 not updated.
 Evidence: decoded messages, ROM entry points; tools/check_routines.py
 commander/security-number (Python model of HL and DE) and commander/p7-security-number-print
-(printed text)."""),
+(printed text).
+competitionremove=yes skips the security-number output. rotationdriftfix=yes enables
+that option and reuses its code for position rotation; the tape record, success message
+and restart snapshot remain unchanged."""),
     0xD3E2: ('CopyCommanderToTemplate', 'verified', """
 Copy the 102 persistent bytes of ActiveCommanderRecord to CommanderTemplateBuffer (the
 restart snapshot) after a successful load or save, then return to AccessMenuKeyLoop.

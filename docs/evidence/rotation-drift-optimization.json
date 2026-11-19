@@ -1,0 +1,396 @@
+{
+  "machine": "ZX Spectrum 48K",
+  "rom": "assets/zxspectrum48k.rom",
+  "clock_hz": 3500000,
+  "ship": "krait",
+  "image_sha256": {
+    "original": "55de3c7f56b1d54434c6b1a7b360174a1f56252e839abdce5463526128e1ff07",
+    "fixed": "1061007bea288e20e8864f356a51b7cfa7486ac0154de3fcdcb316274e729948",
+    "previous": "0d4287aaf9141a48d51932b05aac5ed7411f7de8156ac7283eee0b5d1105889c"
+  },
+  "routine": {
+    "straight": {
+      "original": {
+        "mean_tstates": 4734.2,
+        "min_tstates": 4703,
+        "max_tstates": 4776
+      },
+      "fixed": {
+        "mean_tstates": 383.2,
+        "min_tstates": 352,
+        "max_tstates": 425
+      },
+      "previous": {
+        "mean_tstates": 383.2,
+        "min_tstates": 352,
+        "max_tstates": 425
+      }
+    },
+    "roll1": {
+      "original": {
+        "mean_tstates": 4742.8,
+        "min_tstates": 4714,
+        "max_tstates": 4787
+      },
+      "fixed": {
+        "mean_tstates": 3825.4,
+        "min_tstates": 3718,
+        "max_tstates": 3887
+      },
+      "previous": {
+        "mean_tstates": 4664,
+        "min_tstates": 4601,
+        "max_tstates": 4727
+      }
+    },
+    "roll15": {
+      "original": {
+        "mean_tstates": 4746.4,
+        "min_tstates": 4714,
+        "max_tstates": 4790
+      },
+      "fixed": {
+        "mean_tstates": 4742.2,
+        "min_tstates": 4435,
+        "max_tstates": 5156
+      },
+      "previous": {
+        "mean_tstates": 6230,
+        "min_tstates": 6167,
+        "max_tstates": 6293
+      }
+    },
+    "pitch1": {
+      "original": {
+        "mean_tstates": 4739.2,
+        "min_tstates": 4708,
+        "max_tstates": 4784
+      },
+      "fixed": {
+        "mean_tstates": 3737.8,
+        "min_tstates": 3685,
+        "max_tstates": 3796
+      },
+      "previous": {
+        "mean_tstates": 4199.2,
+        "min_tstates": 4139,
+        "max_tstates": 4259
+      }
+    },
+    "pitch15": {
+      "original": {
+        "mean_tstates": 4764,
+        "min_tstates": 4717,
+        "max_tstates": 4835
+      },
+      "fixed": {
+        "mean_tstates": 4780,
+        "min_tstates": 4578,
+        "max_tstates": 5133
+      },
+      "previous": {
+        "mean_tstates": 5779,
+        "min_tstates": 5699,
+        "max_tstates": 5875
+      }
+    },
+    "both15": {
+      "original": {
+        "mean_tstates": 4776.4,
+        "min_tstates": 4729,
+        "max_tstates": 4847
+      },
+      "fixed": {
+        "mean_tstates": 9270.4,
+        "min_tstates": 8889,
+        "max_tstates": 9770
+      },
+      "previous": {
+        "mean_tstates": 11626.2,
+        "min_tstates": 11515,
+        "max_tstates": 11691
+      }
+    }
+  },
+  "frames": {
+    "front_after_launch_straight": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 389244.4375,
+        "fps": 8.991779105385417
+      },
+      "fixed": {
+        "mean_tstates": 376174.4375,
+        "fps": 9.304194147960944
+      },
+      "previous": {
+        "mean_tstates": 376174.4375,
+        "fps": 9.304194147960944
+      }
+    },
+    "front_after_launch_roll1": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 415576.5625,
+        "fps": 8.422034146836662
+      },
+      "fixed": {
+        "mean_tstates": 409177.59375,
+        "fps": 8.553743053043211
+      },
+      "previous": {
+        "mean_tstates": 415404.125,
+        "fps": 8.42553019905616
+      }
+    },
+    "front_after_launch_roll15": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 420072.84375,
+        "fps": 8.331888271461251
+      },
+      "fixed": {
+        "mean_tstates": 416763.375,
+        "fps": 8.39805081240644
+      },
+      "previous": {
+        "mean_tstates": 423998.84375,
+        "fps": 8.254739491845607
+      }
+    },
+    "front_after_launch_pitch1": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 422990.90625,
+        "fps": 8.274409563621676
+      },
+      "fixed": {
+        "mean_tstates": 418841.15625,
+        "fps": 8.356389881396714
+      },
+      "previous": {
+        "mean_tstates": 419766.34375,
+        "fps": 8.337971950615682
+      }
+    },
+    "front_after_launch_pitch15": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 413428.125,
+        "fps": 8.465800433872273
+      },
+      "fixed": {
+        "mean_tstates": 414104.28125,
+        "fps": 8.45197733632463
+      },
+      "previous": {
+        "mean_tstates": 422774.375,
+        "fps": 8.278647446406845
+      }
+    },
+    "front_after_launch_both15": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 434399.78125,
+        "fps": 8.05709429670667
+      },
+      "fixed": {
+        "mean_tstates": 448165.8125,
+        "fps": 7.809609529285548
+      },
+      "previous": {
+        "mean_tstates": 455404.90625,
+        "fps": 7.685468364450674
+      }
+    },
+    "rear_station_straight": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 761638.90625,
+        "fps": 4.595353482180388
+      },
+      "fixed": {
+        "mean_tstates": 746125.78125,
+        "fps": 4.690898087097831
+      },
+      "previous": {
+        "mean_tstates": 746125.78125,
+        "fps": 4.690898087097831
+      }
+    },
+    "rear_station_roll1": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 790326.53125,
+        "fps": 4.428549291473631
+      },
+      "fixed": {
+        "mean_tstates": 783929.59375,
+        "fps": 4.4646866605168265
+      },
+      "previous": {
+        "mean_tstates": 790156,
+        "fps": 4.429505059760351
+      }
+    },
+    "rear_station_roll15": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 761945.0625,
+        "fps": 4.593507028598928
+      },
+      "fixed": {
+        "mean_tstates": 758709.875,
+        "fps": 4.613094036768666
+      },
+      "previous": {
+        "mean_tstates": 767092.84375,
+        "fps": 4.562681073766698
+      }
+    },
+    "rear_station_pitch1": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 630517.90625,
+        "fps": 5.550992232427181
+      },
+      "fixed": {
+        "mean_tstates": 628370.65625,
+        "fps": 5.569960922248269
+      },
+      "previous": {
+        "mean_tstates": 629381.84375,
+        "fps": 5.561012022759037
+      }
+    },
+    "rear_station_pitch15": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 423894.53125,
+        "fps": 8.256770828533778
+      },
+      "fixed": {
+        "mean_tstates": 424464.3125,
+        "fps": 8.245687321475348
+      },
+      "previous": {
+        "mean_tstates": 426409.65625,
+        "fps": 8.208069279622464
+      }
+    },
+    "rear_station_both15": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 474984.25,
+        "fps": 7.368665382062669
+      },
+      "fixed": {
+        "mean_tstates": 491760.53125,
+        "fps": 7.117285299622142
+      },
+      "previous": {
+        "mean_tstates": 496902.25,
+        "fps": 7.04363886458554
+      }
+    },
+    "front_four_ships_straight": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 751887.6875,
+        "fps": 4.654950544059814
+      },
+      "fixed": {
+        "mean_tstates": 706082.8125,
+        "fps": 4.956925643902428
+      },
+      "previous": {
+        "mean_tstates": 706082.8125,
+        "fps": 4.956925643902428
+      }
+    },
+    "front_four_ships_roll1": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 754188.84375,
+        "fps": 4.64074751172027
+      },
+      "fixed": {
+        "mean_tstates": 750750.75,
+        "fps": 4.662000004662
+      },
+      "previous": {
+        "mean_tstates": 753881.65625,
+        "fps": 4.64263849767866
+      }
+    },
+    "front_four_ships_roll15": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 759185.96875,
+        "fps": 4.610201115495787
+      },
+      "fixed": {
+        "mean_tstates": 749392.09375,
+        "fps": 4.670452262827866
+      },
+      "previous": {
+        "mean_tstates": 766909.59375,
+        "fps": 4.563771308278799
+      }
+    },
+    "front_four_ships_pitch1": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 777040.4375,
+        "fps": 4.504270088260368
+      },
+      "fixed": {
+        "mean_tstates": 758056.25,
+        "fps": 4.617071622323541
+      },
+      "previous": {
+        "mean_tstates": 770624.90625,
+        "fps": 4.541768597944274
+      }
+    },
+    "front_four_ships_pitch15": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 547298.8125,
+        "fps": 6.395044023597256
+      },
+      "fixed": {
+        "mean_tstates": 547784.0625,
+        "fps": 6.389379026521057
+      },
+      "previous": {
+        "mean_tstates": 562423.1875,
+        "fps": 6.223072017278804
+      }
+    },
+    "front_four_ships_both15": {
+      "frames": 32,
+      "original": {
+        "mean_tstates": 564045.0625,
+        "fps": 6.205177977247164
+      },
+      "fixed": {
+        "mean_tstates": 586973.71875,
+        "fps": 5.96278826154855
+      },
+      "previous": {
+        "mean_tstates": 607543.5,
+        "fps": 5.760904363226666
+      }
+    }
+  },
+  "previous_comparison": {
+    "passed": true,
+    "coordinate_byte_cases": 4096,
+    "peak_stack_bytes": {
+      "previous": 28,
+      "fixed": 28
+    }
+  },
+  "method": "Matched complete MainLoop-to-MainLoop frames from the same ROM-loaded 48K state, real interrupts, 32 frames per fixture, nominal 3.5 MHz, no ULA contention. Original trajectory supplies each next input state."
+}

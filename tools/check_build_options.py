@@ -1,14 +1,15 @@
 """Exercise the build options; leave Adder/single/48K with every fix built.
 
-Default mode (92 builds, about 25 seconds):
+Default mode uses single-option builds and a pairwise covering array:
 
 1. The default build must reproduce the reference tape.
 2. Every non-default value alone, in both verification modes: the strict build
    fails and leaves no release or PASS report; the relaxed build changes only
    the bytes that option declares.  Laser and font bytes are compared with
    independent sources (the owner's patch note and PATCH128.TAP).
-3. The declared areas of all options, including everything ship=adder
-   changes, are pairwise disjoint.  This is what makes options composable.
+3. Declared areas are disjoint except for the competition -> rotation -> docking
+   dependency chain. Docking uses only three padding gaps within rotation.
+   Dependent payloads take precedence inside their declared shared regions.
 4. Combinations: a covering array in which every pair of values of two
    options is built together at least once (two includes that clash on a
    symbol or an assertion fail there); every option on at once for each ship
@@ -19,7 +20,7 @@ Default mode (92 builds, about 25 seconds):
    must fail even with identity checks off.
 
 --full builds the complete product of all values instead of step 4's
-selection (65,536 combinations, several hours).  Use it after changing the
+selection (524,288 requested combinations). Use it after changing the
 build machinery itself.
 """
 import argparse
@@ -48,6 +49,9 @@ OPTIONS = (
     ('textfullstopfix', ('no', 'yes')),
     ('iffunit', ('no', 'yes')),
     ('randomizedspawn', ('no', 'yes')),
+    ('competitionremove', ('no', 'yes')),
+    ('rotationdriftfix', ('no', 'yes')),
+    ('dockingrotation', ('no', 'yes')),
 )
 NAMES = tuple(name for name, _ in OPTIONS)
 DEFAULT = tuple(values[0] for _, values in OPTIONS)
@@ -57,6 +61,14 @@ FINAL = ('adder', 'single', '48') + ALL_FIXES
 # Areas a fix replaces: Start/Limit constant prefixes in src/options.asm, with the
 # original addresses they must keep.
 FIX_PARTS = {
+    'competitionremove': (('CompetitionSecurity', 'CompetitionParity'), [(0xD386, 0xD3E2), (0xD3F0, 0xD3FF)]),
+    'rotationdriftfix': (('CompetitionSecurity', 'CompetitionParity', 'RotationDriftRotation', 'RotationDriftProduct',
+                        'RotationDriftHighMultiply', 'RotationDriftMidMultiply', 'RotationDriftLowMultiply'),
+                       [(0xD386, 0xD3E2), (0xD3F0, 0xD3FF), (0xDED1, 0xDF0B), (0xDF80, 0xDF84),
+                        (0xDF64, 0xDF67), (0xDF6B, 0xDF6E), (0xDF78, 0xDF7B)]),
+    'dockingrotation': (('DockingRotationHook', 'DockingRotationLoad', 'DockingRotationCompare',
+                         'DockingRotationAccept'),
+                        [(0xEB0A, 0xEB10), (0xD3DD, 0xD3E2), (0xD3F7, 0xD3FF), (0xDF05, 0xDF0B)]),
     'stationrandomlaunchfix': (('ParentLaunchSelection',), [(0xF44A, 0xF470)]),
     'stationslotfix': (('StationSwitchOnStore', 'StationSlotAlign', 'StationSlotRoof', 'StationSlotFinish'),
                        [(0x77CB, 0x77CE), (0xE88B, 0xE8CF), (0xAC56, 0xAC77), (0xFCED, 0xFD00)]),
@@ -79,6 +91,16 @@ FIX_PARTS = {
                          (0xF6FB, 0xF70E)]),
 }
 LASER_PATCH = bytes.fromhex('21 3f 00 79 f6 03 4f c3')  # + DrawLine, the owner's final ten-byte patch
+
+
+def effective_values(row):
+    """Independent expectation for requested vs effective build settings."""
+    values = dict(zip(NAMES, row))
+    if values['dockingrotation'] == 'yes':
+        values['rotationdriftfix'] = 'yes'
+    if values['rotationdriftfix'] == 'yes':
+        values['competitionremove'] = 'yes'
+    return values
 
 
 def covering_rows():
@@ -108,6 +130,12 @@ def selected_rows(full):
         rows, pairs = covering_rows()
         rows += [(ship, 'single', font) + ALL_FIXES for ship in ('krait', 'adder')
                  for font in ('48', '128fix', '128fix_ecm_s')]
+        # Exercise every requested state of the three-option dependency chain,
+        # including explicit no values overridden by a dependent yes.
+        for values in product(('no', 'yes'), repeat=3):
+            selected = dict(zip(NAMES, DEFAULT))
+            selected.update(zip(('competitionremove', 'rotationdriftfix', 'dockingrotation'), values))
+            rows.append(tuple(selected[n] for n in NAMES))
     ordered = []
     for row in rows:
         if row not in ordered and row != FINAL:
@@ -154,7 +182,13 @@ def main():
             assert not (ROOT/'build/verification.json').exists()
         run(name+'-relaxed', *(arg for n, v in zip(NAMES, row) for arg in (f'--{n}', v)), '--verify', 'no')
         metadata = json.loads((ROOT/'build/verification.json').read_text())
-        assert tuple(metadata[n] for n in NAMES) == row, (row, metadata)
+        assert {n: metadata[n] for n in NAMES} == effective_values(row), (row, metadata)
+        assert metadata['competitionremove_requested'] == dict(zip(NAMES, row))['competitionremove']
+        assert metadata['rotationdriftfix_requested'] == dict(zip(NAMES, row))['rotationdriftfix']
+        built = symbol_map(ROOT/'build/game.map')
+        assert built['COMPETITION_REMOVE'] == int(effective_values(row)['competitionremove'] == 'yes')
+        assert built['ROTATION_DRIFT_FIX'] == int(effective_values(row)['rotationdriftfix'] == 'yes')
+        assert built['DOCKING_ROTATION'] == int(effective_values(row)['dockingrotation'] == 'yes')
         return RELEASE_TAP.read_bytes()
 
     # 1. Defaults.
@@ -197,7 +231,7 @@ def main():
 
     def expected(row):
         """The reference (or the Adder build) with the selected options' bytes overlaid."""
-        values = dict(zip(NAMES, row))
+        values = effective_values(row)
         blocks = parse(adder_tap if values['ship'] == 'adder' else reference_tap)
         payload = bytearray(blocks[5].payload)
         if values['laser'] == 'single':
@@ -211,6 +245,10 @@ def main():
             assert len(font) == end-start
             payload[start:end] = font
         for name, image in overlay.items():
+            # The dependent option supplies the complete shared-region payload;
+            # do not let the standalone removal's padding erase its helpers.
+            if name == 'competitionremove' and values['rotationdriftfix'] == 'yes':
+                continue
             if values[name] == 'yes':
                 for start, end in areas[name]:
                     payload[start-base:end-base] = image[start-base:end-base]
@@ -222,13 +260,24 @@ def main():
             assert tap == expected(row), f'{name}={value}: bytes outside its declared areas changed'
         singles.append(dict(option=name, value=value, relaxed_sha256=sha(tap)))
 
-    # 3. Declared areas are pairwise disjoint; ship=adder's changes count as its area.
+    # 3. Only explicit dependency regions may overlap. The docking helper's
+    # three parts are wholly inside the rotation padding, not arbitrary code.
     adder_payload = parse(adder_tap)[5].payload
     claimed = {name: {address for start, end in found for address in range(start, end)}
                for name, found in areas.items()}
     claimed['ship'] = {base+i for i, (a, b) in enumerate(zip(reference_payload, adder_payload)) if a != b}
+    docking_gaps = {address for start, end in areas['dockingrotation'][1:] for address in range(start, end)}
+    competition_gaps = {address for start, end in areas['dockingrotation'][1:3] for address in range(start, end)}
+    shared = {('competitionremove', 'rotationdriftfix'): claimed['competitionremove'],
+              ('competitionremove', 'dockingrotation'): competition_gaps,
+              ('dockingrotation', 'rotationdriftfix'): docking_gaps}
+    rotation_payload = overlay['rotationdriftfix']
+    assert all(rotation_payload[a-base] == 0 for a in docking_gaps), 'docking must reuse padding only'
     for first, second in pairs_of(sorted(claimed), 2):
         common = claimed[first] & claimed[second]
+        if (first, second) in shared:
+            assert common == shared[first, second], ('incorrect dependency overlap', first, second)
+            continue
         assert not common, (first, second, sorted(f'${a:04X}' for a in common)[:8])
 
     # 4. Combinations.
@@ -237,7 +286,9 @@ def main():
     for row in rows:
         tap = build_both(row)
         assert tap == expected(row), f'{label(row)}: the build is not the sum of its options'
-        combinations.append(dict(zip(NAMES, row), strict_accepted=row == DEFAULT, relaxed_sha256=sha(tap)))
+        combinations.append(dict(zip(NAMES, row), competitionremove_effective=effective_values(row)['competitionremove'],
+                                 rotationdriftfix_effective=effective_values(row)['rotationdriftfix'],
+                                 strict_accepted=row == DEFAULT, relaxed_sha256=sha(tap)))
     assert rows[-1] == FINAL
 
     # 5. Invalid values, strict verify-only and corrupt TAPs.
@@ -275,12 +326,14 @@ def main():
         passed=True, strategy='full product' if full else 'pairwise covering array',
         value_pairs_covered=pairs, builds=builds[0], single_option_builds=singles,
         declared_areas={name: [f'${s:04X}..${e-1:04X}' for s, e in found] for name, found in sorted(areas.items())},
-        adder_changed_bytes=len(claimed['ship']), areas_pairwise_disjoint=True,
+        adder_changed_bytes=len(claimed['ship']), areas_pairwise_disjoint=False,
+        independent_areas_disjoint=True,
+        declared_dependency=dict(rotationdriftfix='competitionremove', dockingrotation='rotationdriftfix'),
         combinations=combinations, invalid_values_rejected=list(NAMES),
         corrupt_tapes_rejected_without_identity=True,
         final=dict(zip(NAMES, FINAL)), final_tape_sha256=sha(good)), indent=2)+'\n', encoding='utf-8')
     scope = 'the complete product' if full else f'all {pairs} value pairs and every option on at once'
-    print(f'PASS: {len(singles)} single-option builds scoped to disjoint areas; {len(rows)} combinations covering '
+    print(f'PASS: {len(singles)} single-option builds scoped to declared areas (only declared dependencies share); {len(rows)} combinations covering '
           f'{scope}, each the sum of its options; strict rejection, stale-output handling, invalid values and '
           f'corrupt TAP rejection ({builds[0]} builds).')
 

@@ -408,8 +408,11 @@ and |Z.x|, |Z.y| < $6E (compared as 2*magnitude with $DC).  Both below $1E: L_DA
 1, and CheckDocking docks on its next call.  Otherwise a scrape: SoundEffectRequests
 bit 6 and FrontDamageThisUpdate += 12 + 2*PlayerSpeed (again on every update while
 in contact).  The contact box, not the slot position, decides; the roll of the
-station is not tested.  The station keeps its energy.
-Evidence: tools/check_routines.py contact/p9-station-docking."""),
+station is not tested in the original. The station keeps its energy.
+dockingrotation=yes replaces only the six-byte success tail with an additional
+slot-roll gate; failures use the same scrape path.
+Evidence: tools/check_routines.py contact/p9-station-docking;
+tools/check_docking_rotation.py for the optional gate."""),
     0xEB23: ('CollideWithObject', 'verified', """
 Collision with the object at IX: it is removed (energy 0).  Damage B = $50, plus the
 object's energy for a missile (+$26 bit 0).  The marked mission ship (+$26 bit 6)

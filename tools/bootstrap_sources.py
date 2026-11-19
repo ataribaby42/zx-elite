@@ -317,6 +317,14 @@ def emit_graphics(region, memory, labels, payload, provenance=None):
 # assembled only in the ELSE branch, so labels inside them exist only when the
 # option is off (except names that the replacement defines as well).
 OPTIONAL_REGIONS = [
+    (0xDF64, 0xDF67, 'ROTATION_DRIFT_FIX'),
+    (0xDF6B, 0xDF6E, 'ROTATION_DRIFT_FIX'),
+    (0xDF78, 0xDF7B, 'ROTATION_DRIFT_FIX'),
+    (0xD386, 0xD3E2, 'COMPETITION_REMOVE'),
+    (0xD3F0, 0xD3FF, 'COMPETITION_REMOVE'),
+    (0xDED1, 0xDF0B, 'ROTATION_DRIFT_FIX'),
+    (0xDF80, 0xDF84, 'ROTATION_DRIFT_FIX'),
+    (0xEB0A, 0xEB10, 'DOCKING_ROTATION'),
     (0x716B, 0x7189, 'SHIP_ADDER'),
     (0xA660, 0xA706, 'SCANNER_PIXEL_FIX'),
     (0xECF2, 0xECFE, 'LASER_SINGLE'),
@@ -355,6 +363,14 @@ OPTIONAL_REGIONS = [
 # Options made of several parts: region start -> (macro or instruction, comment, limit
 # constant in src/options.asm; the start constant has Start in place of Limit).
 OPTION_PARTS = {
+    0xEB0A: ('DockingRotationHookCode', None, 'DockingRotationHookLimit'),
+    0xDF64: ('CALL RotationDriftMultiply', None, 'RotationDriftHighMultiplyLimit'),
+    0xDF6B: ('CALL RotationDriftMultiply', None, 'RotationDriftMidMultiplyLimit'),
+    0xDF78: ('CALL RotationDriftMultiplyHigh', None, 'RotationDriftLowMultiplyLimit'),
+    0xD386: ('CompetitionSecurityCode', None, 'CompetitionSecurityLimit'),
+    0xD3F0: ('CompetitionParitySpace', None, 'CompetitionParityLimit'),
+    0xDED1: ('RotationDriftRotationCode', None, 'RotationDriftRotationLimit'),
+    0xDF80: ('RotationDriftProductHook', None, 'RotationDriftProductLimit'),
     0x77CB: ('CALL StationSlotAlign', 'switch-on: point the slot at the planet first',
              'StationSwitchOnStoreLimit'),
     0xE88B: ('StationSlotAlignCode', None, 'StationSlotAlignLimit'),
@@ -399,7 +415,7 @@ OPTION_PART_REGIONS = {start: (end, option) for start, end, option in OPTIONAL_R
 OPTION_PART_ENDS = {end: OPTION_PARTS[start][2] for start, (end, _) in OPTION_PART_REGIONS.items()}
 # Region starts whose label names the original code only: it is emitted after the
 # part's ELSE, so the option build has no such label (UseEnergyBomb).
-OPTION_PART_ELSE_LABELS = {0x9260}
+OPTION_PART_ELSE_LABELS = {0x9260, 0xD3F0}
 # Optional parts inside a verified data include: region name -> start -> (end, option,
 # replacement lines, start constant, limit constant).  A None constant is not
 # asserted: iffunit=yes makes token 113 longer and drops the unreachable tokens

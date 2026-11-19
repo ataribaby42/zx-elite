@@ -222,3 +222,56 @@ defc SingleLaserStartCoordinates = $003F
 ; Startup-only storage, before the $C000 graphics buffer is first reused.
 defc VariantStartupStorage = $C600
 defc VariantStartupLimit = $C640
+
+IFNDEF DOCKING_ROTATION
+    defc DOCKING_ROTATION = 0
+ENDIF
+assert DOCKING_ROTATION = 0 || DOCKING_ROTATION = 1
+; Original docking success block and padding within the optimized rotation fix.
+defc DockingRotationHookStart = $EB0A
+defc DockingRotationHookLimit = $EB10
+defc DockingRotationLoadStart = $D3DD
+defc DockingRotationLoadLimit = $D3E2
+defc DockingRotationCompareStart = $D3F7
+defc DockingRotationCompareLimit = $D3FF
+defc DockingRotationAcceptStart = $DF05
+defc DockingRotationAcceptLimit = $DF0B
+IF DOCKING_ROTATION
+    INCLUDE "docking-rotation.asm"
+ENDIF
+
+IFNDEF ROTATION_DRIFT_FIX
+    defc ROTATION_DRIFT_FIX = DOCKING_ROTATION
+ENDIF
+assert ROTATION_DRIFT_FIX = 0 || ROTATION_DRIFT_FIX = 1
+assert !DOCKING_ROTATION || ROTATION_DRIFT_FIX
+; Fixed original patch boundaries, not relocatable routine addresses.
+defc CompetitionSecurityStart = $D386
+defc CompetitionSecurityLimit = $D3E2
+defc CompetitionParityStart = $D3F0
+defc CompetitionParityLimit = $D3FF
+defc RotationDriftRotationStart = $DED1
+defc RotationDriftRotationLimit = $DF0B
+defc RotationDriftProductStart = $DF80
+defc RotationDriftProductLimit = $DF84
+IF ROTATION_DRIFT_FIX
+    INCLUDE "rotation-drift-fix.asm"
+ENDIF
+
+defc RotationDriftHighMultiplyStart = $DF64
+defc RotationDriftHighMultiplyLimit = $DF67
+defc RotationDriftMidMultiplyStart = $DF6B
+defc RotationDriftMidMultiplyLimit = $DF6E
+defc RotationDriftLowMultiplyStart = $DF78
+defc RotationDriftLowMultiplyLimit = $DF7B
+
+; Rotation helpers reuse the competition code. Python builds resolve this
+; dependency first; direct assembly defaults to it and rejects a conflict.
+IFNDEF COMPETITION_REMOVE
+    defc COMPETITION_REMOVE = ROTATION_DRIFT_FIX
+ENDIF
+assert COMPETITION_REMOVE = 0 || COMPETITION_REMOVE = 1
+assert !ROTATION_DRIFT_FIX || COMPETITION_REMOVE
+IF COMPETITION_REMOVE
+    INCLUDE "competition-remove.asm"
+ENDIF
