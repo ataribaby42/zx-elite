@@ -4,6 +4,7 @@ ZX Spectrum Elite 128k source reconstruction
 
 ## 19.11.2026 V1.4
 
+- compassflickerfix prevents the compass dot from flickering when the scanner redraws contacts, including after returning from a chart.
 - competitionremove – removes the competition number after saving; automatically enabled by rotationdriftfix and dockingrotation.
 - rotationdriftfix – fixes planet and sun drift during rotation, optimized without additional memory.
 - dockingrotation – checks the player’s rotational alignment with the station’s docking slot.

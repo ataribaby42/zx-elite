@@ -47,7 +47,7 @@ python tools/build.py --verify-only --verify no
 `ship` accepts `krait` (default) or `adder`; `laser` accepts `original` (default)
 or `single`. `font` accepts `128` (default), `48`, `128fix` or `128fix_ecm_s`. `scannerpixelfix`,
 `stationrandomlaunchfix`, `stationslotfix`, `fuelfix`, `hyperspacedockingfix`, `aicouragefix`,
-`scannerblipfix`, `stardustfix`, `missiletargetfix`, `textfullstopfix`, `iffunit` and `randomizedspawn`
+`scannerblipfix`, `compassflickerfix`, `stardustfix`, `missiletargetfix`, `textfullstopfix`, `iffunit` and `randomizedspawn`
 accept `no` (default) or `yes`.
 `verify` accepts `yes`
 (default) or `no`. A build does not change the saved BAT settings or remember
@@ -558,6 +558,33 @@ and the tallest sticks:
 launch, a test-only poke places a cargo canister at dx = 4, and the real main
 loop draws it with the replaced code. Build the option with the default
 tapfile for this mode. Reports are in `build/scanner-blip-fix-check/`.
+
+## Compass flicker during scanner restore
+
+`compassflickerfix=yes` preserves the current compass dot during a scanner
+refresh. The first visible contact sets `ScannerContactsDrawn`. On the next
+cockpit update, `RestoreScannerBackground` copies a 624-byte snapshot back
+to the screen. Its last byte in each of rows 144 through 159 includes part
+of the compass. The copy can briefly erase a dot pointing left, or show a
+piece of an old dot saved when the pilot opened a chart. The end-of-frame
+compass redraw conceals both defects in a screenshot of the completed frame.
+
+The option replaces the 13 unrolled `LDI` instructions at `$8E6B..$8E84`.
+On restore, the write keeps the live pixels at x = 171..175 in the shared
+rows. Scanner sticks can reach x = 170 and the dash extends to the left,
+so all scanner pixels still come from the backup. Saves still transfer all
+624 bytes, including the compass bits. The copy uses one extra stack word
+temporarily and fits in the original 26 bytes.
+
+```bat
+make.bat compassflickerfix=yes verify=no
+python tools/check_compass_flicker_fix.py --emulator
+```
+
+The check covers the complete save and restore, first and last contacts,
+and a cockpit saved with the dot at its old position. The ZX Spectrum 48K
+flight test places the station on the left after launch and samples the
+compass immediately before and after the scanner routine.
 
 ## Stardust fix
 
@@ -1441,11 +1468,11 @@ pairwise combinations and all eight dependency states. It checks the following:
   the file actually checked.
 
 `python tools/check_build_options.py --full` builds the complete product of
-all values instead of the selected combinations: 1,048,576 requested combinations, several
-hours. Use it after changing the build machinery itself. Either mode leaves
+all values instead of the selected combinations (2,097,152 requested
+combinations). Use it after changing the build machinery itself. Either mode leaves
 Adder with `laser=single font=48 scannerpixelfix=yes stationrandomlaunchfix=yes
 stationslotfix=yes fuelfix=yes hyperspacedockingfix=yes aicouragefix=yes
-scannerblipfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes
+scannerblipfix=yes compassflickerfix=yes stardustfix=yes missiletargetfix=yes textfullstopfix=yes
 iffunit=yes randomizedspawn=yes competitionremove=yes rotationdriftfix=yes dockingrotation=yes trafficcontrol=yes` built. A new option must be added to `OPTIONS`, and a new
 fix's areas to `FIX_PARTS`, in that tool.
 

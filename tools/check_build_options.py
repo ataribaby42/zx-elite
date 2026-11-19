@@ -20,7 +20,7 @@ Default mode uses single-option builds and a pairwise covering array:
    must fail even with identity checks off.
 
 --full builds the complete product of all values instead of step 4's
-selection (1,048,576 requested combinations). Use it after changing the
+selection (2,097,152 requested combinations). Use it after changing the
 build machinery itself.
 """
 import argparse
@@ -45,6 +45,7 @@ OPTIONS = (
     ('hyperspacedockingfix', ('no', 'yes')),
     ('aicouragefix', ('no', 'yes')),
     ('scannerblipfix', ('no', 'yes')),
+    ('compassflickerfix', ('no', 'yes')),
     ('stardustfix', ('no', 'yes')),
     ('missiletargetfix', ('no', 'yes')),
     ('textfullstopfix', ('no', 'yes')),
@@ -82,6 +83,7 @@ FIX_PARTS = {
     'aicouragefix': (('AiCourageHit',), [(0xEC6A, 0xEC7D)]),
     'scannerblipfix': (('ScannerBlipStep', 'ScannerBlipCentre', 'ScannerBlipGuard'),
                        [(0x8CE0, 0x8CF3), (0x8D0B, 0x8D0D), (0x8DCC, 0x8DDE)]),
+    'compassflickerfix': (('CompassScannerCopy',), [(0x8E6B, 0x8E85)]),
     'stardustfix': (('StardustPixel',), [(0xA2EF, 0xA334)]),
     'missiletargetfix': (('MissileTargetCheck',), [(0xEB82, 0xEB86)]),
     'textfullstopfix': (('TextFullStopBuffer', 'TextFullStopHook'), [(0xBCFC, 0xBD1B), (0xBDF5, 0xBE00)]),

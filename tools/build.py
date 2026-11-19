@@ -72,7 +72,7 @@ def verify(output=OUTPUT, exact=True):
     print('SHA256: '+sha(rebuilt))
     return report
 
-def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixelfix='no', stationrandomlaunchfix='no', tapfile=DEFAULT_TAPFILE, stationslotfix='no', fuelfix='no', hyperspacedockingfix='no', aicouragefix='no', scannerblipfix='no', stardustfix='no', missiletargetfix='no', textfullstopfix='no', iffunit='no', randomizedspawn='no', rotationdriftfix='no', competitionremove='no', dockingrotation='no', trafficcontrol='no'):
+def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixelfix='no', stationrandomlaunchfix='no', tapfile=DEFAULT_TAPFILE, stationslotfix='no', fuelfix='no', hyperspacedockingfix='no', aicouragefix='no', scannerblipfix='no', stardustfix='no', missiletargetfix='no', textfullstopfix='no', iffunit='no', randomizedspawn='no', rotationdriftfix='no', competitionremove='no', dockingrotation='no', trafficcontrol='no', compassflickerfix='no'):
     requested_competitionremove = competitionremove
     requested_rotationdriftfix = rotationdriftfix
     if rotationdriftfix == 'yes' or dockingrotation == 'yes':
@@ -107,6 +107,7 @@ def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixe
                  f'-DHYPERSPACE_DOCKING_FIX={int(hyperspacedockingfix=="yes")}',
                  f'-DAI_COURAGE_FIX={int(aicouragefix=="yes")}',
                  f'-DSCANNER_BLIP_FIX={int(scannerblipfix=="yes")}',
+                 f'-DCOMPASS_FLICKER_FIX={int(compassflickerfix=="yes")}',
                  f'-DSTARDUST_FIX={int(stardustfix=="yes")}',
                  f'-DMISSILE_TARGET_FIX={int(missiletargetfix=="yes")}',
                  f'-DTEXT_FULL_STOP_FIX={int(textfullstopfix=="yes")}',
@@ -161,6 +162,7 @@ def assemble(ship='krait', exact=True, laser='original', font='128', scannerpixe
         report['hyperspacedockingfix']=hyperspacedockingfix
         report['aicouragefix']=aicouragefix
         report['scannerblipfix']=scannerblipfix
+        report['compassflickerfix']=compassflickerfix
         report['stardustfix']=stardustfix
         report['missiletargetfix']=missiletargetfix
         report['textfullstopfix']=textfullstopfix
@@ -193,6 +195,7 @@ def main():
     p.add_argument('--hyperspacedockingfix',choices=['no','yes'],default='no',help='a refused H or G press no longer prevents docking; only an accepted jump does (default: no)')
     p.add_argument('--aicouragefix',choices=['no','yes'],default='no',help='a fleeing AI ship keeps its lowest courage instead of wrapping back to high courage when hit (default: no)')
     p.add_argument('--scannerblipfix',choices=['no','yes'],default='no',help='draw scanner contacts at dx = 4 on their row and stop upward sticks at the scanner in every column (default: no)')
+    p.add_argument('--compassflickerfix',choices=['no','yes'],default='no',help='preserve the live compass dot when restoring the scanner background (default: no)')
     p.add_argument('--stardustfix',choices=['no','yes'],default='no',help='never draw stardust on the view frame or outside it, including a particle at Y = -0 on the bottom frame line (default: no)')
     p.add_argument('--missiletargetfix',choices=['no','yes'],default='no',help='a missile whose target is removed explodes, and removing a missile no longer explodes unrelated objects (default: no)')
     p.add_argument('--textfullstopfix',choices=['no','yes'],default='no',help='a full stop arriving as the 31st character of a justified line wraps with its word instead of being lost (default: no)')
@@ -206,7 +209,7 @@ def main():
     # Also accept make.bat ship=adder laser=single verify=no.
     arguments=[]
     for value in sys.argv[1:]:
-        if value.startswith(('ship=','laser=','font=','scannerpixelfix=','stationrandomlaunchfix=','stationslotfix=','fuelfix=','hyperspacedockingfix=','aicouragefix=','scannerblipfix=','stardustfix=','missiletargetfix=','textfullstopfix=','iffunit=','randomizedspawn=','rotationdriftfix=','competitionremove=','dockingrotation=','trafficcontrol=','verify=','tapfile=')):
+        if value.startswith(('ship=','laser=','font=','scannerpixelfix=','stationrandomlaunchfix=','stationslotfix=','fuelfix=','hyperspacedockingfix=','aicouragefix=','scannerblipfix=','compassflickerfix=','stardustfix=','missiletargetfix=','textfullstopfix=','iffunit=','randomizedspawn=','rotationdriftfix=','competitionremove=','dockingrotation=','trafficcontrol=','verify=','tapfile=')):
             key,setting=value.split('=',1)
             arguments += ['--'+key,setting]
         else:
@@ -214,7 +217,7 @@ def main():
     args=p.parse_args(arguments)
     try:
         if args.verify_only: verify(output=release_tap(args.tapfile),exact=args.verify=='yes')
-        else: assemble(args.ship,args.verify=='yes',args.laser,args.font,args.scannerpixelfix,args.stationrandomlaunchfix,args.tapfile,args.stationslotfix,args.fuelfix,args.hyperspacedockingfix,args.aicouragefix,args.scannerblipfix,args.stardustfix,args.missiletargetfix,args.textfullstopfix,args.iffunit,args.randomizedspawn,args.rotationdriftfix,args.competitionremove,args.dockingrotation,args.trafficcontrol)
+        else: assemble(args.ship,args.verify=='yes',args.laser,args.font,args.scannerpixelfix,args.stationrandomlaunchfix,args.tapfile,args.stationslotfix,args.fuelfix,args.hyperspacedockingfix,args.aicouragefix,args.scannerblipfix,args.stardustfix,args.missiletargetfix,args.textfullstopfix,args.iffunit,args.randomizedspawn,args.rotationdriftfix,args.competitionremove,args.dockingrotation,args.trafficcontrol,args.compassflickerfix)
     except (OSError,ValueError,KeyError,subprocess.SubprocessError) as ex:
         (BUILD/'verification.json').unlink(missing_ok=True)
         print('ERROR: '+str(ex),file=sys.stderr);return 1

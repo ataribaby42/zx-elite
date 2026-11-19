@@ -113,6 +113,13 @@ IF SCANNER_BLIP_FIX
     INCLUDE "scanner-blip-fix.asm"
 ENDIF
 
+IFNDEF COMPASS_FLICKER_FIX
+    defc COMPASS_FLICKER_FIX = 0
+ENDIF
+assert COMPASS_FLICKER_FIX = 0 || COMPASS_FLICKER_FIX = 1
+defc CompassScannerCopyStart = $8E6B
+defc CompassScannerCopyLimit = $8E85
+
 IFNDEF STARDUST_FIX
     defc STARDUST_FIX = 0
 ENDIF

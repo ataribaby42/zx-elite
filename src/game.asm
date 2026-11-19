@@ -6590,6 +6590,10 @@ ScannerCopyPushRow:
 ; VERIFIED: SMC: PUSH DE (restore) or PUSH HL (save): keeps the pixel-line start.
 ScannerCopyPushLine:
     PUSH DE                                    ; $8E6A: D5
+assert $-GameImage = CompassScannerCopyStart-GameLoadAddress
+IF COMPASS_FLICKER_FIX
+    INCLUDE "compass-flicker-fix.asm"
+ELSE
     LDI                                        ; $8E6B: ED A0  13 bytes of one pixel line
     LDI                                        ; $8E6D: ED A0
     LDI                                        ; $8E6F: ED A0
@@ -6603,6 +6607,8 @@ ScannerCopyPushLine:
     LDI                                        ; $8E7F: ED A0
     LDI                                        ; $8E81: ED A0
     LDI                                        ; $8E83: ED A0
+ENDIF
+assert $-GameImage = CompassScannerCopyLimit-GameLoadAddress
 
 ; VERIFIED: SMC: POP DE / INC D (restore) or POP HL / INC H (save): next pixel line.
 ScannerCopyNextLine:
