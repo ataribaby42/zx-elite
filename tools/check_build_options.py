@@ -156,22 +156,28 @@ def check_batch_failures(directory):
                 if line.lower().startswith('call make.bat ')]
     assert commands
     results = []
-    for fail_at in (0, 1, (len(commands)+1)//2, len(commands)):
-        fixture = directory/f'batch-failure-{fail_at}'
+    cases = [(0, 0)] + [(fail_at, code)
+                       for fail_at in (1, (len(commands)+1)//2, len(commands))
+                       for code in (1, 7, -1, -1073741510)]
+    for fail_at, code in cases:
+        fixture = directory/f'batch-failure-{fail_at}-{code}'
         fixture.mkdir(exist_ok=True)
         (fixture/'build.bat').write_bytes(source)
         (fixture/'make.bat').write_bytes((
             '@echo off\r\nset /a ZX_ELITE_TEST_CALL+=1 >nul\r\n'
             'echo make.bat %*>>calls.log\r\n'
-            f'if %ZX_ELITE_TEST_CALL%=={fail_at} exit /b 7\r\nexit /b 0\r\n').encode('ascii'))
+            f'if %ZX_ELITE_TEST_CALL%=={fail_at} exit /b {code}\r\nexit /b 0\r\n').encode('ascii'))
         (fixture/'calls.log').unlink(missing_ok=True)
         result = subprocess.run(['cmd.exe', '/d', '/c', 'build.bat'], cwd=fixture,
                                 env=dict(os.environ, ZX_ELITE_TEST_CALL='0'), capture_output=True, text=True)
         (fixture/'execution.log').write_text(result.stdout+result.stderr, encoding='utf-8')
         calls = (fixture/'calls.log').read_text().splitlines()
         assert calls == commands[:fail_at or len(commands)], (fail_at, calls)
-        assert result.returncode == (7 if fail_at else 0), (fail_at, result.returncode)
-        results.append(dict(fail_at=fail_at, calls=len(calls), returncode=result.returncode))
+        # Windows may expose a negative exit status as an unsigned DWORD.
+        # Preserve all 32 bits, then report its signed form for readability.
+        assert result.returncode & 0xFFFFFFFF == code & 0xFFFFFFFF, (fail_at, code, result.returncode)
+        signed_code = (result.returncode + 0x80000000) % 0x100000000 - 0x80000000
+        results.append(dict(fail_at=fail_at, injected_code=code, calls=len(calls), returncode=signed_code))
     return results
 
 

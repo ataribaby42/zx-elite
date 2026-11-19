@@ -239,10 +239,20 @@ def emulator(symbols):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--emulator', action='store_true', help='also run the 48K ROM-load combat scenario')
+    parser.add_argument('--python', action='store_true',
+                        help='with --emulator, force the Python backend for ROM loading and flight')
     args = parser.parse_args()
+    if args.python and not args.emulator:
+        parser.error('--python requires --emulator')
     checker = Checker()
     checker.run()
     if args.emulator:
+        import benchmark_rotation_drift as bench
+        if args.python:
+            # Exercise the same fallback as an installation without the optional
+            # native extension, including tap2sna's own ROM-load simulator.
+            bench.CSimulator = bench.tap2sna.CSimulator = None
+        checker.report['emulator_backend'] = 'native' if bench.CSimulator else 'python'
         checker.report['emulator'] = emulator(checker.symbols)
     checker.write()
 

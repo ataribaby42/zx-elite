@@ -19,6 +19,7 @@ from check_build_options import FIX_PARTS
 import check_routines as cr
 from skoolkit import CSimulator, tap2sna
 from skoolkit.snapshot import Snapshot
+from skoolkit.simulator import Simulator
 from skoolkit.simutils import PC, T, from_snapshot
 from skoolkit.trace import Tracer
 from emulator_check import KEYS
@@ -39,7 +40,7 @@ def boot(s):
         tap2sna.main(['--start', hex(s['Entry']), RELEASE_TAP.relative_to(ROOT).as_posix(),
                       str(OUT / 'loaded.z80')])
         snapshot = Snapshot.get(str(OUT / 'loaded.z80'))
-        sim = from_snapshot(CSimulator, snapshot, rom_file=str(rom))
+        sim = from_snapshot(CSimulator or Simulator, snapshot, rom_file=str(rom))
         trace = Tracer(sim, snapshot.border, 0, 0, [0] * 16, snapshot.outfe, False)
         sim.set_tracer(trace)
         t0 = sim.registers[T]
@@ -62,7 +63,7 @@ def boot(s):
 
 
 def clone(memory, registers):
-    sim = CSimulator(list(memory))
+    sim = (CSimulator or Simulator)(list(memory))
     for i, value in enumerate(registers):
         sim.registers[i] = value
     trace = Tracer(sim, 0, 0, 0, [0] * 16, 0, False)

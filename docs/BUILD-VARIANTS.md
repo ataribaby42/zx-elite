@@ -18,8 +18,9 @@ run `make.bat` directly for command-line options. The Python helper's defaults
 remain Krait, original laser, 128K-compatible font, all fixes disabled and
 strict verification.
 
-After every `make.bat` call, `build.bat` checks its return code and stops on
-failure, preserving that code. A later successful build cannot mask an earlier
+After every `make.bat` call, `build.bat` stops on any nonzero return code,
+including a negative Windows process status, and preserves that code.
+A later successful build cannot mask an earlier
 failure. The explicit option lines, REM examples and their ordering are kept.
 
 Build the byte-identical Krait reconstruction independently of `build.bat` settings:
@@ -489,6 +490,12 @@ same number of updates; its courage must wrap. This replaces the old fixed-time
 snapshot, which could catch proximity avoidance when other options were enabled.
 Build the option with the default tapfile for this mode. Reports are in
 `build/ai-courage-fix-check/`.
+
+The shared launch and cloning helpers use SkoolKit's native `CSimulator` when
+available and its Python `Simulator` otherwise. To check the fallback even
+with the native extension installed, run
+`python tools/check_ai_courage_fix.py --emulator --python`. This forces Python
+for ROM loading and both combat runs; the report records the selected backend.
 
 ## Scanner contact fix
 
@@ -1424,7 +1431,8 @@ pairwise combinations and all eight dependency states. It checks the following:
   are rejected even with identity disabled.
 - On Windows, the real `build.bat` is run with a controlled `make.bat` stub.
   Successful runs execute every requested build; failures in the first, middle
-  and final calls stop immediately and preserve a nonzero error code.
+  and final calls stop immediately and preserve positive and negative error
+  codes (1, 7, -1 and -1073741510). The check compares all 32 exit-status bits.
 - Verify-only retains metadata for the same custom TAP, discards settings for
   renamed/replaced payloads, accepts missing or malformed previous reports and
   removes the report on verification failure. Every successful report names
